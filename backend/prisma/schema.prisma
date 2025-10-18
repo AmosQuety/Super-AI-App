@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String            @id @default(cuid())
+  email     String            @unique
+  name      String?
+  password  String
+  role      String            @default("USER")
+  avatarUrl String?
+  lastLoginAt DateTime?
+  isActive  Boolean           @default(true)
+  chats     Chat[]
+  images    ImageGeneration[]
+  audioJobs AudioJob[]
+  documents Document[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([createdAt])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String?
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("chats")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  role      String   @default("USER")
+  content   String
+  imageUrl  String?
+  fileName  String?
+  fileUri   String?
+  fileMimeType String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId, createdAt])
+  @@index([role])
+  @@map("messages")
+}
+
+model ImageGeneration {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  prompt    String
+  imageUrl  String
+  status    String   @default("COMPLETED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("image_generations")
+}
+
+model AudioJob {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  type          String   @default("TTS")
+  inputText     String?
+  inputAudioUrl String?
+  outputUrl     String?
+  status        String   @default("PENDING")
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("audio_jobs")
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String?
+  content   String
+  summary   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("documents")
+}

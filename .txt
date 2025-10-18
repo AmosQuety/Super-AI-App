@@ -1,0 +1,7 @@
+git init
+git add .
+git commit -m "Initial monorepo commit"
+
+
+git remote add origin https://github.com/AmosQuety/Super-AI-App.git
+git push -u origin main

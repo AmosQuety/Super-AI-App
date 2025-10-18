@@ -1,0 +1,99 @@
+# ===============================
+# 🔒 General Sensitive Files
+# ===============================
+.env
+*.env
+*.key
+*.pem
+*.crt
+*.log
+*.pid
+*.seed
+*.secret
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# ===============================
+# 🧠 Node.js / Backend
+# ===============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+coverage/
+.DS_Store
+
+# Prisma
+backend/prisma/*.db
+backend/prisma/migrations/dev.db
+backend/prisma/migrations/*.db-journal
+
+# ===============================
+# 🧬 Python / Face Recognition Service
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.env/
+venv/
+env/
+face_recognition_env/
+*.sqlite3
+*.db
+
+# ===============================
+# 🧱 Frontend (React/Vite)
+# ===============================
+web/node_modules/
+web/dist/
+web/build/
+web/.env
+web/.env.*
+web/.vercel
+web/.cache
+*.local
+
+# ===============================
+# 📱 Mobile App (React Native / Expo)
+# ===============================
+mobile/node_modules/
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/web-build/
+mobile/.env
+
+# ===============================
+# 🖥️ Desktop (Electron/Tauri)
+# ===============================
+desktop/node_modules/
+desktop/dist/
+desktop/out/
+desktop/.env
+
+# ===============================
+# 🧰 System & Editor Files
+# ===============================
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+ehthumbs.db
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# ===============================
+# 🧪 Tests & Debug
+# ===============================
+debug.log
+debug_*.log
+coverage/
+reports/

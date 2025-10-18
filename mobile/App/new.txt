@@ -1,0 +1,399 @@
+Am sorry i didn't provide you with the existing scaffold files so here they are please repeat the code you were providing with them in mind
+
+services/api.ts 'import axios from 'axios';
+import { Config } from '../libs/config';
+import { ApiResponse, AuthCredentials, AuthResponse } from '../libs/types';
+import { storageService } from './storage';
+
+// Mock user database
+const mockUsers = [
+  {
+    id: '1',
+    email: 'demo@example.com',
+    password: 'password', // In real app, this would be hashed
+    name: 'Demo User',
+    createdAt: new Date().toISOString(),
+  }
+];
+
+class ApiService {
+  private client;
+  private useMock = true; // Set to false when you want to use real API
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: Config.API_BASE_URL,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      async (config) => {
+        // Add auth token if available
+        const token = await storageService.getItem('authToken');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Handle unauthorized access
+          this.handleUnauthorized();
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  private async getAuthToken(): Promise<string | null> {
+    // Use storageService instead of localStorage
+    return await storageService.getItem('authToken');
+  }
+
+  private async setAuthToken(token: string): Promise<void> {
+    // Use storageService instead of localStorage
+    await storageService.setItem('authToken', token);
+  }
+
+  private async removeAuthToken(): Promise<void> {
+    // Use storageService instead of localStorage
+    await storageService.removeItem('authToken');
+  }
+
+  private async handleUnauthorized() {
+    // Implement logout logic using storageService
+    await this.removeAuthToken();
+    console.warn('User unauthorized, redirect to login');
+  }
+
+  // Mock methods
+  private async mockLogin(credentials: AuthCredentials): Promise<AuthResponse> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const user = mockUsers.find(u => u.email === credentials.email && u.password === credentials.password);
+    
+    if (!user) {
+      throw new Error('Invalid email or password');
+    }
+
+    const { password, ...userWithoutPassword } = user;
+    const token = 'mock-jwt-token-' + Date.now();
+    
+    // Store token for future requests using storageService
+    await this.setAuthToken(token);
+    
+    return {
+      user: userWithoutPassword,
+      token: token
+    };
+  }
+
+  private async mockRegister(credentials: AuthCredentials & { name: string }): Promise<AuthResponse> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const existingUser = mockUsers.find(u => u.email === credentials.email);
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
+
+    const newUser = {
+      id: (mockUsers.length + 1).toString(),
+      email: credentials.email,
+      password: credentials.password,
+      name: credentials.name,
+      createdAt: new Date().toISOString(),
+    };
+
+    mockUsers.push(newUser);
+
+    const { password, ...userWithoutPassword } = newUser;
+    const token = 'mock-jwt-token-' + Date.now();
+    
+    // Store token for future requests using storageService
+    await this.setAuthToken(token);
+    
+    return {
+      user: userWithoutPassword,
+      token: token
+    };
+  }
+
+  private async mockHealthCheck(): Promise<{ status: string; timestamp: string }> {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return {
+      status: 'healthy',
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // Auth endpoints
+  async login(credentials: AuthCredentials): Promise<AuthResponse> {
+    if (this.useMock) {
+      return this.mockLogin(credentials);
+    }
+
+    const response = await this.client.post<ApiResponse<AuthResponse>>(
+      '/auth/login',
+      credentials
+    );
+    
+    // Store token from real API response
+    if (response.data.data.token) {
+      await this.setAuthToken(response.data.data.token);
+    }
+    
+    return response.data.data;
+  }
+
+  async register(credentials: AuthCredentials & { name: string }): Promise<AuthResponse> {
+    if (this.useMock) {
+      return this.mockRegister(credentials);
+    }
+
+    const response = await this.client.post<ApiResponse<AuthResponse>>(
+      '/auth/register',
+      credentials
+    );
+    
+    // Store token from real API response
+    if (response.data.data.token) {
+      await this.setAuthToken(response.data.data.token);
+    }
+    
+    return response.data.data;
+  }
+
+  // Health check
+  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+    if (this.useMock) {
+      return this.mockHealthCheck();
+    }
+
+    const response = await this.client.get<ApiResponse<{ status: string; timestamp: string }>>(
+      '/health'
+    );
+    return response.data.data;
+  }
+
+  // Logout method
+  async logout(): Promise<void> {
+    await this.removeAuthToken();
+    
+    // If using real API, you might want to call a logout endpoint
+    if (!this.useMock) {
+      try {
+        await this.client.post('/auth/logout');
+      } catch (error) {
+        // Logout endpoint might not be critical, so we can ignore errors
+        console.log('Logout API call failed:', error);
+      }
+    }
+  }
+
+  // Method to check if user is authenticated
+  async isAuthenticated(): Promise<boolean> {
+    const token = await this.getAuthToken();
+    return !!token;
+  }
+
+  // Method to switch between mock and real API
+  setUseMock(useMock: boolean): void {
+    this.useMock = useMock;
+  }
+}
+
+export const apiService = new ApiService();' , hooks/use-auth.ts 'import { createContext, useContext, useEffect, useState } from 'react';
+import { AuthCredentials, User } from '../libs/types';
+import { apiService } from '../services/api';
+import { storageService } from '../services/storage';
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  signIn: (credentials: AuthCredentials) => Promise<void>;
+  signUp: (credentials: AuthCredentials & { name: string }) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await storageService.getAuthToken();
+      if (token) {
+        const userData = await validateToken(token);
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      await storageService.clearAuth();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const validateToken = async (token: string): Promise<User> => {
+    // Mock implementation
+    return {
+      id: '1',
+      email: 'user@example.com',
+      name: 'Demo User',
+      createdAt: new Date().toISOString(),
+    };
+  };
+
+  const signIn = async (credentials: AuthCredentials) => {
+    try {
+      setIsLoading(true);
+      const response = await apiService.login(credentials);
+      await storageService.setAuthToken(response.token);
+      setUser(response.user);
+    } catch (error) {
+      console.error('Sign in failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signUp = async (credentials: AuthCredentials & { name: string }) => {
+    try {
+      setIsLoading(true);
+      const response = await apiService.register(credentials);
+      await storageService.setAuthToken(response.token);
+      setUser(response.user);
+    } catch (error) {
+      console.error('Sign up failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setIsLoading(true);
+      await storageService.clearAuth();
+      setUser(null);
+    } catch (error) {
+      console.error('Sign out failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const value = {
+    user,
+    isLoading,
+    isAuthenticated: !!user,
+    signIn,
+    signUp,
+    signOut,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}' and libs/environment.ts 'export type Environment = 'development' | 'staging' | 'production';
+
+export interface AppConfig {
+  API_URL: string;
+  APP_NAME: string;
+  ENVIRONMENT: Environment;
+  LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error';
+  FEATURE_FLAGS: {
+    enableAnalytics: boolean;
+    enableCrashReporting: boolean;
+  };
+}
+
+const developmentConfig: AppConfig = {
+  API_URL: 'https://api-dev.example.com',
+  APP_NAME: 'MyApp (Dev)',
+  ENVIRONMENT: 'development',
+  LOG_LEVEL: 'debug',
+  FEATURE_FLAGS: {
+    enableAnalytics: false,
+    enableCrashReporting: true,
+  },
+};
+
+const stagingConfig: AppConfig = {
+  API_URL: 'https://api-staging.example.com',
+  APP_NAME: 'MyApp (Staging)',
+  ENVIRONMENT: 'staging',
+  LOG_LEVEL: 'info',
+  FEATURE_FLAGS: {
+    enableAnalytics: true,
+    enableCrashReporting: true,
+  },
+};
+
+const productionConfig: AppConfig = {
+  API_URL: 'https://api.example.com',
+  APP_NAME: 'MyApp',
+  ENVIRONMENT: 'production',
+  LOG_LEVEL: 'error',
+  FEATURE_FLAGS: {
+    enableAnalytics: true,
+    enableCrashReporting: true,
+  },
+};
+
+function getEnvironment(): Environment {
+  const env = process.env.EXPO_PUBLIC_APP_ENV || 'development';
+  return env as Environment;
+}
+
+export const environment = getEnvironment();
+
+export const config: AppConfig = (() => {
+  switch (environment) {
+    case 'production':
+      return productionConfig;
+    case 'staging':
+      return stagingConfig;
+    default:
+      return developmentConfig;
+  }
+})();
+
+// Environment variables validation
+if (!config.API_URL) {
+  throw new Error('API_URL is required in environment configuration');
+}
+
+console.log(`App running in ${config.ENVIRONMENT} mode`);'

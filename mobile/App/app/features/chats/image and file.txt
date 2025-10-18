@@ -1,0 +1,667 @@
+// app/features/chats/[id].tsx 
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ActionSheetIOS,
+  ActivityIndicator,
+  Image, // Import Image for displaying images
+  Clipboard, // For copying text
+} from 'react-native';
+import { gql } from '@apollo/client';
+import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
+import { useLocalSearchParams } from 'expo-router';
+import { shouldUsePolling } from '../../../libs/apollo-client';
+import { Ionicons } from '@expo/vector-icons'; // For icons
+import * as ImagePicker from 'expo-image-picker'; // For image attachments
+import * as DocumentPicker from 'expo-document-picker'; // For file attachments
+import * as FileSystem from 'expo-file-system'; // To read file content if needed
+
+// --- GraphQL Operations ---
+const GET_CHAT_HISTORY = gql`
+  query GetChatHistory($chatId: ID!, $limit: Int, $offset: Int) {
+    chatHistory(chatId: $chatId, limit: $limit, offset: $offset) {
+      messages {
+        id
+        role
+        content
+        createdAt
+        imageUrl # Add imageUrl to query
+        fileName # Add fileName
+        fileUri # Add fileUri
+        fileMimeType # Add fileMimeType
+      }
+      hasMore
+    }
+  }
+`;
+
+// Update mutation to accept imageUrl, fileName, fileUri, fileMimeType
+const SEND_MESSAGE_WITH_RESPONSE = gql`
+  mutation SendMessageWithResponse(
+    $chatId: ID!, 
+    $content: String!, 
+    $imageUrl: String,
+    $fileName: String,
+    $fileUri: String,
+    $fileMimeType: String
+  ) {
+    sendMessageWithResponse(
+      chatId: $chatId, 
+      content: $content, 
+      imageUrl: $imageUrl,
+      fileName: $fileName,
+      fileUri: $fileUri,
+      fileMimeType: $fileMimeType
+    ) {
+      userMessage {
+        id
+        role
+        content
+        createdAt
+        imageUrl
+        fileName
+        fileUri
+        fileMimeType
+      }
+      aiMessage {
+        id
+        role
+        content
+        createdAt
+        imageUrl
+        fileName
+        fileUri
+        fileMimeType
+      }
+      usedCustomResponse
+    }
+  }
+`;
+
+const DELETE_MESSAGE = gql`
+  mutation DeleteMessage($messageId: ID!) {
+    deleteMessage(messageId: $messageId)
+  }
+`;
+
+const MESSAGE_SUBSCRIPTION = gql`
+  subscription OnMessageAdded($chatId: ID!) {
+    messageAdded(chatId: $chatId) {
+      id
+      role
+      content
+      createdAt
+      imageUrl # Add imageUrl to subscription
+      fileName # Add fileName
+      fileUri # Add fileUri
+      fileMimeType # Add fileMimeType
+    }
+  }
+`;
+
+// --- Type Definitions ---
+type Message = {
+  id: string;
+  role: string;
+  content: string;
+  createdAt: string;
+  imageUrl?: string; // Optional image URL (base64 or actual URL)
+  fileName?: string; // Optional file name
+  fileUri?: string; // Optional file URI (for local display/download)
+  fileMimeType?: string; // Optional file MIME type
+};
+
+// --- ChatDetailScreen Component ---
+function ChatDetailScreen() {
+  const { id } = useLocalSearchParams();
+  const chatId = Array.isArray(id) ? id[0] : id;
+  const [message, setMessage] = useState('');
+  const flatListRef = useRef<FlatList>(null);
+  const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // Base64 image
+  const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string; mimeType?: string; size?: number } | null>(null);
+
+  const usePolling = shouldUsePolling();
+
+  // Get initial messages
+  const { data, loading, error, refetch, fetchMore } = useQuery(GET_CHAT_HISTORY, {
+    variables: { chatId, limit: 50, offset: 0 },
+    skip: !chatId,
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: false,
+    onCompleted: (data) => {
+      // Ensure messages are only set if different from current state to prevent unnecessary re-renders
+      if (data?.chatHistory?.messages && JSON.stringify(data.chatHistory.messages) !== JSON.stringify(allMessages)) {
+        setAllMessages(data.chatHistory.messages);
+      }
+    },
+  });
+
+  // Subscribe to new messages (ONLY if NOT using polling)
+  const { data: subscriptionData } = useSubscription(MESSAGE_SUBSCRIPTION, {
+    variables: { chatId },
+    skip: !chatId || usePolling,
+    shouldResubscribe: false,
+  });
+
+  // Handle subscription updates separately
+  useEffect(() => {
+    if (subscriptionData?.messageAdded && !usePolling) {
+      const newMessage = subscriptionData.messageAdded;
+      setAllMessages(prev => {
+        // Avoid duplicates
+        if (prev.some(msg => msg.id === newMessage.id)) {
+          return prev;
+        }
+        // Remove temp message if this is the real one
+        const filtered = prev.filter(msg => !msg.id.startsWith('temp-'));
+        return [...filtered, newMessage];
+      });
+    }
+  }, [subscriptionData, usePolling]);
+
+  const [addMessage] = useMutation(gql`mutation AddMessage($chatId: ID!, $role: String!, $content: String!) { addMessage(chatId: $chatId, role: $role, content: $content) { id role content createdAt } }`); // Kept original addMessage for clarity, though sendMessageWithResponse is primary
+  const [sendMessageWithResponse] = useMutation(SEND_MESSAGE_WITH_RESPONSE);
+  const [deleteMessage] = useMutation(DELETE_MESSAGE);
+
+  const hasMore = data?.chatHistory?.hasMore || false;
+
+  // Auto-scroll to bottom when new messages arrive or when component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (allMessages.length > 0) {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 300); // Small delay to ensure layout is calculated
+    return () => clearTimeout(timer);
+  }, [allMessages.length]);
+
+  // Polling setup (only if needed)
+  useEffect(() => {
+    if (!chatId || !usePolling) return;
+
+    console.log('🔄 Setting up polling fallback for chat updates');
+    const interval = setInterval(() => {
+      refetch();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [chatId, refetch, usePolling]);
+
+  // --- Image Picker ---
+  const pickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant media library permissions to pick an image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true, // Request base64 for sending
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setSelectedImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      setSelectedFile(null); // Clear any selected file
+    }
+  }, []);
+
+  // --- Document Picker ---
+  const pickDocument = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*', // Allow all file types
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        if (file.size && file.size > 5 * 1024 * 1024) { // 5MB limit example
+          Alert.alert('File too large', 'Please select a file smaller than 5MB.');
+          return;
+        }
+        setSelectedFile({
+          uri: file.uri,
+          name: file.name,
+          mimeType: file.mimeType || 'application/octet-stream', // Fallback MIME type
+          size: file.size,
+        });
+        setSelectedImage(null); // Clear any selected image
+      }
+    } catch (err) {
+      console.error('Error picking document:', err);
+      Alert.alert('Error', 'Failed to pick document.');
+    }
+  }, []);
+
+  const clearAttachments = useCallback(() => {
+    setSelectedImage(null);
+    setSelectedFile(null);
+  }, []);
+
+  // --- Send Message Function ---
+  const sendMessage = useCallback(async () => {
+    if ((!message.trim() && !selectedImage && !selectedFile) || !chatId || isSending) {
+      return;
+    }
+
+    const userMessageContent = message.trim();
+    setMessage(''); // Clear input immediately
+    setIsSending(true);
+
+    try {
+      // Create temp message for optimistic UI
+      const tempId = `temp-${Date.now()}`;
+      const tempUserMessage: Message = {
+        id: tempId,
+        role: 'user',
+        content: userMessageContent,
+        createdAt: new Date().toISOString(),
+        imageUrl: selectedImage || undefined,
+        fileName: selectedFile?.name || undefined,
+        fileUri: selectedFile?.uri || undefined,
+        fileMimeType: selectedFile?.mimeType || undefined,
+      };
+
+      // Show user message immediately
+      setAllMessages(prev => [...prev, tempUserMessage]);
+      clearAttachments(); // Clear attachments after optimistic update
+
+      // Prepare variables for the mutation
+      const variables: { chatId: string; content: string; imageUrl?: string; fileName?: string; fileUri?: string; fileMimeType?: string } = {
+        chatId,
+        content: userMessageContent,
+      };
+
+      if (selectedImage) {
+        variables.imageUrl = selectedImage;
+      }
+      if (selectedFile) {
+        variables.fileName = selectedFile.name;
+        variables.fileUri = selectedFile.uri; // In a real backend, you'd upload this file to storage and send a public URL
+        variables.fileMimeType = selectedFile.mimeType;
+        // For actual file upload, you'd need to send the binary data to your server
+        // Example: const fileBase64 = await FileSystem.readAsStringAsync(selectedFile.uri, { encoding: FileSystem.EncodingType.Base64 });
+        // Then send fileBase64 to your backend if your mutation supports it
+      }
+
+
+      // Send to backend
+      const { data: responseData } = await sendMessageWithResponse({ variables });
+
+      if (responseData?.sendMessageWithResponse) {
+        const { userMessage: realUserMsg, aiMessage, usedCustomResponse } = responseData.sendMessageWithResponse;
+        
+        console.log(usedCustomResponse ? '✅ Used custom response' : '🤖 Used Gemini AI');
+
+        setAllMessages(prev => {
+          // Remove temp message
+          const withoutTemp = prev.filter(msg => msg.id !== tempId);
+          // Add real messages. Ensure images/files are preserved if sent
+          const updatedMessages = [...withoutTemp, realUserMsg];
+          if (aiMessage) { // Only add AI message if it exists
+             updatedMessages.push(aiMessage);
+          }
+          return updatedMessages;
+        });
+      }
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', error.message || 'Failed to send message');
+      
+      // Remove temp message and restore input/attachments
+      setAllMessages(prev => prev.filter(msg => !msg.id.startsWith('temp-')));
+      setMessage(userMessageContent);
+      // Restore attachments if not successful, assuming they weren't consumed
+      // For simplicity, we'll keep them cleared in this example on failure too
+    } finally {
+      setIsSending(false);
+    }
+  }, [message, chatId, isSending, sendMessageWithResponse, selectedImage, selectedFile, clearAttachments]);
+
+  const handleMessageAction = (messageItem: Message) => {
+    const options = ['Cancel', 'Copy Text', 'Delete'];
+    const destructiveButtonIndex = 2;
+    const cancelButtonIndex = 0;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex,
+          cancelButtonIndex,
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 1) { // Copy
+            Clipboard.setString(messageItem.content);
+            Alert.alert('Copied!', 'Message copied to clipboard');
+          } else if (buttonIndex === 2) { // Delete
+            Alert.alert(
+              'Delete Message',
+              'Are you sure you want to delete this message?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await deleteMessage({ variables: { messageId: messageItem.id } });
+                    setAllMessages(prev => prev.filter(msg => msg.id !== messageItem.id));
+                  },
+                },
+              ]
+            );
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Message Actions',
+        'Choose an action',
+        [
+          { text: 'Copy Text', onPress: () => { Clipboard.setString(messageItem.content); Alert.alert('Copied!', 'Message copied to clipboard'); } },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteMessage({ variables: { messageId: messageItem.id } });
+              setAllMessages(prev => prev.filter(msg => msg.id !== messageItem.id));
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  };
+
+  const renderMessage = ({ item }: { item: Message }) => (
+    <TouchableOpacity
+      className={`mx-4 my-1 p-3 rounded-2xl max-w-[85%] ${
+        item.role === 'user' 
+          ? 'bg-blue-500 self-end rounded-br-none' 
+          : 'bg-gray-200 self-start rounded-bl-none'
+      } ${item.imageUrl || item.fileName ? 'pb-2' : ''}`} // Adjust padding if content includes media
+      onLongPress={() => handleMessageAction(item)} // Pass the whole item
+      delayLongPress={500}
+    >
+      {item.imageUrl && (
+        <Image 
+          source={{ uri: item.imageUrl }} 
+          className="w-48 h-48 rounded-lg mb-2" // Fixed size for display
+          resizeMode="cover" 
+        />
+      )}
+
+      {item.fileName && (
+        <View className="flex-row items-center bg-blue-100 p-2 rounded-lg mb-2">
+          <Ionicons name="document-text" size={20} color="#3B82F6" />
+          <Text className="text-blue-700 text-sm ml-2 flex-1" numberOfLines={1}>
+            {item.fileName}
+          </Text>
+          {/* Optional: Add a download/view icon if fileUri is a remote URL */}
+          {/* <Ionicons name="download" size={20} color="#3B82F6" /> */}
+        </View>
+      )}
+
+      {item.content ? (
+        <Text className={`text-sm ${
+          item.role === 'user' ? 'text-white' : 'text-gray-800'
+        }`}>
+          {item.content}
+        </Text>
+      ) : null}
+
+      <Text className={`text-xs mt-1 ${
+        item.role === 'user' ? 'text-blue-200' : 'text-gray-500'
+      } ${item.imageUrl || item.fileName || item.content ? '' : 'hidden'}`}>
+        {new Date(item.createdAt).toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}
+      </Text>
+      {item.id.startsWith('temp-') && (
+        <ActivityIndicator size="small" color={item.role === 'user' ? '#93c5fd' : '#6b7280'} className="mt-1" />
+      )}
+    </TouchableOpacity>
+  );
+
+  const loadMore = useCallback(() => {
+    if (hasMore && allMessages.length > 0 && !loading) {
+      fetchMore({
+        variables: {
+          offset: allMessages.length,
+        },
+      });
+    }
+  }, [hasMore, allMessages.length, loading, fetchMore]);
+
+  if (loading && allMessages.length === 0) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-gray-500 mt-2">Loading chat...</Text>
+      </View>
+    );
+  }
+
+  if (error && allMessages.length === 0) { // Only show full error if no messages could be loaded
+    return (
+      <View className="flex-1 justify-center items-center bg-white px-4">
+        <Text className="text-red-500 text-lg text-center mb-4">
+          Error loading chat: {error.message}
+        </Text>
+        <TouchableOpacity
+          className="bg-blue-500 rounded-lg px-6 py-3"
+          onPress={() => refetch()}
+        >
+          <Text className="text-white font-semibold">Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const isSendButtonDisabled = (!message.trim() && !selectedImage && !selectedFile) || isSending;
+
+  return (
+    <KeyboardAvoidingView 
+      className="flex-1 bg-white"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Adjust this offset based on your header height
+    >
+      <FlatList
+        ref={flatListRef}
+        data={allMessages}
+        renderItem={renderMessage}
+        keyExtractor={(item) => item.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.1}
+        contentContainerStyle={{ paddingVertical: 16 }}
+        ListEmptyComponent={
+          !loading && ( // Only show empty message if not loading
+            <View className="flex-1 justify-center items-center py-12">
+              <Text className="text-gray-400 text-lg text-center">
+                No messages yet{'\n'}Start the conversation!
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          loading && allMessages.length > 0 ? (
+            <ActivityIndicator size="small" color="#3B82F6" className="py-4" />
+          ) : null
+        }
+      />
+
+      {/* Input Area with Attachments */}
+      <View className="border-t border-gray-200 px-4 py-3 bg-white">
+        {(selectedImage || selectedFile) && (
+          <View className="flex-row items-center p-2 mb-2 bg-gray-100 rounded-lg">
+            {selectedImage ? (
+              <Image source={{ uri: selectedImage }} className="w-10 h-10 rounded-md mr-2" resizeMode="cover" />
+            ) : (
+              <Ionicons name="document-attach" size={24} color="#6B7280" className="mr-2" />
+            )}
+            <Text className="flex-1 text-gray-700 text-sm" numberOfLines={1}>
+              {selectedImage ? 'Image attached' : selectedFile?.name}
+            </Text>
+            <TouchableOpacity onPress={clearAttachments} className="p-1">
+              <Ionicons name="close-circle" size={24} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        )}
+        <View className="flex-row items-end"> {/* Align items to the bottom */}
+          <TouchableOpacity onPress={pickImage} className="p-2">
+            <Ionicons name="image-outline" size={24} color={isSending ? '#9CA3AF' : '#3B82F6'} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={pickDocument} className="p-2 ml-1 mr-2">
+            <Ionicons name="attach-outline" size={24} color={isSending ? '#9CA3AF' : '#3B82F6'} />
+          </TouchableOpacity>
+
+          <TextInput
+            className="flex-1 border border-gray-300 rounded-full px-4 py-3"
+            placeholder="Type a message..."
+            value={message}
+            onChangeText={setMessage}
+            multiline // Enable multiline
+            maxHeight={120} // Limit max height, then becomes scrollable
+            minHeight={50} // Minimum height for the input
+            style={{ paddingVertical: 10 }} // Adjust vertical padding for better multiline appearance
+            returnKeyType="send"
+            onSubmitEditing={sendMessage}
+            editable={!isSending}
+            blurOnSubmit={false} // Prevents keyboard dismissal on submit for multiline
+          />
+          <TouchableOpacity
+            className={`rounded-full w-12 h-12 justify-center items-center ml-2 ${
+              isSendButtonDisabled ? 'bg-gray-300' : 'bg-blue-500'
+            }`}
+            onPress={sendMessage}
+            disabled={isSendButtonDisabled}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text className="text-white font-bold text-lg">→</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+export default ChatDetailScreen;
+
+
+
+
+
+
+Important Considerations and Next Steps for your Backend:
+The changes above prepare your frontend to send and display images/files. However, your backend (Apollo Server) will need corresponding updates:
+GraphQL Schema Update:
+You'll need to add imageUrl: String, fileName: String, fileUri: String, fileMimeType: String to your Message type definition in your GraphQL schema.
+Update the sendMessageWithResponse mutation to accept these new optional arguments.
+
+# Example GraphQL Schema snippet
+type Message {
+  id: ID!
+  role: String!
+  content: String
+  createdAt: String!
+  imageUrl: String # Base64 or URL
+  fileName: String
+  fileUri: String # For actual file storage link
+  fileMimeType: String
+}
+
+input MessageInput {
+  role: String!
+  content: String
+  imageUrl: String
+  fileName: String
+  fileUri: String
+  fileMimeType: String
+}
+
+type SendMessageWithResponsePayload {
+  userMessage: Message!
+  aiMessage: Message
+  usedCustomResponse: Boolean!
+}
+
+type Mutation {
+  sendMessageWithResponse(
+    chatId: ID!
+    content: String!
+    imageUrl: String
+    fileName: String
+    fileUri: String
+    fileMimeType: String
+  ): SendMessageWithResponsePayload!
+  # ... other mutations
+}
+
+Backend Resolver Logic for sendMessageWithResponse:
+When an imageUrl (base64) is received, you need to decide if you want to:
+Store it as base64: This can make your database large.
+Upload to cloud storage: Convert the base64 to a file (e.g., JPEG, PNG) and upload it to a service like Google Cloud Storage, AWS S3, or Firebase Storage. Then store the public URL of the uploaded image in your imageUrl field in the database. This is the recommended approach for production.
+Pass to Gemini: If you're sending this image directly to Gemini, you'd include the base64 data in the parts array of the generateContent request.
+When a fileName, fileUri, fileMimeType are received:
+The fileUri from the client will be a local URI. Your backend cannot directly access this. You would need to implement an actual file upload mechanism where the client sends the binary data of the file to your backend first.
+Alternatively, if you only need to log that a file was sent, you could store the fileName and fileMimeType.
+For a fully functional file attachment, the user would select a file, the app would read its binary content, send it to your backend, the backend would upload it to cloud storage, and then store the public URL in fileUri.
+Gemini API Integration (if sending images to AI):
+If your sendMessageWithResponse mutation is designed to also send the image to Gemini for analysis, your backend resolver for sendMessageWithResponse would look something like this:
+
+// Example backend resolver logic (Node.js with Google Generative AI SDK)
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" }); // Use vision model for image input
+
+async function sendMessageWithResponseResolver(parent, { chatId, content, imageUrl, fileName, fileUri, fileMimeType }, context) {
+  // ... existing logic to save userMessage to DB
+
+  const parts: Part[] = [{ text: content }];
+
+  if (imageUrl) {
+    // Assume imageUrl is base64 for direct Gemini input
+    // You might need to extract the base64 string from "data:image/jpeg;base64,..."
+    const base64Data = imageUrl.split(',')[1]; 
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg', // Or dynamically determine from imageUrl prefix
+        data: base64Data,
+      },
+    });
+  }
+
+  // If you want Gemini to process generic files, you'd need to
+  // extract text from them *before* sending to Gemini, using
+  // another service (e.g., Cloud Vision OCR for images, or a PDF parser).
+  // Gemini's vision model mainly works with images.
+
+  try {
+    const result = await model.generateContent({ contents: [{ role: "user", parts }] });
+    const aiResponse = result.response.text();
+
+    // ... logic to save aiMessage to DB and return payload
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    throw new Error("Failed to get AI response.");
+  }
+}
+

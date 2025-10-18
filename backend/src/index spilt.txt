@@ -1,0 +1,448 @@
+// ============================================
+// PROPOSED FILE STRUCTURE
+// ============================================
+
+/**
+ * src/
+ * ├── index.ts                          # Entry point (minimal - just starts server)
+ * ├── server.ts                         # Server class/factory
+ * ├── config/
+ * │   ├── index.ts                      # Export all configs
+ * │   ├── app.config.ts                 # App-level config (PORT, ENV, etc.)
+ * │   ├── cors.config.ts                # CORS configuration
+ * │   ├── upload.config.ts              # File upload settings
+ * │   └── apollo.config.ts              # Apollo Server config
+ * ├── middleware/
+ * │   ├── index.ts                      # Export all middleware
+ * │   ├── logging.ts                    # Already exists
+ * │   ├── security.ts                   # Rate limiting, CORS setup
+ * │   └── error-handler.ts              # Global error handling
+ * ├── routes/
+ * │   ├── index.ts                      # Route aggregator
+ * │   ├── health.routes.ts              # Health check routes
+ * │   └── info.routes.ts                # Info/status routes
+ * ├── graphql/
+ * │   ├── apollo-server.ts              # Apollo Server setup
+ * │   └── websocket-server.ts           # WebSocket/subscription setup
+ * └── utils/
+ *     ├── shutdown.ts                   # Graceful shutdown handler
+ *     └── validators.ts                 # Startup validators
+ */
+
+// ============================================
+// FILE 1: src/config/app.config.ts
+// ============================================
+export const AppConfig = {
+  port: parseInt(process.env.PORT || '4001', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  isDevelopment: process.env.NODE_ENV !== 'production',
+  isProduction: process.env.NODE_ENV === 'production',
+} as const;
+
+// ============================================
+// FILE 2: src/config/cors.config.ts
+// ============================================
+import { CorsOptions } from 'cors';
+
+export const corsConfig: CorsOptions = {
+  origin: [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8081",
+    "exp://localhost:8081",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Apollo-Require-Preflight",
+  ],
+};
+
+// ============================================
+// FILE 3: src/config/upload.config.ts
+// ============================================
+export const uploadConfig = {
+  maxFileSize: 10000000, // 10MB
+  maxFiles: 10,
+} as const;
+
+// ============================================
+// FILE 4: src/config/index.ts
+// ============================================
+export { AppConfig } from './app.config';
+export { corsConfig } from './cors.config';
+export { uploadConfig } from './upload.config';
+
+// ============================================
+// FILE 5: src/routes/health.routes.ts
+// ============================================
+import { Router, Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { AppConfig } from '../config';
+import { logger } from '../utils/logger';
+
+export function createHealthRoutes(prisma: PrismaClient): Router {
+  const router = Router();
+
+  router.get('/health', async (_req: Request, res: Response) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      
+      res.json({ 
+        status: "OK", 
+        timestamp: new Date().toISOString(),
+        services: {
+          database: "healthy",
+          security: "configured"
+        },
+        environment: AppConfig.nodeEnv
+      });
+    } catch (error) {
+      logger.error('Health check failed', { error });
+      res.status(503).json({ 
+        status: "ERROR", 
+        timestamp: new Date().toISOString(),
+        error: "Service unavailable" 
+      });
+    }
+  });
+
+  router.get('/', (_req: Request, res: Response) => {
+    res.json({
+      message: "GraphQL Server is running",
+      version: "1.0.0",
+      environment: AppConfig.nodeEnv,
+      graphql: `http://localhost:${AppConfig.port}/graphql`,
+      subscriptions: `ws://localhost:${AppConfig.port}/graphql`,
+      health: `http://localhost:${AppConfig.port}/health`
+    });
+  });
+
+  return router;
+}
+
+// ============================================
+// FILE 6: src/graphql/apollo-server.ts
+// ============================================
+import { ApolloServer } from 'apollo-server-express';
+import { GraphQLSchema } from 'graphql';
+import { createContext } from '../resolvers/types/context';
+import { queryComplexityPlugin } from '../utils/queryComplexityPlugin';
+import { logger } from '../utils/logger';
+import { AppConfig } from '../config';
+
+export function createApolloServer(schema: GraphQLSchema): ApolloServer {
+  return new ApolloServer({
+    schema,
+    context: createContext,
+    csrfPrevention: true,
+    introspection: AppConfig.isDevelopment,
+    cache: 'bounded',
+    plugins: [
+      queryComplexityPlugin,
+      {
+        async serverWillStart() {
+          logger.info('Apollo Server starting...');
+          return {
+            async drainServer() {
+              logger.info('Draining Apollo Server...');
+            }
+          };
+        }
+      }
+    ],
+    formatError: (error) => {
+      logger.error('GraphQL Error', { error });
+      
+      if (AppConfig.isProduction && !error.extensions?.code) {
+        return new Error('Internal server error');
+      }
+      
+      return error;
+    }
+  });
+}
+
+// ============================================
+// FILE 7: src/graphql/websocket-server.ts
+// ============================================
+import { Server as HTTPServer } from 'http';
+import { WebSocketServer } from 'ws';
+import { useServer } from 'graphql-ws/lib/use/ws';
+import { GraphQLSchema } from 'graphql';
+import { createContext } from '../resolvers/types/context';
+import { logger } from '../utils/logger';
+
+export function createWebSocketServer(
+  httpServer: HTTPServer,
+  schema: GraphQLSchema
+) {
+  const wsServer = new WebSocketServer({
+    server: httpServer,
+    path: '/graphql',
+  });
+
+  const subscriptionServer = useServer(
+    {
+      schema,
+      context: async (ctx) => createContext({ connection: ctx }),
+      onConnect: () => {
+        logger.info('🔌 WebSocket client connected');
+      },
+      onDisconnect: (_ctx: any, code?: number, reason?: string) => {
+        logger.info('🔌 WebSocket client disconnected', { code, reason });
+      },
+    },
+    wsServer
+  );
+
+  return subscriptionServer;
+}
+
+// ============================================
+// FILE 8: src/utils/shutdown.ts
+// ============================================
+import { ApolloServer } from 'apollo-server-express';
+import { Server as HTTPServer } from 'http';
+import { PrismaClient } from '@prisma/client';
+import { disconnectPrisma } from '../resolvers/types/context';
+import { logger } from './logger';
+
+export interface ShutdownHandlers {
+  httpServer: HTTPServer;
+  apolloServer: ApolloServer;
+  subscriptionServer: any;
+  prisma: PrismaClient;
+}
+
+export function setupGracefulShutdown(handlers: ShutdownHandlers) {
+  const shutdown = async (signal: string) => {
+    logger.info(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+    
+    handlers.httpServer.close(async () => {
+      logger.info('✅ HTTP server closed');
+    });
+
+    try {
+      if (handlers.subscriptionServer) {
+        handlers.subscriptionServer.dispose();
+        logger.info('✅ WebSocket subscriptions closed');
+      }
+
+      if (handlers.apolloServer) {
+        await handlers.apolloServer.stop();
+        logger.info('✅ Apollo Server stopped');
+      }
+
+      await disconnectPrisma();
+      logger.info('✅ Shared Prisma client disconnected');
+
+      await handlers.prisma.$disconnect();
+      logger.info('✅ Health check Prisma client disconnected');
+
+      logger.info('✅ Graceful shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      logger.error('❌ Error during shutdown:', { error });
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', { promise, reason });
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', { error });
+    shutdown('UNCAUGHT_EXCEPTION');
+  });
+}
+
+// ============================================
+// FILE 9: src/utils/validators.ts
+// ============================================
+import { SecurityConfig } from '../auth/security';
+import { logger } from './logger';
+import { AppConfig } from '../config';
+
+export function validateSecurityConfig(): void {
+  try {
+    SecurityConfig.getJWTConfig();
+    logger.info("✅ Security configuration validated");
+  } catch (error: any) {
+    logger.error("❌ Security configuration error:", { error: error.message });
+    if (AppConfig.isProduction) {
+      throw error;
+    }
+  }
+}
+
+// ============================================
+// FILE 10: src/middleware/security.ts
+// ============================================
+import { Application } from 'express';
+import cors from 'cors';
+import { corsConfig } from '../config';
+import { RateLimitService } from '../auth/rate-limiting';
+
+export function setupSecurity(app: Application): void {
+  // CORS
+  app.options('*', cors(corsConfig));
+  app.use(cors(corsConfig));
+
+  // Rate limiting
+  RateLimitService.initializeRedis();
+  app.use('/graphql', RateLimitService.getGraphQLLimiter());
+  app.use('/auth/*', RateLimitService.getAuthLimiter());
+  app.use('/health', RateLimitService.getGeneralLimiter());
+}
+
+// ============================================
+// FILE 11: src/server.ts (Main server class)
+// ============================================
+import express, { Application } from 'express';
+import { createServer, Server as HTTPServer } from 'http';
+import { PrismaClient } from '@prisma/client';
+import { ApolloServer } from 'apollo-server-express';
+import { graphqlUploadExpress } from 'graphql-upload-minimal';
+import { makeExecutableSchema } from '@graphql-tools/schema';
+
+import { typeDefs } from './schema/schema';
+import { resolvers } from './resolvers/index';
+import { AppConfig, uploadConfig } from './config';
+import { setupSecurity } from './middleware/security';
+import { createHealthRoutes } from './routes/health.routes';
+import { createApolloServer } from './graphql/apollo-server';
+import { createWebSocketServer } from './graphql/websocket-server';
+import { setupGracefulShutdown } from './utils/shutdown';
+import { validateSecurityConfig } from './utils/validators';
+import { logger } from './utils/logger';
+import {
+  loggingMiddleware,
+  graphQLLoggingMiddleware,
+  errorLoggingMiddleware,
+  securityLoggingMiddleware,
+  performanceMiddleware
+} from './middleware/logging';
+
+export class GraphQLServer {
+  private app: Application;
+  private httpServer: HTTPServer;
+  private apolloServer: ApolloServer;
+  private subscriptionServer: any;
+  private prisma: PrismaClient;
+
+  constructor() {
+    this.app = express();
+    this.prisma = new PrismaClient();
+  }
+
+  private setupMiddleware(): void {
+    // Security
+    setupSecurity(this.app);
+
+    // Logging
+    this.app.use(loggingMiddleware);
+    this.app.use(graphQLLoggingMiddleware);
+    this.app.use(securityLoggingMiddleware);
+    this.app.use(performanceMiddleware);
+
+    // Body parsing
+    this.app.use(express.json());
+
+    // File uploads
+    this.app.use(graphqlUploadExpress(uploadConfig));
+
+    // Error logging (should be last)
+    this.app.use(errorLoggingMiddleware);
+  }
+
+  private setupRoutes(): void {
+    const healthRoutes = createHealthRoutes(this.prisma);
+    this.app.use(healthRoutes);
+  }
+
+  private async setupGraphQL(): Promise<void> {
+    const schema = makeExecutableSchema({ typeDefs, resolvers });
+    
+    this.apolloServer = createApolloServer(schema);
+    await this.apolloServer.start();
+
+    this.apolloServer.applyMiddleware({
+      app: this.app,
+      path: '/graphql',
+      cors: false,
+    });
+
+    this.httpServer = createServer(this.app);
+    this.subscriptionServer = createWebSocketServer(this.httpServer, schema);
+  }
+
+  async start(): Promise<void> {
+    try {
+      // Validate configuration
+      validateSecurityConfig();
+
+      // Setup components
+      this.setupMiddleware();
+      this.setupRoutes();
+      await this.setupGraphQL();
+
+      // Start listening
+      this.httpServer.listen(AppConfig.port, () => {
+        logger.info(`
+          🚀 GraphQL Server ready at http://localhost:${AppConfig.port}${this.apolloServer.graphqlPath}
+          🔌 Subscriptions ready at ws://localhost:${AppConfig.port}/graphql
+          🔍 Apollo Sandbox available at http://localhost:${AppConfig.port}/graphql
+          🏥 Health check available at http://localhost:${AppConfig.port}/health
+        `);
+        
+        logger.info(`
+          📊 Services Initialized:
+          ✅ Database Service (Optimized with connection pooling)
+          ✅ Security Services
+          ✅ GraphQL Service
+          ✅ WebSocket Service
+          ✅ Singleton Services (Face Recognition, Gemini AI)
+        `);
+      });
+
+      // Setup graceful shutdown
+      setupGracefulShutdown({
+        httpServer: this.httpServer,
+        apolloServer: this.apolloServer,
+        subscriptionServer: this.subscriptionServer,
+        prisma: this.prisma,
+      });
+
+    } catch (error) {
+      logger.error('Error starting server:', { error });
+      throw error;
+    }
+  }
+}
+
+// ============================================
+// FILE 12: src/index.ts (NEW - Super clean!)
+// ============================================
+import * as dotenv from 'dotenv';
+import { GraphQLServer } from './server';
+import { logger } from './utils/logger';
+
+// Initialize environment
+dotenv.config();
+
+// Start server
+const server = new GraphQLServer();
+
+server.start().catch((error) => {
+  logger.error('Failed to start server:', { error });
+  process.exit(1);
+});

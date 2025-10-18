@@ -1,0 +1,10 @@
+
+
+Long-term (Scalability)
+Implement Redis for session storage and caching
+
+Add distributed tracing with OpenTelemetry
+
+Set up monitoring with Prometheus/Grafana
+
+Implement circuit breakers for external services

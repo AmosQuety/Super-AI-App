@@ -1,0 +1,144 @@
+🔄 Phase-Specific Prompts
+Phase 2: GraphQL Integration & State Management
+
+Implement loginWithFace and user mutations.
+
+Handle online/offline states gracefully.
+
+
+
+Phase 3: Chat Interface (Mobile-Optimized)
+
+Build a chat UI using the existing backend message structure.
+
+Create mobile-friendly chat bubbles (TouchableOpacity sizes).
+
+Move chat list/sidebar into its own screen (instead of drawer).
+
+Add pull-to-refresh and infinite scroll.
+
+Reuse message actions (copy, delete) with mobile-friendly modals.
+
+Implement keyboard-aware input and image attachments via expo-image-picker.
+
+
+Phase 3-4
+First organise and clean the backend before i continue and also intergrate gemini to the mobile app
+
+
+
+Phase 4: Camera & Face Recognition
+
+Add face login and registration flows.
+
+Use expo-camera and expo-permissions.
+
+Connect to the existing addFace and loginWithFace mutations.
+
+Handle camera UI for multiple screen sizes.
+
+Add a fallback login if face fails.
+
+Update auth/sign-in.tsx to support this flow.
+
+
+
+
+
+Phase 5: Voice Features
+
+Build voice recording and playback features.
+
+Use expo-av for audio recording/playback.
+
+Use expo-speech for TTS, and an external service for STT.
+
+Integrate with SAVE_TRANSCRIPT mutation.
+
+Add a WhatsApp-style voice message bubble UI.
+
+Manage audio files with expo-file-system.
+
+
+
+
+
+
+Phase 6: AI Content Generation
+
+Integrate the existing generateGeminiContent mutation.
+
+Add loading states and typing indicators.
+
+Implement retry logic + offline queuing with async-storage.
+
+Reuse IntelligentMatcher response system.
+
+
+
+
+Phase 7: Image Generation
+
+Create an image generation workflow.
+
+Screen with prompt input + generated results.
+
+Save to device with expo-media-library.
+
+Add sharing via expo-sharing.
+
+Enable zoomable previews.
+
+
+
+
+
+Phase 8: Mobile-Specific Features
+
+Add native niceties.
+
+Push notifications (expo-notifications).
+
+Deep linking.
+
+Haptics.
+
+Theme detection.
+
+Custom splash + icons.
+
+
+
+
+
+Phase 9: Performance & Polish
+
+Optimize the app.
+
+Virtualized FlatList for chat history.
+
+Image compression with expo-image-manipulator.
+
+Error boundaries.
+
+Accessibility improvements.
+
+Reanimated animations.
+
+
+
+
+
+Phase 10: Testing & Deployment
+
+Prepare for release.
+
+Build with EAS.
+
+Submit to app stores.
+
+Add beta testing with Expo internal distribution.
+
+Monitor performance.
+
+⚡ The idea is: you’ll feed the AI the Base Prompt + Phase Prompt (only one at a time). That way, it won’t overload, and you’ll get structured, working code aligned with your timeline.

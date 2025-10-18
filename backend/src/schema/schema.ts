@@ -1,0 +1,181 @@
+// src/schema/schema.ts
+import { gql } from "apollo-server-express";
+import { authTypeDefs } from "./auth";
+
+export const typeDefs = gql`
+  scalar Upload
+  scalar DateTime  
+
+  type User {
+    id: ID!
+    email: String!
+    name: String
+    role: String!
+    avatarUrl: String
+    lastLoginAt: DateTime
+    isActive: Boolean!
+    chats: [Chat!]
+    images: [ImageGeneration!]
+    audioJobs: [AudioJob!]
+    documents: [Document!]
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    hasFaceRegistered: Boolean
+  }
+
+  type Chat {
+    id: ID!
+    title: String
+    user: User!
+    userId: String!
+    messages: [Message!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type Message {
+    id: ID!
+    role: String!
+    content: String!
+    chat: Chat!
+    chatId: String!
+    imageUrl: String 
+    fileName: String
+    fileUri: String
+    fileMimeType: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type ImageGeneration {
+    id: ID!
+    user: User!
+    userId: String!
+    prompt: String!
+    imageUrl: String!
+    status: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type AudioJob {
+    id: ID!
+    user: User!
+    userId: String!
+    type: String!
+    inputText: String
+    inputAudioUrl: String
+    outputUrl: String
+    status: String!
+    errorMessage: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type Document {
+    id: ID!
+    user: User!
+    userId: String!
+    title: String
+    content: String!
+    summary: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type MessagesPayload {
+    messages: [Message!]!
+    hasMore: Boolean!
+  }
+
+  type Query {
+    # User queries
+    me: User!
+    users: [User!]!
+    
+    # Chat queries
+    chats(userId: ID!): [Chat!]!
+    chatHistory(chatId: ID!, limit: Int, offset: Int): MessagesPayload!
+    
+    # AI queries
+    images(userId: ID!): [ImageGeneration!]!
+    
+    # Face recognition
+    faceServiceStatus: FaceServiceStatus!
+  }
+
+  type Mutation {
+    # Auth mutations (from authTypeDefs)
+    register(email: String!, password: String!, name: String): AuthPayload!
+    login(email: String!, password: String!): AuthPayload!
+    updateProfile(name: String, email: String): User!
+    changePassword(currentPassword: String!, newPassword: String!): ChangePasswordResponse!
+    deleteAccount(password: String!): DeleteAccountResponse!
+    
+    # Chat management
+    createChat(userId: ID!, title: String, messages: [MessageInput!]!): Chat!
+    updateChat(chatId: ID!, title: String!): Chat!
+    deleteChat(chatId: ID!): Boolean!
+    
+    # Message management
+    addMessage(chatId: ID!, role: String!, content: String!): Message!
+    deleteMessage(messageId: ID!): Boolean!
+    
+    # Face recognition
+    addFace(image: Upload!): GenericResponse!
+    loginWithFace(image: Upload!): FaceAuthPayload!
+    removeFace: GenericResponse!
+    
+    # AI content generation
+    generateGeminiContent(prompt: String!): GeminiResponse!
+    generateImage(userId: ID!, prompt: String!): ImageGeneration!
+    generateMultipleImages(userId: ID!, prompt: String!, count: Int): [ImageGeneration!]!
+
+    sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
+  }
+
+  input MessageInput {
+    role: String!
+    content: String!
+    imageUrl: String
+    fileName: String
+    fileUri: String
+    fileMimeType: String
+  }
+
+  type GenericResponse {
+    success: Boolean!
+    message: String!
+  }
+  
+  type FaceAuthPayload {
+    success: Boolean!
+    token: String
+    user: User
+    message: String!
+  }
+  
+  type FaceServiceStatus {
+    isOnline: Boolean!
+    registeredFacesCount: Int!
+    message: String!
+  }
+    
+  type GeminiResponse {
+    generatedText: String!
+    success: Boolean!
+    message: String
+  }
+
+  type SendMessageResponse {
+    userMessage: Message!
+    aiMessage: Message!
+    usedCustomResponse: Boolean!
+  }
+
+  type Subscription {
+    messageAdded(chatId: ID!): Message
+  }
+
+  ${authTypeDefs}
+`;

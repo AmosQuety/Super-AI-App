@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "super-ai-app",
+    "slug": "super-ai-app",
+    "version": "1.0.0",
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store"
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    
+    "android": {
+      
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },    
+      "package": "com.danyrivas13.AppDeliveryReactNative",  
+      "runtimeVersion": {
+        "policy": "sdkVersion"
+      }
+    },   
+     "ios": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },  
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "sdkVersion"
+      }
+    }
+  }
+}
