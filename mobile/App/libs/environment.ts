@@ -18,12 +18,12 @@ export interface AppConfig {
 }
 
 const developmentConfig: AppConfig = {
-  API_URL: 'http://10.239.50.213:4001',
+  API_URL: 'http://10.124.2.213:4001',
  
   // 192.168.137.1
   // 10.207.58.213
-  GRAPHQL_URL: 'http://10.239.50.213:4001/graphql',
-  FACE_SERVICE_URL: 'http://10.239.50.213:5001',
+  GRAPHQL_URL: 'http://10.124.2.213:4001/graphql',
+  FACE_SERVICE_URL: 'http://10.124.2.213:5001',
 
   
   APP_NAME: 'Super AI app',

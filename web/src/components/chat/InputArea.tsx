@@ -1,51 +1,82 @@
-import React, { useState, useRef, ChangeEvent, KeyboardEvent } from "react";
-import {
-  PaperAirplaneIcon,
-  PaperClipIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/solid";
+// src/components/chat/InputArea.tsx
+import React, { useState, useRef, ChangeEvent, KeyboardEvent, useCallback } from "react";
+import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
   disabled?: boolean;
+  isOnline?: boolean;
 }
 
 const InputArea: React.FC<InputAreaProps> = ({
   onSendMessage,
   disabled = false,
+  isOnline = true,
 }) => {
   const [text, setText] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+  // REFACTOR: Memoized text change handler with auto-resize
+  const handleTextChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
-    // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height =
-        Math.min(textareaRef.current.scrollHeight, 160) + "px"; // 160px max height
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
     }
-  };
+  }, []);
 
-  const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
+  // REFACTOR: Enhanced file handling with drag & drop
+  const handleAttachmentChange = useCallback((file: File | null) => {
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File size must be less than 10MB");
+        return;
+      }
+      setAttachment(file);
+    } else {
+      setAttachment(null);
+    }
+  }, []);
+
+  const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    if (file && file.size > 10 * 1024 * 1024) {
-      // 10MB limit
-      alert("File size must be less than 10MB");
-      return;
-    }
-    setAttachment(file);
-    // Clear the input value so the same file can be selected again
-    if (e.target) {
-      e.target.value = "";
-    }
+    handleAttachmentChange(file);
+    if (e.target) e.target.value = "";
   };
 
-  const handleSendMessage = () => {
-    if (disabled) return;
+  // REFACTOR: Drag and drop functionality
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (!disabled && isOnline) {
+      setIsDragging(true);
+    }
+  }, [disabled, isOnline]);
 
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (disabled || !isOnline) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleAttachmentChange(files[0]);
+    }
+  }, [disabled, isOnline, handleAttachmentChange]);
+
+  // REFACTOR: Enhanced send message with validation
+  const handleSendMessage = useCallback(() => {
+    if (disabled || !isOnline) return;
+    
     const trimmedText = text.trim();
     if (trimmedText === "" && !attachment) return;
 
@@ -56,7 +87,7 @@ const InputArea: React.FC<InputAreaProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  };
+  }, [disabled, isOnline, text, attachment, onSendMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -65,79 +96,171 @@ const InputArea: React.FC<InputAreaProps> = ({
     }
   };
 
-  const removeAttachment = () => {
-    setAttachment(null);
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="h-4 w-4 text-purple-400 flex-shrink-0" />;
+    }
+    return <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />;
   };
 
+  const isSendDisabled = disabled || !isOnline || (text.trim() === "" && !attachment);
+
   return (
-    <div className="px-6 pb-6 pt-2 shrink-0">
-      <div className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-        {attachment && (
-          <div className="p-3 border-b border-white/10 flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-sm">
-              <PaperClipIcon className="h-3 w-3 text-cyan-300" />
-              <span className="text-gray-200 truncate max-w-xs">
+    <div 
+      className="px-4 pb-6 pt-2 bg-transparent backdrop-blur-sm"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Offline Warning */}
+      {!isOnline && (
+        <div className="mb-3 p-3 bg-yellow-500/20 backdrop-blur rounded-xl border border-yellow-500/30 flex items-center space-x-2 animate-slide-in">
+          <AlertCircle className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+          <span className="text-sm text-yellow-200">
+            You are offline. Messages will be sent when connection is restored.
+          </span>
+        </div>
+      )}
+
+      {/* Attachment Preview */}
+      {attachment && (
+        <div className="mb-3 p-3 bg-white/10 backdrop-blur rounded-xl border border-white/20 flex items-center justify-between animate-slide-in">
+          <div className="flex items-center space-x-3 text-sm min-w-0 flex-1">
+            {getFileIcon(attachment)}
+            <div className="min-w-0 flex-1">
+              <span className="text-white font-medium truncate block">
                 {attachment.name}
               </span>
-              <span className="text-gray-400">
-                ({(attachment.size / 1024).toFixed(1)} KB)
+              <span className="text-purple-200 text-xs">
+                {(attachment.size / 1024).toFixed(1)} KB
               </span>
             </div>
-            <button
-              onClick={removeAttachment}
-              className="text-gray-400 hover:text-red-400 transition-colors"
-              title="Remove attachment"
-            >
-              <XCircleIcon className="h-6 w-6" />
-            </button>
           </div>
-        )}
-
-        <div className="flex items-end p-2 space-x-2">
-          <textarea
-            ref={textareaRef}
-            placeholder={disabled ? "AI is thinking..." : "Type a message..."}
-            className="w-full p-3 bg-transparent text-gray-200 placeholder-gray-400 focus:outline-none resize-none scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
-            rows={1}
-            value={text}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
+          <button 
+            onClick={() => setAttachment(null)} 
+            className="p-1.5 rounded-full text-purple-200 hover:bg-white/20 hover:text-red-300 transition-all duration-200 flex-shrink-0 ml-2 backdrop-blur"
+            title="Remove attachment"
             disabled={disabled}
-            style={{ minHeight: "52px" }}
-          />
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
-          <div className="flex items-center space-x-2">
-            <label
-              htmlFor="attachment-input"
-              className={`cursor-pointer p-3 rounded-full transition-colors duration-200 group ${
-                disabled
-                  ? "text-gray-500 cursor-not-allowed"
-                  : "text-gray-400 hover:bg-white/10 hover:text-cyan-300"
-              }`}
-            >
-              <PaperClipIcon className="h-6 w-6 transition-transform duration-200 group-hover:rotate-12" />
-              <input
-                ref={fileInputRef}
-                type="file"
-                id="attachment-input"
-                className="hidden"
-                onChange={handleAttachmentChange}
-                disabled={disabled}
-                accept="image/*,.pdf,.doc,.docx,.txt"
-                title="Attach a file"
-              />
-            </label>
-
-            <button
-              onClick={handleSendMessage}
-              disabled={disabled || (text.trim() === "" && !attachment)}
-              className="px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-              title="Send message"
-            >
-              <PaperAirplaneIcon className="h-6 w-6" />
-            </button>
+      {/* Drag & Drop Overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 bg-purple-500/20 backdrop-blur flex items-center justify-center z-50">
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 border-2 border-dashed border-purple-400 text-center">
+            <Paperclip className="h-12 w-12 text-purple-300 mx-auto mb-4" />
+            <div className="text-white text-lg font-medium">Drop your file here</div>
+            <div className="text-purple-200 text-sm">Attach files to your message</div>
           </div>
         </div>
+      )}
+
+      {/* Main Input Container */}
+      <div className={`
+        relative bg-gray-900/60 backdrop-blur-xl border rounded-2xl transition-all duration-300
+        ${isFocused 
+          ? 'border-purple-500/60 shadow-lg shadow-purple-500/20' 
+          : 'border-white/10 hover:border-white/20'
+        }
+        ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
+        ${isDragging ? 'border-purple-400 shadow-lg shadow-purple-400/30' : ''}
+      `}>
+        <div className="flex items-end p-3 space-x-3">
+          {/* Attachment Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || !isOnline}
+            className={`
+              p-2.5 rounded-xl transition-all duration-300 flex-shrink-0
+              ${disabled || !isOnline
+                ? 'opacity-40 cursor-not-allowed' 
+                : 'bg-white/10 hover:bg-white/20 text-purple-300 hover:text-purple-200 hover:scale-105'
+              }
+              backdrop-blur border border-white/10
+            `}
+            aria-label="Attach file"
+            title="Attach file"
+          >
+            <Paperclip className="h-5 w-5" />
+            <input 
+              ref={fileInputRef} 
+              type="file" 
+              className="hidden" 
+              onChange={handleFileInputChange} 
+              disabled={disabled || !isOnline}
+              accept="image/*,.pdf,.doc,.docx,.txt" 
+            />
+          </button>
+          
+          {/* Text Input */}
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              placeholder={
+                !isOnline ? "Offline - waiting for connection..." :
+                disabled ? "AI is thinking..." : 
+                "Type your message... (or drag & drop files)"
+              }
+              className={`
+                w-full p-3 bg-transparent text-white placeholder-purple-200/60 
+                focus:outline-none resize-none scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent
+                text-base leading-relaxed transition-all duration-300
+                ${disabled || !isOnline ? 'cursor-not-allowed' : ''}
+              `}
+              rows={1}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              disabled={disabled || !isOnline}
+              style={{ minHeight: "48px" }}
+            />
+            
+            {/* Focus indicator */}
+            {isFocused && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+            )}
+          </div>
+
+          {/* Send Button */}
+          <button
+            onClick={handleSendMessage}
+            disabled={isSendDisabled}
+            className={`
+              p-3 rounded-xl focus:outline-none transition-all duration-300 transform 
+              flex-shrink-0 backdrop-blur border
+              ${isSendDisabled
+                ? 'bg-gray-700/50 border-gray-600/50 text-gray-400 cursor-not-allowed scale-100' 
+                : `
+                  bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/50 
+                  text-white shadow-lg hover:shadow-purple-500/30 
+                  hover:scale-105 active:scale-95
+                  hover:from-purple-700 hover:to-blue-700
+                `
+              }
+            `}
+            title={!isOnline ? "Offline - cannot send messages" : "Send message"}
+            aria-label="Send message"
+          >
+            <Send className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Subtle glow effect when focused */}
+        {isFocused && (
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 -z-10 blur-sm"></div>
+        )}
+      </div>
+
+      {/* Helper text */}
+      <div className="mt-2 text-center">
+        <p className="text-xs text-purple-300/60">
+          {!isOnline ? "🔴 Offline - Reconnect to send messages" : "Press Enter to send, Shift+Enter for new line"}
+        </p>
       </div>
     </div>
   );

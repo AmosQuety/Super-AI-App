@@ -2,7 +2,6 @@
 import {
   ApolloClient,
   InMemoryCache,
-  HttpLink,
   from,
   createHttpLink,
 } from "@apollo/client";
@@ -16,35 +15,41 @@ const GRAPHQL_URL = "http://localhost:4001/graphql";
 // Create HTTP link
 const httpLink = createHttpLink({
   uri: GRAPHQL_URL,
-  // Add credentials if needed
   credentials: "include",
 });
 
-// Auth link (removed for development - no API key needed)
+// Auth link - Get token from localStorage
 const authLink = setContext((_, { headers }) => {
+  const token = localStorage.getItem('authToken');
+  
   return {
     headers: {
       ...headers,
-      // No authorization header needed in development
-    },
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    }
   };
 });
 
+// REFACTOR: Enhanced retry logic with exponential backoff
 const retryLink = new RetryLink({
   delay: {
     initial: 300,
-    max: Infinity,
+    max: 3000,
     jitter: true,
   },
   attempts: {
     max: 3,
     retryIf: (error, _operation) => {
-      return !!error && Boolean(error).toString() === "[object NetworkError]";
+      // Retry on network errors and specific server errors
+      return !!error && (
+        error.toString().includes('NetworkError') ||
+        error.toString().includes('Failed to fetch')
+      );
     },
   },
 });
 
-
+// REFACTOR: Enhanced error handling with user feedback
 const errorLink = onError(
   ({ graphQLErrors, networkError, operation, forward }) => {
     if (graphQLErrors) {
@@ -53,9 +58,22 @@ const errorLink = onError(
           `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
         );
         
-        // Handle specific error codes
+        // Enhanced authentication error handling
         if (extensions?.code === "UNAUTHENTICATED") {
-          console.warn("User authentication failed");
+          console.warn("User authentication failed - redirecting to login");
+          
+          // Show user feedback before redirecting
+          if (typeof window !== 'undefined') {
+            // You can integrate with a toast notification system here
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            
+            // Use gentle redirect that preserves current path for return
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/login') {
+              window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
+            }
+          }
         }
       });
     }
@@ -63,9 +81,10 @@ const errorLink = onError(
     if (networkError) {
       console.error(`[Network error]: ${networkError.message}`);
       
-      // Check if server is reachable
+      // Enhanced network error feedback
       if (networkError.message.includes("Failed to fetch")) {
         console.error("Server is not reachable. Please check if the backend is running.");
+        // Could trigger a global offline state here
       }
     }
   }
@@ -75,7 +94,6 @@ const errorLink = onError(
 const client = new ApolloClient({
   link: from([retryLink, errorLink, authLink, httpLink]),
   cache: new InMemoryCache(),
-  // Add these options for better debugging
   defaultOptions: {
     watchQuery: {
       errorPolicy: "ignore",

@@ -1,6 +1,6 @@
 // src/components/ImageGenerator.tsx
 import React, { useState } from "react";
-import { Sparkles, Download, RotateCcw } from "lucide-react";
+import { Sparkles, Download, RotateCcw, Image as ImageIcon } from "lucide-react";
 
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("");
@@ -16,10 +16,10 @@ export default function ImageGenerator() {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       const generated = [
-        `https://picsum.photos/seed/${prompt}-1/300/300`,
-        `https://picsum.photos/seed/${prompt}-2/300/300`,
-        `https://picsum.photos/seed/${prompt}-3/300/300`,
-        `https://picsum.photos/seed/${prompt}-4/300/300`,
+        `https://picsum.photos/seed/${prompt}-1/512/512`,
+        `https://picsum.photos/seed/${prompt}-2/512/512`,
+        `https://picsum.photos/seed/${prompt}-3/512/512`,
+        `https://picsum.photos/seed/${prompt}-4/512/512`,
       ];
       setImages(generated);
     } catch (err) {
@@ -30,8 +30,14 @@ export default function ImageGenerator() {
   };
 
   const handleDownload = (url: string, index: number) => {
-    // In a real app, this would download the image
+    // In a real app, this would trigger a proper download
     console.log("Downloading image", index, url);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${prompt.replace(/\s+/g, '_')}_${index + 1}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleRegenerate = () => {
@@ -41,34 +47,35 @@ export default function ImageGenerator() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+    <div className="max-w-7xl mx-auto p-4 md:p-6">
+      <div className="text-center mb-10">
+        <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-3">
           AI Image Generator
         </h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto">
           Transform your ideas into stunning visuals with AI-powered image
-          generation
+          generation.
         </p>
       </div>
 
       {/* Prompt input */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 mb-10 sticky top-20 z-10 backdrop-blur-lg">
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <input
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe what you want to see... (e.g., 'a sunset over mountains with cherry blossoms')"
-              className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="e.g., A majestic lion wearing a crown, cinematic lighting, hyperrealistic"
+              className="w-full p-4 pl-5 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition-all duration-300"
               disabled={loading}
+              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             />
           </div>
           <button
             onClick={handleGenerate}
             disabled={loading || !prompt.trim()}
-            className="px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-purple-500/30 transform hover:scale-105"
           >
             {loading ? (
               <>
@@ -85,72 +92,71 @@ export default function ImageGenerator() {
         </div>
       </div>
 
-      {/* Results */}
-      {images.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
+      {/* Results Section */}
+      {loading ? (
+        <div className="flex justify-center items-center py-16">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400 text-lg">
+              Creating your masterpiece...
+            </p>
+          </div>
+        </div>
+      ) : images.length > 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Generated Images
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Your Creations
             </h2>
             <button
               onClick={handleRegenerate}
               disabled={loading}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 font-medium"
             >
               <RotateCcw className="w-4 h-4" />
               Regenerate
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {images.map((src, i) => (
               <div
                 key={i}
-                className="group relative bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden aspect-square"
+                className="group relative bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden aspect-square shadow-lg border border-slate-200 dark:border-slate-700"
               >
                 <img
                   src={src}
-                  alt={`Generated ${i + 1}`}
+                  alt={`Generated image of ${prompt} - ${i + 1}`}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
                 />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 backdrop-blur-sm">
                   <button
                     onClick={() => handleDownload(src, i)}
-                    className="p-3 bg-white text-gray-900 rounded-full hover:bg-gray-100 transition-colors duration-200 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                    title="Download Image"
+                    aria-label={`Download image ${i + 1}`}
+                    className="p-3 bg-white/90 text-slate-900 rounded-full hover:bg-white transition-colors duration-200 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 shadow-lg"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                  {i + 1}
+                <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded-full font-mono">
+                  #{i + 1}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      )}
-
-      {loading && (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">
-              Creating your images...
-            </p>
+      ) : (
+        <div className="text-center py-16">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg">
+            <ImageIcon className="w-12 h-12 text-blue-500" />
           </div>
-        </div>
-      )}
-
-      {!loading && images.length === 0 && (
-        <div className="text-center py-12">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
-            <Sparkles className="w-12 h-12 text-blue-500" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
             Nothing generated yet
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            Enter a prompt above to create stunning AI-generated images
+          <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+            Enter a prompt above and click "Generate" to create stunning AI-generated images.
           </p>
         </div>
       )}

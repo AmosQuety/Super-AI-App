@@ -39,7 +39,7 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
         </button>
 
         {/* Logo/Brand section */}
-        <div className="flex items-center space-x-3">
+         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 flex items-center justify-center shadow-lg"></div>
           <svg
             className="w-5 h-5 text-white"
@@ -55,7 +55,7 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
             />
           </svg>
         </div>
-      </div>
+      </div> 
 
       {/* Center title with enhanced styling */}
       <div className="absolute left-1/2 transform -translate-x-1/2 z-10 hidden md:block">

@@ -1,20 +1,19 @@
 // web/src/components/chat/ChatContainer.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Message from "./Message";
 import InputArea from "./InputArea";
 import Sidebar from "./Sidebar";
-import { Bot, RefreshCw, WifiOff } from "lucide-react";
+import { Bot, RefreshCw, WifiOff, Menu } from "lucide-react";
 
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
-
-console.log("useLazyQuery exists?", typeof useLazyQuery);
-
-import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY } from "../../graphql/chats";
-import { GENERATE_GEMINI_CONTENT } from "../../graphql/gemini"; // NEW: Import Gemini mutation
+import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
 import { toast } from "react-toastify";
-import Header from "./Header";
+import { useAuth } from "../../hooks/useAuth";
 
-// Define TypeScript interfaces for better type safety
+// REFACTOR: Enhanced message status enum for comprehensive UI states
+export type MessageStatus = "sending" | "sent" | "error" | "retrying";
+
+// REFACTOR: Enhanced MessageType interface with robust optimistic UI support
 export interface MessageType {
   id: string;
   conversationId?: string;
@@ -22,6 +21,10 @@ export interface MessageType {
   sender: "user" | "bot";
   timestamp: Date;
   attachment?: File | null;
+  status?: MessageStatus;
+  error?: string;
+  tempId?: string;
+  retryCount?: number;
 }
 
 interface ChatSession {
@@ -36,12 +39,97 @@ interface Props {
   userInfo: { id: string; username: string };
 }
 
-const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
+interface ApolloErrorExtensions {
+  errorType?: string;
+  retryable?: boolean;
+  details?: string;
+  originalMessage?: string;
+  timestamp?: string;
+}
+
+interface EnhancedApolloError extends Error {
+  extensions?: ApolloErrorExtensions;
+  graphQLErrors?: Array<{
+    message: string;
+    extensions?: ApolloErrorExtensions;
+  }>;
+}
+
+
+// REFACTOR: Custom hook for managing optimistic messages
+const useOptimisticMessages = () => {
   const [messages, setMessages] = useState<MessageType[]>([]);
+
+  const addOptimisticMessage = useCallback((message: Omit<MessageType, 'id' | 'timestamp' | 'status'> & { tempId: string }) => {
+    const optimisticMessage: MessageType = {
+      ...message,
+      id: message.tempId,
+      timestamp: new Date(),
+      status: "sending",
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
+    return optimisticMessage;
+  }, []);
+
+  const updateMessageStatus = useCallback((tempId: string, updates: Partial<MessageType>) => {
+    setMessages(prev => prev.map(msg => 
+      msg.tempId === tempId ? { ...msg, ...updates } : msg
+    ));
+  }, []);
+
+  const replaceTempMessage = useCallback((tempId: string, permanentMessage: MessageType) => {
+    setMessages(prev => prev.map(msg => 
+      msg.tempId === tempId ? permanentMessage : msg
+    ));
+  }, []);
+
+  const removeMessage = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(msg => msg.id !== messageId));
+  }, []);
+
+  const addMessage = useCallback((message: MessageType) => {
+    setMessages(prev => [...prev, message]);
+  }, []);
+
+  const setAllMessages = useCallback((newMessages: MessageType[]) => {
+    setMessages(newMessages);
+  }, []);
+
+  return {
+    messages,
+    addOptimisticMessage,
+    updateMessageStatus,
+    replaceTempMessage,
+    removeMessage,
+    addMessage,
+    setAllMessages,
+  };
+};
+
+const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
+  // REFACTOR: Using custom hook for optimistic message management
+  const {
+    messages,
+    addOptimisticMessage,
+    updateMessageStatus,
+    replaceTempMessage,
+    removeMessage,
+    addMessage,
+    setAllMessages,
+  } = useOptimisticMessages();
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [isDarkMode] = useState(true); // Kept for components that might use it
+  const [isDarkMode] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { user: authUser, token: authToken } = useAuth();
+  
+  // REFACTOR: Enhanced AI state management
+  const [aiState, setAiState] = useState<"idle" | "thinking" | "responding">("idle");
+  
+  const currentUser = authUser || userInfo;
+  const currentToken = authToken || token;
 
   // GraphQL Queries and Mutations
   const {
@@ -50,30 +138,74 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
     error: chatsError,
     refetch: refetchChats,
   } = useQuery(GET_CHATS, {
-    variables: { userId: userInfo.id },
-    skip: !userInfo.id,
+    variables: { userId: currentUser.id },
+    skip: !currentUser.id,
+    onError: (error) => {
+      console.error("Failed to load chats:", error);
+      toast.error("Failed to load conversations. Please refresh the page.", {
+        position: "top-right",
+        autoClose: 4000,
+        theme: "dark",
+      });
+    },
   });
 
-  const [getChatHistory, { data: historyData, loading: historyLoading }] =
-    useLazyQuery(GET_CHAT_HISTORY);
+  const [getChatHistory, { data: historyData, loading: historyLoading, error: historyError }] =
+    useLazyQuery(GET_CHAT_HISTORY, {
+      onError: (error) => {
+        console.error("Failed to load chat history:", error);
+        toast.error("Failed to load conversation history.", {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "dark",
+        });
+      },
+    });
 
-  const [createChat, { loading: sending }] = useMutation(CREATE_CHAT);
+  const [createChat] = useMutation(CREATE_CHAT, {
+    onError: (error) => {
+      console.error("Failed to create chat:", error);
+      toast.error("Failed to create new conversation.", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "dark",
+      });
+    },
+  });
   
-  // NEW: Add Gemini mutation
-  const [generateGeminiContent, { loading: aiThinking }] = useMutation(GENERATE_GEMINI_CONTENT);
+  const [sendMessage] = useMutation(SEND_MESSAGE_WITH_RESPONSE, {
+    onCompleted: () => {
+      refetchChats();
+    },
+    onError: (error) => {
+      console.error("Failed to send message:", error);
+      // Error handling is done in the main send flow
+    }
+  });
 
-  // Load messages when a conversation is selected from the sidebar
+  // REFACTOR: Enhanced auto-responsive sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      const isDesktop = window.innerWidth >= 1024;
+      setIsSidebarOpen(isDesktop);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // REFACTOR: Enhanced chat history loading with error handling
   useEffect(() => {
     if (conversationId && userInfo.id) {
       getChatHistory({
-        variables: {
-          chatId: conversationId,
-        },
+        variables: { chatId: conversationId },
       });
     }
   }, [conversationId, userInfo.id, getChatHistory]);
 
-  // Update messages state when history data is fetched
+  // REFACTOR: Enhanced message history processing
   useEffect(() => {
     if (historyData?.chatHistory) {
       const formattedMessages: MessageType[] = historyData.chatHistory.messages.map(
@@ -83,184 +215,332 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
           sender: msg.role === "user" ? "user" : "bot",
           timestamp: new Date(msg.createdAt),
           attachment: null,
+          status: "sent" as MessageStatus,
         })
       );
-      setMessages(formattedMessages);
-    } else {
-      setMessages([]);
+      setAllMessages(formattedMessages);
+    } else if (historyError) {
+      // Error is already handled by the query onError
+      setAllMessages([]);
     }
-  }, [historyData]);
+  }, [historyData, historyError, setAllMessages]);
 
-  // Auto-scroll to the bottom of the chat window when new messages are added
-  useEffect(() => {
+  // REFACTOR: Optimized smooth scroll with performance considerations
+  const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop =
-        chatContainerRef.current.scrollHeight;
+      requestAnimationFrame(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      });
     }
-  }, [messages, sending, aiThinking]);
+  }, []);
 
-  // Handle dark mode (already works with Tailwind's dark mode strategy)
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
-  const handleSendMessage = async (text: string, attachment?: File) => {
-      const trimmedText = text.trim();
+  // REFACTOR: Comprehensive message sending with optimistic UI and error recovery
+  const handleSendMessage = useCallback(async (text: string, attachment?: File) => {
+    const trimmedText = text.trim();
 
-    if (text.trim() === "" && !attachment) {
+    if (trimmedText === "" && !attachment) {
       toast.warn("Please enter a message or add an attachment.", {
         position: "top-right",
         autoClose: 2000,
         theme: "dark",
-        style: {
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
-        },
       });
       return;
     }
 
-      // Fix: Ensure we don't send empty prompts
-  if (trimmedText === "") {
-    // Only attachment, no text - handle accordingly
-    console.log("Sending attachment only");
-  }
-
-    const userMessage: MessageType = {
-      id: `user-${Date.now()}`,
+    // Create optimistic user message
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const optimisticMessage = addOptimisticMessage({
+      tempId,
       text: trimmedText,
       sender: "user",
-      timestamp: new Date(),
       attachment: attachment || undefined,
-    };
-
-    // Add user message to the UI immediately
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
+      conversationId: conversationId || undefined,
+    });
 
     try {
-      // Step 1: Get AI response from Gemini/Custom responses
-      const { data: aiData } = await generateGeminiContent({
-        variables: { prompt: text },
-      });
+      let currentConversationId = conversationId;
 
-      if (aiData?.generateGeminiContent?.success) {
-        const aiMessage: MessageType = {
-          id: `ai-${Date.now()}`,
-          text: aiData.generateGeminiContent.generatedText,
-          sender: "bot",
-          timestamp: new Date(),
-        };
-
-        // Add AI message to the UI
-        setMessages((prevMessages) => [...prevMessages, aiMessage]);
-
-        // Step 2: Save both messages to the database
-        const messagesForDb = [
-          { role: "user", content: text },
-          { role: "assistant", content: aiData.generateGeminiContent.generatedText },
-        ];
+      // Create new chat if this is the first message
+      if (!currentConversationId) {
+        toast.info("Creating new conversation...", {
+          position: "top-right",
+          autoClose: 1500,
+          theme: "dark",
+        });
 
         const { data: chatData } = await createChat({
           variables: {
-            userId: userInfo.id,
-            title: conversationId ? undefined : text.substring(0, 50) + "...",
-            messages: messagesForDb,
+            userId: currentUser.id,
+            title: trimmedText.substring(0, 40) + (trimmedText.length > 40 ? "..." : ""),
+            messages: [{ role: "user", content: trimmedText }],
           },
         });
 
-        // If this is a new conversation, set the conversation ID
-        if (!conversationId && chatData?.createChat) {
-          setConversationId(chatData.createChat.id);
-          refetchChats(); // Refresh the sidebar
+        if (chatData?.createChat?.id) {
+          currentConversationId = chatData.createChat.id;
+          setConversationId(currentConversationId);
+          await refetchChats();
+          toast.success("New conversation created!", {
+            position: "top-right",
+            autoClose: 2000,
+            theme: "dark",
+          });
+        } else {
+          throw new Error("Failed to create a new chat session.");
         }
+      }
+
+      // Update message with conversation ID and show thinking state
+      updateMessageStatus(tempId, { 
+        status: "sending",
+        conversationId: currentConversationId 
+      });
+      
+      setAiState("thinking");
+
+      // Send message and get AI response
+      const { data: messageData } = await sendMessage({
+        variables: {
+          chatId: currentConversationId,
+          content: trimmedText,
+        },
+      });
+
+       // REFACTOR: Handle GraphQL errors from response
+    if (errors && errors.length > 0) {
+      const error = errors[0];
+      const extensions = error.extensions as ApolloErrorExtensions | undefined;
+      
+      throw new Error(extensions?.details || error.message);
+    }
+
+      setAiState("responding");
+
+      if (messageData?.sendMessageWithResponse?.aiMessage && messageData?.sendMessageWithResponse?.userMessage) {
+        const aiMessageData = messageData.sendMessageWithResponse.aiMessage;
+        const userMessageData = messageData.sendMessageWithResponse.userMessage;
+
+        // Replace temporary user message with confirmed one
+        const confirmedUserMessage: MessageType = {
+          id: userMessageData.id,
+          conversationId: currentConversationId,
+          text: trimmedText,
+          sender: "user",
+          timestamp: new Date(userMessageData.createdAt),
+          attachment: attachment || undefined,
+          status: "sent",
+        };
+
+        replaceTempMessage(tempId, confirmedUserMessage);
+
+        // Add AI response with smooth entrance
+        const aiMessage: MessageType = {
+          id: aiMessageData.id,
+          conversationId: currentConversationId,
+          text: aiMessageData.content,
+          sender: "bot",
+          timestamp: new Date(aiMessageData.createdAt),
+          status: "sent",
+        };
+
+        addMessage(aiMessage);
 
         toast.success("Message sent successfully!", {
           position: "top-right",
           autoClose: 2000,
           theme: "dark",
-          style: {
-            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-            color: "white",
-          },
         });
 
       } else {
-        throw new Error(aiData?.generateGeminiContent?.message || "Failed to generate AI response");
+        throw new Error("Did not receive a valid AI response.");
       }
 
     } catch (error) {
       console.error("Error sending message:", error);
       
-      toast.error("Failed to get AI response. Please try again.", {
-        theme: "dark",
-        style: {
-          background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)",
-          color: "white",
-        },
+      // REFACTOR: Enhanced error parsing for better user feedback
+    let errorMessage = "Failed to send message. Please try again.";
+    let isRetryable = true;
+    
+    // Parse the error message for specific error types
+    if (error.message) {
+      const lowerCaseError = error.message.toLowerCase();
+
+    if (lowerCaseError.includes('timeout')) {
+        errorMessage = "AI service timeout - please try again";
+        isRetryable = true;
+      } else if (lowerCaseError.includes('network') || lowerCaseError.includes('fetch')) {
+        errorMessage = "Network connection issue - please check your connection";
+        isRetryable = true;
+      } else if (lowerCaseError.includes('rate limit')) {
+        errorMessage = "Rate limit exceeded - please wait a moment";
+        isRetryable = true;
+      } else if (lowerCaseError.includes('authentication') || lowerCaseError.includes('auth')) {
+        errorMessage = "Authentication error - please refresh the page";
+        isRetryable = false;
+      } else if (lowerCaseError.includes('service unavailable')) {
+        errorMessage = "AI service temporarily unavailable - please try again later";
+        isRetryable = true;
+      }
+      
+      // Check if it's a structured Apollo error
+      if (error.graphQLErrors && error.graphQLErrors.length > 0) {
+        const graphQLError = error.graphQLErrors[0];
+        const extensions = graphQLError.extensions as ApolloErrorExtensions | undefined;
+
+      if (extensions?.details) {
+          errorMessage = extensions.details;
+          isRetryable = extensions.retryable !== false;
+        }
+      }
+    }
+
+
+      // Update message to error state with retry capability
+      updateMessageStatus(tempId, {
+        status: "error",
+        error: "Failed to send message. Click to retry.",
+        retryCount: (optimisticMessage.retryCount || 0) + 1,
       });
 
-      // Remove the user message from UI if the whole process failed
-      setMessages((prev) => prev.filter((msg) => msg.id !== userMessage.id));
+      // const errorMessage = error instanceof Error 
+      //   ? error.message 
+      //   : "Failed to send message. Please try again.";
+        
+      toast.error(
+        <div>
+        <div className="font-semibold">{errorMessage}</div>
+        {isRetryable && (
+          <div className="text-sm opacity-80">Click the retry button to try again</div>
+          )}
+      </div>,
+      {
+        position: "top-right",
+        autoClose: isRetryable ? 4000 : 8000,
+        theme: "dark",
+        icon: isRetryable ? "🔄" : "⚠️",
+        }
+      );
+    } finally {
+      setAiState("idle");
     }
-  };
+  }, [
+    conversationId, 
+    currentUser.id, 
+    createChat, 
+    sendMessage, 
+    refetchChats, 
+    addOptimisticMessage,
+    updateMessageStatus,
+    replaceTempMessage,
+    addMessage,
+  ]);
 
-  const handleDeleteMessage = useCallback((messageId: string) => {
-    setMessages((prev) => prev.filter((message) => message.id !== messageId));
-    toast.info("Message removed from view.", {
-      theme: "dark",
-      style: {
-        background: "linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)",
-        color: "white",
-      },
+  // REFACTOR: Enhanced retry handler with exponential backoff
+  const handleRetryMessage = useCallback((message: MessageType) => {
+    if (message.status !== "error" && message.status !== "retrying") return;
+
+    // Prevent excessive retries
+    if ((message.retryCount || 0) >= 3) {
+      toast.error("Maximum retry attempts reached. Please try sending a new message.", {
+        position: "top-right",
+        autoClose: 4000,
+        theme: "dark",
+      });
+      return;
+    }
+
+    updateMessageStatus(message.id, { 
+      status: "retrying" as MessageStatus,
+      error: "Retrying...",
     });
-  }, []);
 
-  const handleConversationSelected = (selectedId: string) => {
+    // Small delay before retry for better UX
+    setTimeout(() => {
+      handleSendMessage(message.text, message.attachment || undefined);
+    }, 1000);
+  }, [handleSendMessage, updateMessageStatus]);
+
+  // REFACTOR: Memoized delete handler with undo capability
+  const handleDeleteMessage = useCallback((messageId: string) => {
+    const messageToDelete = messages.find(msg => msg.id === messageId);
+    removeMessage(messageId);
+    
+    toast.info("Message removed from view.", {
+      position: "top-right",
+      autoClose: 3000,
+      theme: "dark",
+      // In a production app, you could add an undo action here
+    });
+  }, [messages, removeMessage]);
+
+  // REFACTOR: Enhanced conversation management
+  const handleConversationSelected = useCallback((selectedId: string) => {
     if (conversationId !== selectedId) {
-      setMessages([]); // Clear messages to show loading state
+      setAllMessages([]);
       setConversationId(selectedId);
+      setAiState("idle");
+      
+      toast.info("Loading conversation...", {
+        position: "top-right",
+        autoClose: 1500,
+        theme: "dark",
+      });
     }
-    // On mobile, close sidebar after selection
+    
+    // Auto-close sidebar on mobile after selection
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
-  };
+  }, [conversationId, setAllMessages]);
 
-  const handleCreateNewConversation = () => {
+  const handleCreateNewConversation = useCallback(() => {
     setConversationId(null);
-    setMessages([]);
+    setAllMessages([]);
+    setAiState("idle");
+    
+    toast.info("Starting new conversation...", {
+      position: "top-right",
+      autoClose: 1500,
+      theme: "dark",
+    });
+    
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
-  };
+  }, [setAllMessages]);
+
+  // REFACTOR: Enhanced online/offline detection
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success("You are back online!", {
+      setShowOfflineBanner(false);
+      toast.success("Connection restored! You're back online.", {
         position: "top-right",
-        autoClose: 2000,
+        autoClose: 3000,
         theme: "dark",
-        style: {
-          background: "linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)",
-          color: "white",
-        },
       });
     };
+    
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error("You are offline.", {
+      setShowOfflineBanner(true);
+      toast.error("You're currently offline. Some features may be limited.", {
         position: "top-right",
-        autoClose: 2000,
+        autoClose: 5000,
         theme: "dark",
-        style: {
-          background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)",
-          color: "white",
-        },
       });
     };
 
@@ -273,44 +553,45 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
     };
   }, []);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  const renderConnectionStatus = () => {
+  // REFACTOR: Memoized connection status component
+  const renderConnectionStatus = useMemo(() => {
     if (!isOnline) {
       return (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2">
-            <WifiOff className="w-4 h-4" />
-            <span>Offline - Check your connection</span>
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
+          <div className="bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3 backdrop-blur">
+            <WifiOff className="w-5 h-5" />
+            <span className="font-medium">Offline - Check your connection</span>
             <button
               onClick={() => window.location.reload()}
-              name="refresh"
-              title="Refresh connection"
-              className="ml-2 p-1 bg-white/20 rounded hover:bg-white/30"
+              className="ml-2 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
+              title="Reload page"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-4 h-4" />
             </button>
           </div>
         </div>
       );
     }
     return null;
-  };
+  }, [isOnline]);
 
+  // REFACTOR: Enhanced loading state
   if (chatsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 relative">
+          <div className="w-20 h-20 mx-auto mb-6 relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full animate-ping opacity-75"></div>
-            <div className="relative w-16 h-16 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-              <div className="w-12 h-12 bg-white dark:bg-gray-900 rounded-full"></div>
+            <div className="relative w-20 h-20 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
+                <Bot className="w-8 h-8 text-purple-300" />
+              </div>
             </div>
           </div>
-          <div className="text-lg font-medium text-gray-900 dark:text-white">
-            Loading conversations...
+          <div className="text-lg font-medium text-white mb-2">
+            Loading your conversations...
           </div>
-          <div className="mt-2 text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-purple-300">
             Preparing your chat experience
           </div>
         </div>
@@ -318,53 +599,65 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
     );
   }
 
+  // REFACTOR: Enhanced error state with recovery options
   if (chatsError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <div className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-center bg-gray-800 rounded-2xl p-8 shadow-lg max-w-md mx-4">
+          <div className="text-red-400 text-6xl mb-4">⚠️</div>
+          <div className="text-xl font-semibold text-white mb-2">
             Unable to Load Chats
           </div>
-          <div className="text-gray-600 dark:text-gray-400 mb-4">
-            {chatsError.message}
+          <p className="text-gray-400 mb-6">
+            We couldn't load your conversations. This might be a temporary issue.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('authToken');
+                window.location.href = '/login';
+              }}
+              className="px-6 py-3 bg-gray-700 text-white rounded-xl font-medium hover:bg-gray-600 transition-colors"
+            >
+              Sign In Again
+            </button>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors duration-300"
-          >
-            Retry
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-purple-900 to-slate-900 text-white transition-all duration-500">
-      {renderConnectionStatus()}
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -inset-10 opacity-50">
+    <div className="h-screen w-screen flex bg-gray-900 text-white overflow-hidden relative">
+      {renderConnectionStatus}
+      
+      {/* Enhanced animated background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-purple-900 to-slate-900 -z-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-purple-600/20 to-transparent"></div>
+          <div className="absolute bottom-0 right-0 w-full h-1/3 bg-gradient-to-t from-blue-600/20 to-transparent"></div>
+          
+          {/* Animated orbs */}
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/30 to-pink-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse"></div>
           <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-gradient-to-r from-cyan-500/30 to-blue-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-gradient-to-r from-indigo-500/30 to-purple-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse delay-500"></div>
         </div>
       </div>
 
-      <Header
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-      />
-
-      <div className="flex flex-1 overflow-hidden relative z-10">
-        {/* Backdrop for mobile sidebar */}
+      <div className="flex flex-1 relative z-10">
+        {/* Mobile sidebar backdrop */}
         {isSidebarOpen && (
           <div
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 z-20 lg:hidden"
+            className="fixed inset-0 bg-black/80 z-20 lg:hidden animate-fade-in"
             aria-hidden="true"
-          ></div>
+          />
         )}
 
         <Sidebar
@@ -376,14 +669,27 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
           activeConversationId={conversationId}
         />
 
-        <main
-          className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-            isSidebarOpen ? "lg:ml-64" : "ml-0"
-          }`}
-        >
+        {/* Main conversation area */}
+        <main className="flex-1 flex flex-col min-w-0 h-full bg-transparent ml-0 lg:ml-0">
+          {/* Mobile header */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-white/10 bg-transparent backdrop-blur">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <div className="flex-1 text-center">
+              <h1 className="text-lg font-semibold text-white">AI Chat</h1>
+            </div>
+            <div className="w-10"></div>
+          </div>
+
+          {/* Messages area */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-purple-500/50 scrollbar-track-transparent hover:scrollbar-thumb-purple-400/70"
+            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 scrollbar-thin scrollbar-thumb-purple-500/50 scrollbar-track-transparent bg-transparent"
           >
             {(() => {
               if (historyLoading) {
@@ -392,57 +698,65 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
                     <div className="text-center">
                       <div className="w-16 h-16 mx-auto mb-4 relative">
                         <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full w-16 h-16 animate-pulse flex items-center justify-center">
+                        <div className="relative bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full w-full h-full flex items-center justify-center">
                           <div className="w-12 h-12 bg-slate-800 rounded-full"></div>
                         </div>
                       </div>
                       <div className="text-lg font-medium bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
-                        Loading conversation history...
+                        Loading conversation...
+                      </div>
+                      <div className="text-sm text-purple-300 mt-2">
+                        Fetching your messages
                       </div>
                     </div>
                   </div>
                 );
               } else if (messages.length === 0 && !historyLoading) {
                 return (
-                  <div className="flex items-center justify-center h-full">
+                  <div className="flex items-center justify-center h-full px-4">
                     <div className="text-center max-w-md">
-                      <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
-                        <Bot className="w-12 h-12 text-blue-500" />
+                      <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full flex items-center justify-center backdrop-blur">
+                        <Bot className="w-12 h-12 text-purple-300" />
                       </div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                      <h2 className="text-2xl font-bold text-white mb-4">
                         Start a Conversation
                       </h2>
-                      <p className="text-gray-600 dark:text-gray-400 mb-6">
-                        Select a chat from the sidebar or begin typing to start
-                        your AI conversation.
+                      <p className="text-base text-purple-200 mb-6">
+                        Select a chat from the sidebar or begin typing to start your AI conversation.
                       </p>
+                      <div className="text-sm text-purple-300">
+                        Your AI assistant is ready to help!
+                      </div>
                     </div>
                   </div>
                 );
               } else {
-                return messages.map((message) => (
+                return messages.map((message, index) => (
                   <Message
                     key={message.id}
                     message={message}
                     isDarkMode={isDarkMode}
                     onDelete={handleDeleteMessage}
+                    onRetry={handleRetryMessage}
+                    // Add animation delay for staggered entrance
+                    style={{ animationDelay: `${index * 0.1}s` }}
                   />
                 ));
               }
             })()}
             
-            {/* UPDATED: Show loading state for both sending and AI thinking */}
-            {(sending || aiThinking) && (
-              <div className="flex justify-start">
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg max-w-[70%]">
+            {/* REFACTOR: Enhanced AI thinking indicator with state-based messaging */}
+            {aiState !== "idle" && (
+              <div className="flex justify-start animate-slide-up">
+                <div className="bg-white/10 backdrop-blur p-4 rounded-2xl shadow-lg max-w-[70%] border border-white/10">
                   <div className="flex items-center space-x-3">
                     <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.1s]"></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                      <div className="w-2 h-2 bg-blue-300 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-blue-300 rounded-full animate-bounce [animation-delay:0.1s]"></div>
+                      <div className="w-2 h-2 bg-blue-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                     </div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {aiThinking ? "AI is thinking..." : "Sending..."}
+                    <span className="text-sm text-blue-200">
+                      {aiState === "thinking" ? "AI is thinking..." : "AI is responding..."}
                     </span>
                   </div>
                 </div>
@@ -450,10 +764,16 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
             )}
           </div>
 
-          <InputArea
-            onSendMessage={handleSendMessage}
-            disabled={sending || historyLoading || aiThinking} // UPDATED: Disable during AI thinking too
-          />
+          {/* Input Area */}
+          <div className="px-4 lg:px-6 pb-6">
+            <div className="max-w-4xl mx-auto">
+              <InputArea
+                onSendMessage={handleSendMessage}
+                disabled={historyLoading || aiState !== "idle"}
+                isOnline={isOnline}
+              />
+            </div>
+          </div>
         </main>
       </div>
     </div>

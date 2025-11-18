@@ -944,7 +944,7 @@ export class IntelligentMatcher {
 
     // Default configuration optimized for performance and accuracy
     this.config = {
-      confidenceThreshold: 0.7,
+      confidenceThreshold: 0.85,
       useLevenshtein: true,
       useJaroWinkler: true,
       useCosineSimilarity: true,
@@ -1007,7 +1007,7 @@ export class IntelligentMatcher {
 
     return circuitBreaker.execute(async () => {
       return TimeoutManager.withTimeout(
-        () => Promise.resolve(this.findBestMatch(userInput)),
+        () => Promise.resolve(this._performMatch(userInput)),
         this.config.maxProcessingTimeMs,
         () => this.createFallbackResult(userInput)
       );
@@ -1114,9 +1114,24 @@ export class IntelligentMatcher {
   }
 
   /**
-   * Main matching function with comprehensive algorithm combination
+   * Main public entry point for matching.
+   * This function orchestrates whether to use safety features.
    */
   public async findBestMatch(userInput: string): Promise<MatchResult> {
+    if (this.config.enableSafetyFeatures) {
+      // If safety is on, go through the circuit breaker and timeout manager
+      return this.safeFindBestMatch(userInput);
+    } else {
+      // Otherwise, call the core logic directly
+      return this._performMatch(userInput);
+    }
+  }
+
+
+  /**
+   * Main matching function with comprehensive algorithm combination
+   */
+  private async _performMatch(userInput: string): Promise<MatchResult> {
     const startTime = performance.now();
 
     try {
@@ -1162,11 +1177,7 @@ export class IntelligentMatcher {
       const bestCandidate = scoredCandidates[0]; // Already sorted by confidence
       const processingTime = performance.now() - startTime;
 
-      //  Step 6: Safety Circuit Breaker (optional)
-      if (this.config.enableSafetyFeatures) {
-        return this.safeFindBestMatch(userInput);
-      }
-
+      
       //  Step 7: Learning (if enabled)
       if (this.config.enableLearning) {
         this.recordLearningPattern(
@@ -1296,7 +1307,10 @@ export class IntelligentMatcher {
         candidateProcessing,
         candidate
       );
-      const confidence = this.combineScores(scores);
+      const confidence = this.combineScores(scores,
+        inputProcessing.normalized.length, 
+        candidateProcessing.normalized.length
+        );
       const primaryAlgorithm = this.getPrimaryAlgorithm(scores);
 
       return {
@@ -1362,7 +1376,11 @@ export class IntelligentMatcher {
   /**
    * Combine algorithm scores using weighted average
    */
-  private combineScores(scores: { [algorithm: string]: number }): number {
+  private combineScores(
+    scores: { [algorithm: string]: number }, 
+    inputLength: number,
+    candidateLength: number
+  ): number {
     let totalWeight = 0;
     let weightedSum = 0;
 
@@ -1372,7 +1390,16 @@ export class IntelligentMatcher {
       totalWeight += weight;
     }
 
-    return totalWeight > 0 ? weightedSum / totalWeight : 0;
+    const initialConfidence = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+     // +++ START: ADD THIS NEW LOGIC +++
+    // Apply a penalty for significant length differences
+    const lengthRatio = Math.min(inputLength, candidateLength) / Math.max(inputLength, candidateLength);
+    const lengthPenalty = Math.pow(lengthRatio, 0.5); // Use a gentle curve (sqrt)
+    const finalConfidence = initialConfidence * lengthPenalty;
+    // +++ END: ADD THIS NEW LOGIC +++
+
+    return finalConfidence;
   }
 
   /**

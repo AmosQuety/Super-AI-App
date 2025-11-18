@@ -1,31 +1,29 @@
-// src/resolvers/sendMessageWithResponse.ts - FIXED VERSION
-import { AuthenticationError, UserInputError } from "apollo-server-express";
+// src/resolvers/sendMessageWithResponse.ts - ENHANCED VERSION
+import { AuthenticationError, UserInputError, ApolloError } from "apollo-server-express";
 import { AppContext } from "./types/context";
 import { IntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
 import { pubsub } from './subscriptionResolvers';
 import { DocumentProcessor } from "../services/documentProcessor";
+import { GeminiAPIError } from "../services/geminiAIService"; // ADD THIS IMPORT
 
 const intelligentMatcher = new IntelligentMatcher(customResponses);
 const documentProcessor = new DocumentProcessor();
 
-// FIXED: Enhanced prompt builder with better validation
+// Enhanced prompt builder
 const buildEnhancedPrompt = (
   userMessage: string, 
   fileContent: string, 
   fileName?: string, 
   fileType?: string
 ): string => {
-  // Clean the file content
   const cleanedFileContent = fileContent?.trim() || '';
   const cleanedUserMessage = userMessage?.trim() || '';
 
-  // If file processing failed
   if (!cleanedFileContent || 
       cleanedFileContent.startsWith('[Unable to process') || 
       cleanedFileContent.startsWith('[Error processing')) {
     
-    // Return user message if available, otherwise a default prompt
     if (cleanedUserMessage) {
       return `${cleanedUserMessage}\n\n[Note: Attached file "${fileName}" could not be processed]`;
     }
@@ -33,7 +31,6 @@ const buildEnhancedPrompt = (
     return `Please help me with the file "${fileName}" (${fileType}). I've attached it but it couldn't be fully processed. Can you provide general guidance?`;
   }
 
-  // If we have both user message and file content
   if (cleanedUserMessage && cleanedFileContent) {
     return `User Request: ${cleanedUserMessage}
 
@@ -45,7 +42,6 @@ ${cleanedFileContent}
 Please analyze the file content and respond to the user's request.`;
   }
 
-  // If only file content (no user message)
   if (cleanedFileContent) {
     return `Please analyze this file and provide a comprehensive summary:
 
@@ -58,8 +54,50 @@ ${cleanedFileContent}
 Provide insights, key points, and any relevant analysis.`;
   }
 
-  // Fallback - should never reach here if validation works
   return "Hello! How can I help you today?";
+};
+
+// REFACTOR: Enhanced error mapper for frontend consumption
+const mapErrorForFrontend = (error: Error) => {
+  if (error instanceof GeminiAPIError) {
+    return {
+      message: error.message,
+      code: error.statusCode?.toString() || '500',
+      type: error.errorType || 'UNKNOWN_ERROR',
+      retryable: error.retryable !== false,
+      details: `AI Service Error: ${error.message}`
+    };
+  }
+
+  // Handle other known error types
+  if (error.message.includes('timeout')) {
+    return {
+      message: 'Request timeout - please try again',
+      code: '408',
+      type: 'TIMEOUT_ERROR',
+      retryable: true,
+      details: 'The AI service took too long to respond'
+    };
+  }
+
+  if (error.message.includes('network') || error.message.includes('fetch')) {
+    return {
+      message: 'Network connection issue - please check your connection',
+      code: '503',
+      type: 'NETWORK_ERROR',
+      retryable: true,
+      details: 'Unable to reach the AI service'
+    };
+  }
+
+  // Default error
+  return {
+    message: 'An unexpected error occurred',
+    code: '500',
+    type: 'UNKNOWN_ERROR',
+    retryable: false,
+    details: error.message
+  };
 };
 
 export const sendMessageWithResponse = {
@@ -109,11 +147,9 @@ export const sendMessageWithResponse = {
         try {
           console.log(`📁 Processing attached file: ${fileName}, Type: ${fileMimeType}`);
           
-          // Extract text from the file
           extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
           
           console.log(`✅ File processed. Extracted ${extractedText?.length || 0} characters`);
-          console.log(`📝 Extracted text preview: ${extractedText?.substring(0, 200)}...`);
           
           // Enhance the prompt with file context
           finalContent = buildEnhancedPrompt(content, extractedText, fileName, fileMimeType);
@@ -131,7 +167,7 @@ export const sendMessageWithResponse = {
         }
       }
 
-      // CRITICAL FIX: Validate finalContent before proceeding
+      // Validate finalContent before proceeding
       if (!finalContent || finalContent.trim().length === 0) {
         finalContent = "Hello! I've sent you a message.";
         console.warn('⚠️ Empty prompt detected, using fallback');
@@ -144,7 +180,7 @@ export const sendMessageWithResponse = {
         data: {
           chatId,
           role: "user",
-          content: content || `[Attached: ${fileName}]`, // Store original user message
+          content: content || `[Attached: ${fileName}]`,
           imageUrl: imageUrl || null,
           fileName: fileName || null,
           fileUri: fileUri || null,
@@ -204,8 +240,28 @@ export const sendMessageWithResponse = {
 
     } catch (error: any) {
       console.error("❌ Error in sendMessageWithResponse:", error);
-      console.error("Error stack:", error.stack);
-      throw new Error(`Failed to send message: ${error.message}`);
+      
+      // REFACTOR: Enhanced error handling with structured error information
+      const frontendError = mapErrorForFrontend(error);
+      
+      console.error("🔍 Error details for frontend:", {
+        originalError: error.message,
+        mappedError: frontendError,
+        stack: error.stack
+      });
+
+      // Use ApolloError for structured error handling
+      throw new ApolloError(
+        frontendError.message,
+        frontendError.code,
+        {
+          errorType: frontendError.type,
+          retryable: frontendError.retryable,
+          details: frontendError.details,
+          originalMessage: error.message,
+          timestamp: new Date().toISOString()
+        }
+      );
     }
   },
 };
