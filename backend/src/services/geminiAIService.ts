@@ -1,12 +1,11 @@
-// src/services/geminiAIService.ts
-import axios from "axios";
+// src/services/geminiAIService.ts - FIXED VERSION
+import axios, { AxiosError } from "axios";
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
-import { TimeoutManager } from "../IntelligentMatcher/safety/TimeoutManager";
 import { InputValidator } from "../IntelligentMatcher/safety/InputValidator";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_TIMEOUT = 30000; // 30 seconds
 
-// REFACTOR: Enhanced error types for better frontend handling
 export class GeminiAPIError extends Error {
   constructor(
     message: string,
@@ -25,7 +24,6 @@ export class GeminiAIService {
   private lastModelCheck: number = 0;
   private readonly MODEL_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
-  // REFACTOR: Enhanced model discovery with better error handling
   private async discoverBestModel(): Promise<string> {
     const now = Date.now();
     
@@ -84,7 +82,6 @@ export class GeminiAIService {
     return await this.discoverBestModel();
   }
 
-  // REFACTOR: Enhanced error handling with detailed feedback
   async generateContent(prompt: string) {
     console.log(`🔍 Validating prompt (length: ${prompt?.length || 0})`);
     console.log(`📝 Prompt preview: "${prompt?.substring(0, 100)}..."`);
@@ -118,43 +115,44 @@ export class GeminiAIService {
       throw new GeminiAPIError("Gemini API key not configured", 500, "CONFIGURATION_ERROR", false);
     }
 
-    const GEMINI_TIMEOUT = 30000; // 30 seconds timeout
-
-    // Get the best available model
     const modelName = await this.getModel();
     console.log(`🚀 Using model: ${modelName}`);
     console.log(`📤 Sending prompt to Gemini (${trimmedPrompt.length} chars)...`);
 
     try {
-      const response = await this.breaker.execute(() =>
-        TimeoutManager.withTimeout(
-          () =>
-            axios.post(
-              `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
-              {
-                contents: [{ parts: [{ text: trimmedPrompt }] }],
-              },
-              {
-                headers: { "Content-Type": "application/json" },
-                timeout: GEMINI_TIMEOUT,
-              }
-            ),
-          GEMINI_TIMEOUT,
-          () => {
+      // CRITICAL FIX: Remove TimeoutManager wrapper, let axios handle timeout directly
+      const response = await this.breaker.execute(async () => {
+        try {
+          return await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              contents: [{ parts: [{ text: trimmedPrompt }] }],
+            },
+            {
+              headers: { "Content-Type": "application/json" },
+              timeout: GEMINI_TIMEOUT,
+              // Add timeout config for better control
+              timeoutErrorMessage: `Gemini API timeout after ${GEMINI_TIMEOUT}ms`,
+            }
+          );
+        } catch (axiosError: any) {
+          // Handle axios timeout specifically
+          if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
             throw new GeminiAPIError(
-              "AI service timeout - please try again",
+              "AI service timeout - the request took too long. Please try again.",
               408,
               "TIMEOUT_ERROR",
               true
             );
           }
-        )
-      );
+          // Re-throw other axios errors to be handled below
+          throw axiosError;
+        }
+      });
 
       if (response.status !== 200) {
         console.error(`❌ Gemini API returned status ${response.status}`);
         
-        // Enhanced status code handling
         let errorMessage = "AI service temporarily unavailable";
         let errorType = "API_ERROR";
         let retryable = true;
@@ -223,16 +221,47 @@ export class GeminiAIService {
         throw error;
       }
 
+      // Handle circuit breaker errors
+      if (error.message === 'Circuit breaker is open') {
+        throw new GeminiAPIError(
+          "AI service is temporarily unavailable due to repeated failures. Please try again in a moment.",
+          503,
+          "CIRCUIT_BREAKER_OPEN",
+          true
+        );
+      }
+
       // Handle axios errors
-      if (error.isAxiosError) {
-        const statusCode = error.response?.status || 500;
-        const errorMessage = error.response?.data?.error?.message || error.message;
+      if (error.isAxiosError || error.code) {
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status || 500;
+        const errorMessage = (axiosError.response?.data as any)?.error?.message || error.message;
+        
+        // Specific handling for timeout
+        if (error.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
+          throw new GeminiAPIError(
+            "AI service timeout - the request took too long. Please try again with a shorter message.",
+            408,
+            "TIMEOUT_ERROR",
+            true
+          );
+        }
+
+        // Network errors
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          throw new GeminiAPIError(
+            "Cannot reach AI service - please check your internet connection",
+            503,
+            "NETWORK_ERROR",
+            true
+          );
+        }
         
         throw new GeminiAPIError(
           `AI service error: ${errorMessage}`,
           statusCode,
           "NETWORK_ERROR",
-          statusCode >= 500 // Retryable for server errors
+          statusCode >= 500
         );
       }
 
@@ -246,12 +275,10 @@ export class GeminiAIService {
     }
   }
 
-  // Get current model info (for debugging)
   getCurrentModel(): string {
     return this.currentModel;
   }
 
-  // Force refresh the model
   async refreshModel(): Promise<string> {
     this.lastModelCheck = 0;
     return await this.discoverBestModel();

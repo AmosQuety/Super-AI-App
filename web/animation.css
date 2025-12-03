@@ -1,9 +1,11 @@
+/* web/animation.css */
 /* 
  * REFACTOR: Custom animations for smooth, fluid UI transitions
  * Add this file to your project and import it in your main CSS or index file
  * Import: import './animations.css';
  */
 
+ 
 /* Slide up animation for messages */
 @keyframes slideUp {
   from {

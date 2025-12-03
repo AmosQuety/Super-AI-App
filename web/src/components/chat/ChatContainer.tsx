@@ -9,6 +9,7 @@ import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
 import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
 import { toast } from "react-toastify";
 import { useAuth } from "../../hooks/useAuth";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // REFACTOR: Enhanced message status enum for comprehensive UI states
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
@@ -108,7 +109,9 @@ const useOptimisticMessages = () => {
 };
 
 const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
-  // REFACTOR: Using custom hook for optimistic message management
+  
+  const { theme } = useTheme();
+  
   const {
     messages,
     addOptimisticMessage,
@@ -315,12 +318,9 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
         },
       });
 
-       // REFACTOR: Handle GraphQL errors from response
-    if (errors && errors.length > 0) {
-      const error = errors[0];
-      const extensions = error.extensions as ApolloErrorExtensions | undefined;
-      
-      throw new Error(extensions?.details || error.message);
+      // Check if we got valid data back
+    if (!messageData?.sendMessageWithResponse) {
+      throw new Error("Did not receive a valid response from the server.");
     }
 
       setAiState("responding");
@@ -372,7 +372,7 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
     let isRetryable = true;
     
     // Parse the error message for specific error types
-    if (error.message) {
+    if (error?.message) {
       const lowerCaseError = error.message.toLowerCase();
 
     if (lowerCaseError.includes('timeout')) {
@@ -412,10 +412,6 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
         retryCount: (optimisticMessage.retryCount || 0) + 1,
       });
 
-      // const errorMessage = error instanceof Error 
-      //   ? error.message 
-      //   : "Failed to send message. Please try again.";
-        
       toast.error(
         <div>
         <div className="font-semibold">{errorMessage}</div>
@@ -634,63 +630,66 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
   }
 
   return (
-    <div className="h-screen w-screen flex bg-gray-900 text-white overflow-hidden relative">
-      {renderConnectionStatus}
-      
-      {/* Enhanced animated background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-purple-900 to-slate-900 -z-10">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-purple-600/20 to-transparent"></div>
-          <div className="absolute bottom-0 right-0 w-full h-1/3 bg-gradient-to-t from-blue-600/20 to-transparent"></div>
-          
-          {/* Animated orbs */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/30 to-pink-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse"></div>
-          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-gradient-to-r from-cyan-500/30 to-blue-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-gradient-to-r from-indigo-500/30 to-purple-500/20 rounded-full mix-blend-screen filter blur-3xl animate-pulse delay-500"></div>
-        </div>
+     <div className="h-screen w-screen flex bg-gray-900 dark:bg-gray-900 text-white overflow-hidden relative">
+    {renderConnectionStatus}
+    
+    {/* Enhanced animated background */}
+    {/* Update background for light mode */}
+      <div className={`fixed inset-0 -z-10 ${
+        theme === 'dark' 
+          ? 'bg-gradient-to-br from-gray-900 via-purple-900 to-slate-900' 
+          : 'bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50'
+      }`}>
+        {/* ... background content ... */}
       </div>
 
-      <div className="flex flex-1 relative z-10">
-        {/* Mobile sidebar backdrop */}
-        {isSidebarOpen && (
-          <div
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/80 z-20 lg:hidden animate-fade-in"
-            aria-hidden="true"
-          />
-        )}
-
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onConversationSelected={handleConversationSelected}
-          onCreateNewConversation={handleCreateNewConversation}
-          chatSessions={chatsData?.chats || []}
-          userId={userInfo.id}
-          activeConversationId={conversationId}
+    <div className="flex flex-1 relative z-10 w-full">
+      {/* Mobile sidebar backdrop */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/80 z-20 lg:hidden animate-fade-in"
+          aria-hidden="true"
         />
+      )}
 
-        {/* Main conversation area */}
-        <main className="flex-1 flex flex-col min-w-0 h-full bg-transparent ml-0 lg:ml-0">
-          {/* Mobile header */}
-          <div className="lg:hidden flex items-center justify-between p-4 border-b border-white/10 bg-transparent backdrop-blur">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
-              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <div className="flex-1 text-center">
-              <h1 className="text-lg font-semibold text-white">AI Chat</h1>
-            </div>
-            <div className="w-10"></div>
-          </div>
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onConversationSelected={handleConversationSelected}
+        onCreateNewConversation={handleCreateNewConversation}
+        chatSessions={chatsData?.chats || []}
+        userId={userInfo.id}
+        activeConversationId={conversationId}
+      />
 
-          {/* Messages area */}
-          <div
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 scrollbar-thin scrollbar-thumb-purple-500/50 scrollbar-track-transparent bg-transparent"
+      {/* Main conversation area - FIXED: Added proper margin for sidebar */}
+      <main className={`
+        flex-1 flex flex-col min-w-0 h-full bg-transparent
+        transition-all duration-300
+        ${isSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}
+      `}>
+        {/* Mobile header */}
+         <div className="lg:hidden flex items-center justify-between p-4 border-b border-white/10 dark:border-white/10 bg-white/80 dark:bg-transparent backdrop-blur">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+            aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex-1 text-center">
+            <h1 className="text-lg font-semibold text-white">AI Chat</h1>
+          </div>
+          <div className="w-10"></div>
+        </div>
+
+        {/* Messages area - FIXED: Better container constraints */}
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 scrollbar-thin scrollbar-thumb-purple-500/50 scrollbar-track-transparent bg-transparent"
+        >
+          {/* Center messages with max-width */}
+          <div className="max-w-4xl mx-auto w-full">
             {(() => {
               if (historyLoading) {
                 return (
@@ -738,14 +737,13 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
                     isDarkMode={isDarkMode}
                     onDelete={handleDeleteMessage}
                     onRetry={handleRetryMessage}
-                    // Add animation delay for staggered entrance
                     style={{ animationDelay: `${index * 0.1}s` }}
                   />
                 ));
               }
             })()}
             
-            {/* REFACTOR: Enhanced AI thinking indicator with state-based messaging */}
+            {/* AI thinking indicator */}
             {aiState !== "idle" && (
               <div className="flex justify-start animate-slide-up">
                 <div className="bg-white/10 backdrop-blur p-4 rounded-2xl shadow-lg max-w-[70%] border border-white/10">
@@ -763,20 +761,21 @@ const ChatContainer: React.FC<Props> = ({ token, userInfo }) => {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Input Area */}
-          <div className="px-4 lg:px-6 pb-6">
-            <div className="max-w-4xl mx-auto">
-              <InputArea
-                onSendMessage={handleSendMessage}
-                disabled={historyLoading || aiState !== "idle"}
-                isOnline={isOnline}
-              />
-            </div>
+        {/* Input Area - FIXED: Better positioning */}
+        <div className="px-4 lg:px-6 pb-6">
+          <div className="max-w-4xl mx-auto">
+            <InputArea
+              onSendMessage={handleSendMessage}
+              disabled={historyLoading || aiState !== "idle"}
+              isOnline={isOnline}
+            />
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
+  </div>
   );
 };
 

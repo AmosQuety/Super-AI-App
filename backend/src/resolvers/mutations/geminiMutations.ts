@@ -1,9 +1,23 @@
 // src/resolvers/mutations/geminiMutations.ts
 import { AppContext } from "../types/context";
-import { SafeIntelligentMatcher } from "../../IntelligentMatcher/safety/SafeIntelligentMatcher";
 import customResponses from "../../IntelligentMatcher/customResponses";
+import { createIntelligentMatcher } from "../../IntelligentMatcher/IntelligentMatcher";
 
-const intelligentMatcher = new SafeIntelligentMatcher(customResponses);
+// lazy initialization of IntelligentMatcher
+let intelligentMatcher: any = null;
+
+const getIntelligentMatcher = async () => {
+  if (!intelligentMatcher) {
+    console.log("🔄 Initializing IntelligentMatcher for Gemini Mutations...");
+    
+    intelligentMatcher = createIntelligentMatcher(customResponses,  {
+      optimizeFor: "speed",
+      debugMode: false
+    });
+    console.log("✅ IntelligentMatcher initialized ");
+  }
+  return intelligentMatcher;
+};
 
 export const geminiMutations = {
   generateGeminiContent: async (
@@ -26,7 +40,8 @@ export const geminiMutations = {
     try {
       // Try intelligent matcher first
       try {
-        const matchResult = await intelligentMatcher.findBestMatch(cleanPrompt);
+        const matcher = await getIntelligentMatcher();
+        const matchResult = await matcher.findBestMatch(cleanPrompt);
         if (matchResult.match && matchResult.confidence >= 0.7) {
           return {
             generatedText: matchResult.suggestedResponse || "I'm here to help!",

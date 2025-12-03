@@ -1,5 +1,5 @@
 // src/components/Layout.tsx - Fixed version
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, NavLink, useNavigate } from "react-router-dom";
 import { 
   MessageSquare, 
@@ -18,6 +18,7 @@ import {
   Home
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth"; 
+import { useTheme } from "../contexts/ThemeContext";
 
 // Navigation data
 const navigation = [
@@ -63,21 +64,12 @@ const features = [
 ];
 
 const Layout = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth(); // Use the real auth hook
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDarkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [isDarkMode]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -88,13 +80,10 @@ const Layout = () => {
   }, []);
 
   useEffect(() => {
+
     // Close mobile menu on route change
     setMobileMenuOpen(false);
   }, [location.pathname]);
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
-  };
 
   const handleSignOut = async () => {
     try {
@@ -169,9 +158,18 @@ const Layout = () => {
                 </div>
               )}
 
-              <button onClick={toggleDarkMode} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-all duration-200 group border border-slate-200 dark:border-slate-700/50" aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"} title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}>
-                {isDarkMode ? <Sun className="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" /> : <Moon className="h-5 w-5 group-hover:-rotate-180 transition-transform duration-500" />}
-              </button>
+              {/* Updated theme toggle button */}
+          <button 
+            onClick={toggleTheme} 
+            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-all duration-200 group border border-slate-200 dark:border-slate-700/50" 
+            aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"} 
+            title={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === 'dark' ? 
+              <Sun className="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" /> : 
+              <Moon className="h-5 w-5 group-hover:-rotate-180 transition-transform duration-500" />
+            }
+          </button>
 
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors border border-slate-200 dark:border-slate-700/50" aria-label="Toggle menu">
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -208,9 +206,10 @@ const Layout = () => {
                         <LogOut className="w-5 h-5" />
                         <span className="font-medium">Sign Out</span>
                     </button>
-                </div>
+                    
+                 </div> 
               )}
-            </div>
+             </div> 
           )}
         </div>
       </nav>

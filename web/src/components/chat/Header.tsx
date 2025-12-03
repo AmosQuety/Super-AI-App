@@ -1,9 +1,9 @@
-import React from "react";
 import {
   Bars3Icon as MenuIcon,
   XMarkIcon as XIcon,
 } from "@heroicons/react/24/solid";
-import { Link } from "react-router-dom";
+import { useTheme } from "../../contexts/ThemeContext";
+
 
 interface HeaderProps {
   isSidebarOpen: boolean;
@@ -11,12 +11,16 @@ interface HeaderProps {
 }
 
 function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
-  const [isDarkMode, setIsDarkMode] = React.useState(true); // Keeping theme toggle local for now
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="relative bg-slate-900/80 backdrop-blur-xl border-b border-white/10 text-white p-4 shadow-2xl flex items-center justify-between z-20 flex-shrink-0 h-20">
       {/* Animated background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-purple-500/10 to-pink-500/5 animate-pulse"></div>
+      <div className={`absolute inset-0 bg-gradient-to-r animate-pulse ${
+        theme === 'dark' 
+          ? 'from-cyan-500/5 via-purple-500/10 to-pink-500/5' 
+          : 'from-blue-500/10 via-purple-500/5 to-pink-500/5'
+      }`}></div>
 
       <div className="relative z-10 flex items-center space-x-4">
         <button
@@ -73,28 +77,29 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
           <span className="text-sm text-green-300 font-medium">Online</span>
         </div>
 
-        {/* Theme toggle button */}
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="group relative p-3 rounded-2xl bg-gradient-to-r from-slate-700/50 to-slate-600/50 backdrop-blur border border-white/20 hover:from-yellow-600/50 hover:to-orange-600/50 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all duration-300 transform hover:scale-105 shadow-lg overflow-hidden"
-          aria-label="Toggle dark mode"
-        >
-          <div className="relative z-10">
-            {isDarkMode ? (
-              <div className="flex items-center justify-center">
-                <span className="text-2xl group-hover:rotate-12 transition-transform duration-300">
-                  ☀️
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center">
-                <span className="text-2xl group-hover:-rotate-12 transition-transform duration-300">
-                  🌙
-                </span>
-              </div>
-            )}
-          </div>
-        </button>
+        {/* Theme toggle button - Updated */}
+      <button
+        onClick={toggleTheme} // USE TOGGLE THEME
+        className="group relative p-3 rounded-2xl bg-gradient-to-r from-slate-700/50 to-slate-600/50 backdrop-blur border border-white/20 hover:from-yellow-600/50 hover:to-orange-600/50 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all duration-300 transform hover:scale-105 shadow-lg overflow-hidden"
+        aria-label="Toggle theme"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        <div className="relative z-10">
+          {theme === 'dark' ? (
+            <div className="flex items-center justify-center">
+              <span className="text-2xl group-hover:rotate-12 transition-transform duration-300">
+                ☀️
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center">
+              <span className="text-2xl group-hover:-rotate-12 transition-transform duration-300">
+                🌙
+              </span>
+            </div>
+          )}
+        </div>
+      </button>
 
         {/* Settings/Profile button */}
         <button

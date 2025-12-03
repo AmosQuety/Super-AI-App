@@ -34,33 +34,16 @@ export class InputValidator {
     return { valid: true };
   }
   
-  private static containsMaliciousPatterns(input: string): boolean {
-    // FIXED: More specific patterns that won't block normal document content
-    const maliciousPatterns = [
-      // SQL Injection - but only if they're clearly malicious
-      /'\s*OR\s*'1'\s*=\s*'1/gi,
-      /'\s*OR\s*1\s*=\s*1/gi,
-      /UNION\s+SELECT/gi,
-      /DROP\s+TABLE/gi,
-      /DELETE\s+FROM/gi,
-      
-      // Code execution attempts - but only dangerous ones
-      /eval\s*\(/gi,
-      /Function\s*\(/gi,
-      /<script[^>]*>/gi,
-      /<iframe[^>]*>/gi,
-      
-      // Only flag require/exec if they look like actual function calls
-      /require\s*\(\s*['"`]/gi,
-      /exec\s*\(\s*['"`]/gi,
-      
-      // XSS attempts
-      /javascript\s*:/gi,
-      /on\w+\s*=\s*['"`]/gi, // onclick="..." etc
-    ];
-    
-    return maliciousPatterns.some(pattern => pattern.test(input));
-  }
+  // Remove aggressive pattern matching that blocks common phrases
+private static containsMaliciousPatterns(input: string): boolean {
+  // Only check for actual dangerous patterns
+  const dangerousPatterns = [
+    /<script[^>]*>/gi,      // Script tags
+    /javascript\s*:/gi,     // JavaScript URLs
+    /eval\s*\(.*\)/gi,      // eval() calls
+  ];
+  return dangerousPatterns.some(pattern => pattern.test(input));
+}
   
   private static checkMemoryConstraints(): boolean {
     return true; // Always return true to bypass memory checks

@@ -1,6 +1,7 @@
 // src/components/chat/InputArea.tsx
 import React, { useState, useRef, ChangeEvent, KeyboardEvent, useCallback } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
@@ -13,6 +14,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   disabled = false,
   isOnline = true,
 }) => {
+  const { theme } = useTheme();
   const [text, setText] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -107,7 +109,7 @@ const InputArea: React.FC<InputAreaProps> = ({
 
   return (
     <div 
-      className="px-4 pb-6 pt-2 bg-transparent backdrop-blur-sm"
+      className="px-4 pb-6 pt-2 bg-transparent dark:bg-transparent backdrop-blur-sm"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -124,7 +126,11 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       {/* Attachment Preview */}
       {attachment && (
-        <div className="mb-3 p-3 bg-white/10 backdrop-blur rounded-xl border border-white/20 flex items-center justify-between animate-slide-in">
+        <div className={`mb-3 p-3 backdrop-blur rounded-xl border flex items-center justify-between animate-slide-in ${
+          theme === 'dark'
+            ? 'bg-white/10 border-white/20'
+            : 'bg-black/5 border-gray-200'
+        }`}>
           <div className="flex items-center space-x-3 text-sm min-w-0 flex-1">
             {getFileIcon(attachment)}
             <div className="min-w-0 flex-1">
@@ -160,14 +166,20 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       {/* Main Input Container */}
       <div className={`
-        relative bg-gray-900/60 backdrop-blur-xl border rounded-2xl transition-all duration-300
-        ${isFocused 
-          ? 'border-purple-500/60 shadow-lg shadow-purple-500/20' 
-          : 'border-white/10 hover:border-white/20'
+       relative backdrop-blur-xl border rounded-2xl transition-all duration-300
+        ${theme === 'dark'
+          ? isFocused
+            ? 'border-purple-500/60 shadow-lg shadow-purple-500/20 bg-gray-900/60'
+            : 'border-white/10 hover:border-white/20 bg-gray-900/60'
+          : isFocused
+            ? 'border-purple-500/60 shadow-lg shadow-purple-500/20 bg-white/60'
+            : 'border-gray-200 hover:border-gray-300 bg-white/60'
         }
         ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
         ${isDragging ? 'border-purple-400 shadow-lg shadow-purple-400/30' : ''}
       `}>
+
+
         <div className="flex items-end p-3 space-x-3">
           {/* Attachment Button */}
           <button
@@ -258,7 +270,9 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       {/* Helper text */}
       <div className="mt-2 text-center">
-        <p className="text-xs text-purple-300/60">
+        <p className={`text-xs ${
+          theme === 'dark' ? 'text-purple-300/60' : 'text-gray-500'
+        }`}>
           {!isOnline ? "🔴 Offline - Reconnect to send messages" : "Press Enter to send, Shift+Enter for new line"}
         </p>
       </div>

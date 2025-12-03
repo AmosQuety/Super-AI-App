@@ -531,7 +531,7 @@ function ChatDetailScreen() {
 
       {/* Input Area - FIXED FOR KEYBOARD */}
       <View 
-        className="bg-white border-t border-gray-200 px-4 py-3"
+        className="bg-white border-t border-gray-200 px-4 py-3 mb-12"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },

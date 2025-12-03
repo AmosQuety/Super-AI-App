@@ -1,13 +1,30 @@
 // src/resolvers/sendMessageWithResponse.ts - ENHANCED VERSION
 import { AuthenticationError, UserInputError, ApolloError } from "apollo-server-express";
 import { AppContext } from "./types/context";
-import { IntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
+import { IntelligentMatcher, createIntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
 import { pubsub } from './subscriptionResolvers';
 import { DocumentProcessor } from "../services/documentProcessor";
 import { GeminiAPIError } from "../services/geminiAIService"; // ADD THIS IMPORT
+import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
 
-const intelligentMatcher = new IntelligentMatcher(customResponses);
+// lazy initialization of IntelligentMatcher : create matcher only when needed
+let intelligentMatcher: IntelligentMatcher | null = null;
+const matcherCircuitBreaker = new CircuitBreaker(3, 60000); // 3 failures, 1 minute cooldown
+
+const getIntelligentMatcher = async (): Promise<IntelligentMatcher> => {
+  if (!intelligentMatcher) {
+    console.log("🔄 Initializing IntelligentMatcher...");
+    intelligentMatcher = createIntelligentMatcher(customResponses, {
+      optimizeFor: "speed", // Use speed-optimized configuration
+      debugMode: false,
+    });
+    console.log("✅ IntelligentMatcher initialized");
+  }
+  return intelligentMatcher;
+}
+
+
 const documentProcessor = new DocumentProcessor();
 
 // Enhanced prompt builder
@@ -17,6 +34,7 @@ const buildEnhancedPrompt = (
   fileName?: string, 
   fileType?: string
 ): string => {
+
   const cleanedFileContent = fileContent?.trim() || '';
   const cleanedUserMessage = userMessage?.trim() || '';
 
@@ -194,7 +212,13 @@ export const sendMessageWithResponse = {
       // Step 3: Try intelligent matcher first (only for text without files)
       if (!hasFileAttachment && content?.trim()) {
         try {
-          const matchResult = await intelligentMatcher.findBestMatch(content.trim());
+          // use circuit breaker to avoid repeated failures
+
+          const matchResult = await matcherCircuitBreaker.execute(async () => {
+            const matcher = await getIntelligentMatcher();
+            return await matcher.findBestMatch(content.trim());
+          });
+
           if (matchResult.match && matchResult.confidence >= 0.7) {
             aiResponse = matchResult.suggestedResponse || "I'm here to help!";
             usedCustomResponse = true;
