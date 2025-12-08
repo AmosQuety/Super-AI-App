@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@graphql-tools/schema": "^10.0.25",
+    "@huggingface/inference": "^4.13.4",
     "@prisma/client": "5.14.0",
+    "@types/node-fetch": "^2.6.13",
     "apollo-server-express": "^3.12.1",
     "apollo-server-plugin-response-cache": "^3.8.2",
     "axios": "^1.5.0",
@@ -35,6 +37,7 @@
     "ioredis": "^5.8.0",
     "jsonwebtoken": "^9.0.2",
     "node-cache": "^5.1.2",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.0.1",
     "pdf-parse": "^2.1.7",
     "rate-limit-redis": "^4.2.2",

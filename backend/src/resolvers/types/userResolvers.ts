@@ -1,4 +1,4 @@
-// src/resolvers/types/userResolvers.ts - UPDATED
+// src/resolvers/types/userResolvers.ts
 import { AppContext } from "./context";
 
 export const userResolvers = {
@@ -30,8 +30,20 @@ export const userResolvers = {
     });
   },
   
+  // FIX IS HERE: We check the parent object (Prisma User) directly
   hasFaceRegistered: async (parent: any, _: any, context: AppContext) => {
-    return await context.faceRecognitionService.checkUserHasFace(parent.id);
+    // 1. If the parent object already has the boolean, return it
+    if (typeof parent.hasFaceRegistered === 'boolean') {
+      return parent.hasFaceRegistered;
+    }
+
+    // 2. If not (e.g. it wasn't selected in the query), fetch it from DB
+    const user = await context.prisma.user.findUnique({
+      where: { id: parent.id },
+      select: { hasFaceRegistered: true }
+    });
+    
+    return !!user?.hasFaceRegistered;
   },
   
   createdAt: (parent: any) => {

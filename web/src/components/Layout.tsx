@@ -42,6 +42,8 @@ const navigation = [
   },
 ];
 
+
+
 const features = [
   {
     name: "Lightning Fast",
@@ -70,6 +72,7 @@ const Layout = () => {
   const location = useLocation();
   const { user, signOut } = useAuth(); // Use the real auth hook
   const navigate = useNavigate();
+  
 
   useEffect(() => {
     const handleScroll = () => {
@@ -146,7 +149,7 @@ const Layout = () => {
                 <div className="hidden md:flex items-center space-x-3">
                     <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-white/10">
-                            <User className="w-4 h-4 text-white" />
+                            <User className="w-4 h-4 text-white" onClick={() => navigate("/profile")}/>
                         </div>
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {user.name || user.email}

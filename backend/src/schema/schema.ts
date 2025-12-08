@@ -1,4 +1,4 @@
-// src/schema/schema.ts
+// src/schema/schema.ts 
 import { gql } from "apollo-server-express";
 import { authTypeDefs } from "./auth";
 
@@ -88,6 +88,35 @@ export const typeDefs = gql`
     hasMore: Boolean!
   }
 
+  # ===== NEW HUGGING FACE TYPES =====
+  type AIImageGenerationResponse {
+    success: Boolean!
+    images: [String!] # base64 encoded images
+    error: String
+    model: String!
+    timestamp: String!
+    generationTime: String!
+  }
+
+  input AIImageGenerationInput {
+    prompt: String!
+    negativePrompt: String
+    width: Int
+    height: Int
+    steps: Int
+    guidanceScale: Float
+    numImages: Int
+  }
+
+  type AIImageGenerationStatus {
+    available: Boolean!
+    message: String!
+    model: String!
+    maxPromptLength: Int!
+    defaultDimensions: String!
+  }
+  # ===== END NEW TYPES =====
+
   type Query {
     # User queries
     me: User!
@@ -102,6 +131,9 @@ export const typeDefs = gql`
     
     # Face recognition
     faceServiceStatus: FaceServiceStatus!
+
+    # NEW: Hugging Face status
+    aiImageGenerationStatus: AIImageGenerationStatus!
   }
 
   type Mutation {
@@ -130,6 +162,10 @@ export const typeDefs = gql`
     generateGeminiContent(prompt: String!): GeminiResponse!
     generateImage(userId: ID!, prompt: String!): ImageGeneration!
     generateMultipleImages(userId: ID!, prompt: String!, count: Int): [ImageGeneration!]!
+
+    # NEW: Hugging Face image generation (different names to avoid conflict)
+    generateAIImage(input: AIImageGenerationInput!): AIImageGenerationResponse!
+    generateAIImageVariants(prompt: String!): AIImageGenerationResponse!
 
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
   }

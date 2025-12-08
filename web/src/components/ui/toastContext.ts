@@ -1,7 +1,14 @@
 // src/components/ui/toastContext.ts
 import { createContext, useContext } from 'react';
 
+export interface ToastType {
+  type: 'success' | 'error';
+  title: string;
+  message: string;
+}
+
 export interface ToastContextType {
+  addToast: (toast: ToastType) => void;
   showSuccess: (title: string, message: string) => void;
   showError: (title: string, message: string) => void;
 }

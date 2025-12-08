@@ -7,6 +7,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signInSchema, type SignInFormData } from '../../lib/validation-schemas';
+import { FaceCapture } from "./FaceCapture"; // Import component
+import { ScanFace } from "lucide-react"; 
 
 export default function LoginScreen() {
   const { showSuccess, showError } = useToast();
@@ -14,6 +16,9 @@ export default function LoginScreen() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { addToast } = useToast();
+  
+  const [isFaceMode, setIsFaceMode] = useState(false);
 
   const {
     register,
@@ -37,6 +42,28 @@ export default function LoginScreen() {
     }
   };
 
+   const handleFaceLogin = async (file: File) => {
+    try {
+      setLoading(true);
+      const message = await loginWithFace(file);
+      
+      addToast({
+        type: 'success',
+        title: 'Access Granted',
+        message: message || "Welcome back!",
+      });
+      navigate("/");
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        title: 'Verification Failed',
+        message: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-900 flex flex-col">
       {/* Header */}
@@ -54,6 +81,35 @@ export default function LoginScreen() {
               Sign in to your account
             </p>
           </div>
+
+          {isFaceMode ? (
+          // FACE LOGIN MODE
+          <FaceCapture 
+            onCapture={handleFaceLogin}
+            onCancel={() => setIsFaceMode(false)}
+            loading={loading}
+            mode="login"
+          />
+        ) : (
+          // PASSWORD LOGIN MODE
+          <>
+           <form onSubmit={/* your submit handler */ e => e.preventDefault()} className="space-y-4">
+              {/* ... Your existing Email/Password Inputs ... */}
+              
+              {/* Add Face Login Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsFaceMode(true)}
+                className="w-full py-3 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition flex items-center justify-center gap-2"
+              >
+                <ScanFace size={20} />
+                Login with Face ID
+              </button>
+
+              {/* ... Submit Button ... */}
+            </form>
+          </>
+        )}
 
           {/* Form Card */}
           <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-lg">

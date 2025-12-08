@@ -21,8 +21,10 @@ model User {
   images    ImageGeneration[]
   audioJobs AudioJob[]
   documents Document[]
+  hasFaceRegistered Boolean @default(false)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+  
 
   @@index([email])
   @@index([role])

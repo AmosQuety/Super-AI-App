@@ -1,40 +1,35 @@
 // src/components/ui/Toast.tsx
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ToastContext } from './toastContext';
+import { ToastContext, type ToastType } from './toastContext';
 
-interface Toast {
+interface ToastItem extends ToastType {
   id: string;
-  type: 'success' | 'error';
-  title: string;
-  message: string;
 }
 
-
-
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
-  const addToast = (type: 'success' | 'error', title: string, message: string) => {
-    const id = Math.random().toString(36);
-    setToasts(prev => [...prev, { id, type, title, message }]);
+  const addToast = (toast: ToastType) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, ...toast }]);
     setTimeout(() => {
       removeToast(id);
     }, 5000);
   };
 
-  const showSuccess = (title: string, message: string) => addToast('success', title, message);
-  const showError = (title: string, message: string) => addToast('error', title, message);
+  const showSuccess = (title: string, message: string) => addToast({ type: 'success', title, message });
+  const showError = (title: string, message: string) => addToast({ type: 'error', title, message });
 
   return (
-    <ToastContext.Provider value={{ showSuccess, showError }}>
+    <ToastContext.Provider value={{ addToast, showSuccess, showError }}>
       {children}
-      <div className="fixed top-4 right-4 z-[100] w-full max-w-sm space-y-3">
+      <div className="fixed top-4 right-4 z-[100] w-full max-w-sm space-y-3 pointer-events-none">
         <AnimatePresence>
           {toasts.map(toast => (
             <motion.div
@@ -43,7 +38,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               initial={{ opacity: 0, y: -50, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.8, transition: { duration: 0.2 } }}
-              className={`flex items-start p-4 rounded-xl shadow-2xl border ${
+              className={`flex items-start p-4 rounded-xl shadow-2xl border pointer-events-auto ${
                 toast.type === 'success'
                   ? 'bg-emerald-50 dark:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
                   : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
@@ -78,4 +73,3 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     </ToastContext.Provider>
   );
 };
-

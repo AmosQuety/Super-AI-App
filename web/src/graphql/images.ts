@@ -23,3 +23,41 @@ export const GENERATE_IMAGE = gql`
     }
   }
 `;
+
+export const GENERATE_AI_IMAGE_VARIANTS = gql`
+  mutation GenerateAIImageVariants($prompt: String!) {
+    generateAIImageVariants(prompt: $prompt) {
+      success
+      images
+      error
+      generationTime
+      model
+      timestamp
+    }
+  }
+`;
+
+export const GENERATE_AI_IMAGE = gql`
+  mutation GenerateAIImage($input: AIImageGenerationInput!) {
+    generateAIImage(input: $input) {
+      success
+      images
+      error
+      generationTime
+      model
+      timestamp
+    }
+  }
+`;
+
+export const GET_AI_IMAGE_STATUS = gql`
+  query GetAIImageStatus {
+    aiImageGenerationStatus {
+      available
+      message
+      model
+      maxPromptLength
+      defaultDimensions
+    }
+  }
+`;

@@ -1,46 +1,35 @@
 // src/resolvers/queries/faceServiceQueries.ts
 import { AppContext } from "../types/context";
+import axios from "axios";
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
 export const faceServiceQueries = {
   faceServiceStatus: async (_: any, __: any, context: AppContext) => {
-    const healthCheck = await context.faceRecognitionService.checkHealth();
+    try {
+      // Check root endpoint
+      const response = await axios.get(`${PYTHON_SERVICE_URL}/`, { timeout: 2000 });
+      
+      // Calculate how many users have Face ID enabled in our database
+      const facesInDb = await context.prisma.user.count({
+        where: { hasFaceRegistered: true }
+      });
 
-    if (healthCheck.isOnline) {
-      try {
-        // Get registered users from the face service
-        const registeredUserIds = await context.faceRecognitionService.getRegisteredUsers();
-        
-        // Count how many of these users exist in our database
-        const registeredUsers = await context.prisma.user.findMany({
-          where: {
-            id: {
-              in: registeredUserIds
-            }
-          }
-        });
-
+      if (response.status === 200) {
         return {
           isOnline: true,
-          registeredFacesCount: registeredUsers.length,
-          message: "Face recognition service is online and ready",
+          registeredFacesCount: facesInDb,
+          message: `Biometric Engine Online. System: ${response.data.system}`,
         };
-      } catch (error) {
-        console.error("Error getting registered faces count:", error);
-        return {
-          isOnline: true,
-          registeredFacesCount: healthCheck.data?.known_faces_count || 0,
-          message: "Face recognition service is online",
-        };
+      } else {
+        throw new Error("Service returned non-200 status");
       }
-    } else {
+    } catch (error) {
       return {
         isOnline: false,
         registeredFacesCount: 0,
-        message: "Face recognition service is offline. Please start the Python service.",
+        message: "Biometric Engine is OFFLINE. Please check server logs.",
       };
     }
   },
 };
-
-
-

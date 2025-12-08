@@ -2,6 +2,9 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 // import {SignInFormData, SignUpFormData } from '../types/auth';
 import type {SignInFormData, SignUpFormData } from '../types/auth';
+import { LOGIN_WITH_FACE } from '../graphql/users';
+import client from '../lib/apolloClient'; // Import your apollo client instance
+
 
 interface User {
   id: string;
@@ -17,6 +20,7 @@ interface AuthContextType {
   signIn: (data: SignInFormData) => Promise<void>;
   signUp: (data: SignUpFormData) => Promise<void>;
   signOut: () => void;
+  loginWithFace: (file: File) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -141,6 +145,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const loginWithFace = async (file: File) => {
+    try {
+      setIsLoading(true);
+      
+      const result = await client.mutate({
+        mutation: LOGIN_WITH_FACE,
+        variables: { image: file },
+        context: {
+          headers: {
+            "apollo-require-preflight": "true", // Required for uploads
+          },
+        },
+      });
+
+      if (result.errors) {
+        throw new Error(result.errors[0].message);
+      }
+
+      const { success, token: authToken, user: userData, message } = result.data.loginWithFace;
+
+      if (!success) {
+        throw new Error(message || "Face login failed");
+      }
+
+      // Store auth data
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(userData));
+      setToken(authToken);
+      setUser(userData);
+      
+      return message; // Return success message
+    } catch (error: any) {
+      console.error("Face Login Error:", error);
+      throw new Error(error.message || 'Face login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = {
     user,
     token,
@@ -149,6 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     signOut,
     isLoading,
+    loginWithFace,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

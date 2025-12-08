@@ -10,6 +10,7 @@ import { UserRole } from "../../auth/authorization";
 import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
 import { ImageGenerationService } from "../../services/imageGenerationService";
+import { HuggingFaceService } from '../../services/huggingface.service'; // Add this import
 
 export interface Upload {
   filename: string;
@@ -31,6 +32,7 @@ export interface AppContext {
   faceRecognitionService: FaceRecognitionService;
   geminiAIService: GeminiAIService;
   imageGenerationService: ImageGenerationService;
+  huggingFaceService: HuggingFaceService; // Add this
   chatService: ChatService;
   userService: UserService;
   messageService: MessageService;
@@ -47,7 +49,8 @@ export interface AppContext {
 const singletonServices = {
   faceRecognitionService: new FaceRecognitionService(),
   geminiAIService: new GeminiAIService(),
-   imageGenerationService: new ImageGenerationService(),
+  imageGenerationService: new ImageGenerationService(),
+  huggingFaceService: HuggingFaceService.getInstance(), // Add this - use getInstance() for singleton
 };
 
 // ============================================

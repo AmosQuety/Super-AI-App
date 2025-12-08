@@ -1,8 +1,11 @@
 // src/index.ts 
+import * as dotenv from "dotenv";
+// Initialize environment variables
+dotenv.config();
 import express, { Application, Request, Response } from "express";
 import { ApolloServer } from "apollo-server-express";
 import { PrismaClient } from "@prisma/client";
-import * as dotenv from "dotenv";
+
 import { graphqlUploadExpress } from "graphql-upload-minimal";
 import { typeDefs } from "./schema/schema";
 import { resolvers } from "./resolvers/index";
@@ -26,8 +29,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Initialize environment variables
-dotenv.config();
+
 
 // Initialize Prisma Client (this will be replaced by the shared instance in context)
 const prisma = new PrismaClient({
@@ -87,6 +89,9 @@ const startServer = async (): Promise<any> => {
         "http://127.0.0.1:3000",
         "http://localhost:8081",
         "exp://localhost:8081",
+        // Add Apollo Studio domains
+        "https://studio.apollographql.com",
+        "https://sandbox.apollo.dev",
       ],
       credentials: true,
       methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
@@ -94,6 +99,8 @@ const startServer = async (): Promise<any> => {
         "Content-Type",
         "Authorization",
         "Apollo-Require-Preflight",
+        "apollographql-client-name",
+        "apollographql-client-version",
       ],
     };
 

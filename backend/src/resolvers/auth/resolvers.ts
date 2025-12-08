@@ -243,9 +243,9 @@ export const authResolvers = {
       return parent.createdAt ? new Date(parent.createdAt).toISOString() : null;
     },
 
-    hasFaceRegistered: async (parent: User, _: any, context: AppContext): Promise<boolean> => {
-      AuthorizationService.requireAuth(context);
-      return await context.faceRecognitionService.checkUserHasFace(parent.id);
+    hasFaceRegistered: (parent: any) => {
+      // Return the value directly from the database object
+      return !!parent.hasFaceRegistered;
     },
   },
 };

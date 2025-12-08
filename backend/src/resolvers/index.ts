@@ -8,6 +8,7 @@ import { IResolvers } from "@graphql-tools/utils";
 import { subscriptionResolvers } from "./subscriptionResolvers";
 import { sendMessageWithResponse } from "./sendMessageWithResponse";
 import { AppContext } from "./types/context";
+import { imageGenerationResolvers } from "./imageGenerationResolvers";
 
 export const resolvers: IResolvers = {
   ...scalarResolvers,
@@ -16,12 +17,14 @@ export const resolvers: IResolvers = {
   Query: { 
     ...authResolvers.Query,
     ...queryResolvers,
+    ...imageGenerationResolvers.Query,
   },
 
   Mutation: {
     ...authResolvers.Mutation,
     ...mutationResolvers,
     ...sendMessageWithResponse,
+    ...imageGenerationResolvers.Mutation,
   },
   
   User: { 

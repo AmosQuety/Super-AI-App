@@ -13,6 +13,7 @@ import VoiceScreen from "./src/pages/VoiceScreen";
 import ImageGenerator from "./src/components/ImageGenerator";
 import VoiceTools from "./src/components/VoiceTools";
 import "./index.css";
+import ProfilePage from "./src/pages/ProfilePage";
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -126,6 +127,11 @@ const AppRoutes = () => {
           element={<VoiceTools userId={defaultUser.id} />}
         />
       </Route>
+
+      <Route
+        path="/profile"
+        element={<ProfilePage />}
+      />
 
       {/* Redirect unknown routes to the main dashboard or login */}
       <Route path="*" element={<Navigate to="/" replace />} />
