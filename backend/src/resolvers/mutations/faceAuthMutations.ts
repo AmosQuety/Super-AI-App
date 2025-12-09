@@ -1,168 +1,108 @@
 // src/resolvers/mutations/faceAuthMutations.ts
 import { AuthenticationError } from "apollo-server-express";
-import axios from "axios";
-import FormData from "form-data";
 import { AppContext } from "../types/context";
 import { Upload } from "../types/upload";
 import { SecurityConfig } from "../../auth/security"; 
 import { logger } from "../../utils/logger";
+import { FaceRecognitionService } from "../../services/faceRecognitionService";
 
-const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
-
-const checkFaceServiceHealth = async () => {
-  try {
-    const response = await axios.get(`${PYTHON_SERVICE_URL}/`, {
-      timeout: 3000,
-    });
-    return {
-      isOnline: response.status === 200,
-      data: response.data,
-    };
-  } catch (error) {
-    logger.error("Error checking face service health:", error);
-    return {
-      isOnline: false,
-      data: null,
-    };
-  }
-};
+const faceService = new FaceRecognitionService();
 
 export const faceAuthMutations = {
+  
+  // ==========================================
+  // REGISTER (Enrollment)
+  // ==========================================
   addFace: async (
     _: any,
     { image }: { image: Promise<Upload> },
     context: AppContext
   ) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to add a face.");
-    }
+    if (!context.user) throw new AuthenticationError("Login required.");
 
-    const healthCheck = await checkFaceServiceHealth();
-    if (!healthCheck.isOnline) {
-      return {
-        success: false,
-        message: "Biometric engine is offline. Please contact admin.",
-      };
-    }
+    // 1. Health Check
+    const health = await faceService.checkHealth();
+    if (!health.isOnline) return { success: false, message: "Biometric engine offline." };
 
     try {
-      const { createReadStream, filename, mimetype } = await image;
-      const stream = createReadStream();
-
-      // FIX: Fetch the fresh user from DB to get the name (since token doesn't have it)
+      // 2. Identify User
       const currentUser = await context.prisma.user.findUnique({
         where: { id: context.user.id },
         select: { name: true, email: true }
       });
       
-      const identifier = currentUser?.name || currentUser?.email || "User_" + context.user.id;
+      if (!currentUser?.email) return { success: false, message: "User email not found." };
 
-      const formData = new FormData();
-      formData.append("name", identifier);
-      formData.append("file", stream, { filename, contentType: mimetype });
-
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/register`,
-        formData,
-        {
-          headers: { ...formData.getHeaders() },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        }
+      // 3. Call Service (Global Registration)
+      // We pass the PROMISE 'image' directly now
+      const result = await faceService.registerFace(
+        context.user.id,        
+        "global",               
+        currentUser.email,      
+        image 
       );
 
-      if (response.data.status === "success") {
+      // 4. Handle Result
+      if (result.success) {
         await context.prisma.user.update({
             where: { id: context.user.id },
             data: { hasFaceRegistered: true }
         });
 
+        logger.info("✅ Face registration successful", { userId: context.user.id });
         return {
           success: true,
-          message: `Face ID enabled! System now holds ${response.data.total_faces} identities.`,
+          message: `Face ID enabled! System now holds ${result.total_faces} identities.`,
         };
-      } else {
-        return {
-          success: false,
-          message: response.data.message || "Failed to register face.",
-        };
-      }
+      } 
+      
+      return { success: false, message: result.message };
+
     } catch (error: any) {
-      logger.error("Error calling face-recognition service:", error.message);
-      return {
-        success: false,
-        message: "An error occurred while processing your biometric data.",
-      };
+      logger.error("AddFace Error:", error.message);
+      return { success: false, message: "Biometric enrollment failed." };
     }
   },
 
+  // ==========================================
+  // LOGIN (Verification)
+  // ==========================================
   loginWithFace: async (
     _: any,
     { image }: { image: Promise<Upload> },
     context: AppContext
   ) => {
-    const healthCheck = await checkFaceServiceHealth();
-    if (!healthCheck.isOnline) {
-      return {
-        success: false,
-        token: null,
-        user: null,
-        message: "Face service offline. Use password.",
-      };
-    }
+    logger.info("🔐 Face login attempt...");
+
+    // 1. Health Check
+    const health = await faceService.checkHealth();
+    if (!health.isOnline) return { success: false, message: "Service offline. Use password." };
 
     try {
-      const { createReadStream, filename, mimetype } = await image;
-      const stream = createReadStream();
-
-      const formData = new FormData();
-      formData.append("file", stream, { filename, contentType: mimetype });
-
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/verify`,
-        formData,
-        {
-          headers: { ...formData.getHeaders() },
-          timeout: 10000,
-          validateStatus: (status) => status < 500, 
-        }
+      // 2. Call Service (Global Verification)
+      // We send "global" because we don't know who the user is yet
+      const verification = await faceService.verifyFace(
+        "global", 
+        "global", 
+        image
       );
 
-      const { access, user, emotion_detected, error } = response.data;
+      // 3. Handle Result
+      if (verification.success && verification.matchedUser) {
+        logger.info(`✅ Match Found: ${verification.matchedUser}`);
 
-      if (access === "GRANTED" && user) {
-        
-        const foundUser = await context.prisma.user.findFirst({
-          where: {
-            OR: [
-                { name: user },
-                { email: user },
-                { name: user.replace(/_/g, " ") } 
-            ]
-          },
+        // Find user by EMAIL (because we saved email as the name in addFace)
+        const foundUser = await context.prisma.user.findUnique({
+          where: { email: verification.matchedUser },       
         });
 
-        if (!foundUser) {
-            logger.warn(`Face match '${user}' found in Python but not in Postgres.`);
-            return {
-                success: false,
-                token: null,
-                user: null,
-                message: "Biometric match found, but account linking failed.",
-            };
-        }
+        if (!foundUser) return { success: false, message: "Face recognized, but account not found." };
+        if (!foundUser.isActive) return { success: false, message: "Account disabled." };
 
-        if (!foundUser.isActive) {
-            return {
-                success: false,
-                token: null,
-                user: null,
-                message: "Account is disabled.",
-            };
-        }
-
+        // Generate Token
         const token = SecurityConfig.generateToken(foundUser);
 
+        // Update Stats
         await context.prisma.user.update({
             where: { id: foundUser.id },
             data: { lastLoginAt: new Date() }
@@ -172,41 +112,36 @@ export const faceAuthMutations = {
           success: true,
           token: token,
           user: foundUser,
-          message: `Welcome, ${foundUser.name}! (Mood: ${emotion_detected})`,
+          message: `Welcome back, ${foundUser.name}! (Mood: ${verification.emotion})`,
         };
-
-      } else {
-        return {
-          success: false,
-          token: null,
-          user: null,
-          message: error || "Face not recognized. Please try again.",
-        };
-      }
-    } catch (error: any) {
-      logger.error("Error during facial login:", error.message);
+      } 
+      
+      // 4. Failure
+      logger.warn(`⛔ Login Failed: ${verification.error || verification.emotion}`);
       return {
         success: false,
         token: null,
         user: null,
-        message: "Biometric processing error.",
+        message: verification.emotion ? `Liveness Failed: ${verification.emotion}` : "Face not recognized.",
       };
+
+    } catch (error: any) {
+      logger.error("Login Error:", error.message);
+      return { success: false, message: "Biometric processing error." };
     }
   },
 
+  // ==========================================
+  // REMOVE
+  // ==========================================
   removeFace: async (_: any, __: any, context: AppContext) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to remove your face.");
-    }
+    if (!context.user) throw new AuthenticationError("Unauthorized");
     
     await context.prisma.user.update({
         where: { id: context.user.id },
         data: { hasFaceRegistered: false }
     });
 
-    return {
-      success: true,
-      message: "Face ID disabled for this account.",
-    };
+    return { success: true, message: "Face ID disabled." };
   },
 };

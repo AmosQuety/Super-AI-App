@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  
 }
 
 model User {
@@ -22,6 +23,7 @@ model User {
   audioJobs AudioJob[]
   documents Document[]
   hasFaceRegistered Boolean @default(false)
+  workspaces    Workspace[]
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   
@@ -113,4 +115,46 @@ model Document {
   @@index([userId])
   @@index([createdAt])
   @@map("documents")
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Game of Thrones Cast"
+  description String?
+  isDefault   Boolean  @default(false) // Every user needs a default one
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // A workspace contains many faces
+  faces       Face[]
+  
+  // Settings specific to this workspace (e.g., threshold 0.4 vs 0.6)
+  settings    String?  // JSON string storing configs
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Face {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Jon Snow"
+  imageUrl    String   // Path to the image on disk
+  
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  
+  // We track when this face was enrolled
+  createdAt   DateTime @default(now())
+}
+
+model ExperimentLog {
+  id          String   @id @default(cuid())
+  type        String   // "RECOGNITION", "LIVENESS", "TWIN_METER"
+  result      String   // JSON result
+  screenshot  String?  // Path to the image captured
+  
+  workspaceId String?  // Optional: link log to a workspace
+  
+  createdAt   DateTime @default(now())
 }

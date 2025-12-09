@@ -148,6 +148,10 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+              <button 
+                onClick={() => window.location.href = "/profile"} // or use navigate if you have router access
+                className="flex items-center space-x-3 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 p-4 rounded-xl transition-colors"
+              >
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-white/10 shadow-sm">
                 <User className="w-5 h-5 text-white" />
               </div>
@@ -159,6 +163,7 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
                   {user?.email || ""}
                 </span>
               </div>
+              </button>
             </div>
             <button 
               onClick={signOut} 

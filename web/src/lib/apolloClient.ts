@@ -1,4 +1,4 @@
-// web/src/lib/apolloClient.ts
+// src/lib/apolloClient.ts
 
 import {
   ApolloClient,
@@ -6,30 +6,52 @@ import {
   from,
   ApolloLink,
   Observable,
+  HttpLink, // Import HttpLink
+  split,    // Import split
 } from "@apollo/client";
+import { getMainDefinition } from "@apollo/client/utilities"; // Import utility
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { RetryLink } from "@apollo/client/link/retry";
-import createUploadLink from "apollo-upload-client";
+import { createUploadLink } from "./uploadLink"; // Ensure this path is correct for your project
 
-// GraphQL endpoint
-const GRAPHQL_URL = "http://localhost:4001/graphql";
+// phone IP address
+const GRAPHQL_URL = "http://10.117.54.213:4001/graphql";
 
 console.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,
   environment: import.meta.env.MODE,
 });
 
-// --- FIX IS HERE ---
-// 1. We cast the result to 'unknown' first, then 'ApolloLink'.
-// This tells TypeScript: "I know this library returns a link, trust me."
-const httpLink = createUploadLink({
+// 1. Create the Upload Link (For mutations with files)
+const uploadLink = createUploadLink({
   uri: GRAPHQL_URL,
   headers: {
     "apollo-require-preflight": "true",
-  }
-}) as unknown as ApolloLink; 
-// -------------------
+  },
+}) as unknown as ApolloLink;
+
+// 2. Create the Standard HTTP Link (For everything else - sends application/json)
+const httpLink = new HttpLink({
+  uri: GRAPHQL_URL,
+});
+
+// 3. Create a Split Link
+// This routes requests: If it's a mutation with files, use uploadLink. Otherwise, use httpLink.
+const terminalLink = split(
+  ({ query }) => {
+    const definition = getMainDefinition(query);
+    return (
+      definition.kind === 'OperationDefinition' &&
+      definition.operation === 'mutation' 
+      // You can add more logic here if needed, but usually 
+      // separating mutations is enough to catch file uploads 
+      // if you assume only mutations have files.
+    );
+  },
+  uploadLink,
+  httpLink
+);
 
 // Add loading state tracking
 let activeRequests = 0;
@@ -45,18 +67,23 @@ const decrementRequest = () => {
 };
 
 // Auth link - Get token from localStorage
-const authLink = setContext((_, { headers }) => {
+const authLink = setContext(async (_, { headers }) => {
+  // Read token fresh from localStorage every time
   const token = localStorage.getItem('authToken');
+  
+  // Debug log to ensure token exists when query fires
+  if (!token) console.warn('⚠️ No auth token found in localStorage');
   
   return {
     headers: {
       ...headers,
+      "apollo-require-preflight": "true",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     }
   };
 });
 
-// REFACTOR: Enhanced retry logic with exponential backoff
+// Retry logic
 const retryLink = new RetryLink({
   delay: {
     initial: 300,
@@ -66,7 +93,6 @@ const retryLink = new RetryLink({
   attempts: {
     max: 3,
     retryIf: (error, _operation) => {
-      // Retry on network errors and specific server errors
       return !!error && (
         error.toString().includes('NetworkError') ||
         error.toString().includes('Failed to fetch')
@@ -75,7 +101,7 @@ const retryLink = new RetryLink({
   },
 });
 
-// REFACTOR: Enhanced error handling with user feedback
+// Error handling
 const errorLink = onError(
   ({ graphQLErrors, networkError, operation, forward }) => {
     decrementRequest();
@@ -87,18 +113,18 @@ const errorLink = onError(
         console.error(
           `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
         );
-        console.error('Extensions:', extensions);
         
         if (extensions?.code === "UNAUTHENTICATED") {
           console.warn("User authentication failed - redirecting to login");
           
           if (typeof window !== 'undefined') {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('userData');
-            
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/login') {
-              window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
+            // Only clear and redirect if we are SURE it's not a temporary glitch
+            // Checks if the token is actually missing before nuking session
+            if (!localStorage.getItem('authToken')) {
+                const currentPath = window.location.pathname;
+                if (currentPath !== '/login') {
+                  window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
+                }
             }
           }
         }
@@ -107,15 +133,11 @@ const errorLink = onError(
 
     if (networkError) {
       console.error(`[Network error]: ${networkError.message}`);
-      
-      if (networkError.message.includes("Failed to fetch")) {
-        console.error("🔴 Server is not reachable. Please check if the backend is running.");
-      }
     }
   }
 );
 
-// Create a custom link to track requests and log them
+// Tracking link
 const trackingLink = new ApolloLink((operation, forward) => {
   incrementRequest();
   
@@ -130,16 +152,10 @@ const trackingLink = new ApolloLink((operation, forward) => {
     const subscription = observable.subscribe({
       next: (response) => {
         decrementRequest();
-        console.log('✅ GraphQL Response:', {
-          name: operation.operationName,
-          data: response.data,
-          errors: response.errors,
-        });
         observer.next(response);
       },
       error: (error) => {
         decrementRequest();
-        console.error('❌ GraphQL Error in tracking link:', error);
         observer.error(error);
       },
       complete: () => {
@@ -153,7 +169,8 @@ const trackingLink = new ApolloLink((operation, forward) => {
 
 // Create Apollo Client
 const client = new ApolloClient({
-  link: from([trackingLink, retryLink, errorLink, authLink, httpLink]),
+  // CHAIN: Track -> Retry -> Error -> Auth -> (Split: HTTP vs Upload)
+  link: from([trackingLink, retryLink, errorLink, authLink, terminalLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {

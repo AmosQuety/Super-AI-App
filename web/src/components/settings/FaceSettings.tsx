@@ -1,6 +1,6 @@
 // src/components/settings/FaceSettings.tsx
 import React, { useState } from "react";
-import { useMutation, useQuery } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { ADD_FACE, GET_ME, REMOVE_FACE } from "../../graphql/users";
 import { FaceCapture } from "../auth/FaceCapture";
 import { useToast } from "../ui/toastContext";

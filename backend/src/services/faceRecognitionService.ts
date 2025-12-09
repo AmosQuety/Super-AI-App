@@ -1,45 +1,47 @@
 // src/services/faceRecognitionService.ts
 import axios from "axios";
 import FormData from "form-data";
-import { Upload } from "../resolvers/types/upload"; // Ensure you have the Upload type defined
+import { Upload } from "../resolvers/types/upload"; 
 import { logger } from "../utils/logger";
 
-// Point to your running Python FastAPI server
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
 export class FaceRecognitionService {
   
-  /**
-   * Ping the Python Service to see if it's alive
-   */
   async checkHealth() {
     try {
-      const response = await axios.get(`${PYTHON_SERVICE_URL}/`);
+      const response = await axios.get(`${PYTHON_SERVICE_URL}/`, { timeout: 2000 });
       return { 
         isOnline: response.status === 200, 
         message: response.data.system || "Python Service Online",
-        registeredFacesCount: 0 // You could add an endpoint in Python to get this count
+        registeredFacesCount: 0 
       };
     } catch (error: any) {
-      logger.error("❌ Python Face Service is OFFLINE", { error: error.message });
+      // Don't log full error stack for health checks to keep logs clean
       return { isOnline: false, message: "Face Recognition Service Unavailable", registeredFacesCount: 0 };
     }
   }
 
   /**
-   * Send image to Python for Registration (Enrollment)
+   * Register a face (Accepts Promise<Upload>)
    */
-  async registerFace(userId: string, userName: string, image: Upload) {
+  async registerFace(
+    userId: string, 
+    workspaceId: string, 
+    characterName: string, 
+    image: Promise<Upload> // <--- CHANGED TYPE HERE
+  ) {
     try {
-      logger.info(`Attempting to register face for User ID: ${userId} (${userName})`);
-      
+      logger.info(`Sending face to Python: User=${userId}, Workspace=${workspaceId}, Name=${characterName}`);
+
+      // Await the upload promise here
       const { createReadStream, filename, mimetype } = await image;
       const stream = createReadStream();
 
-      // Prepare form data
       const formData = new FormData();
-      // Python API expects 'name' and 'file'
-      formData.append("name", userName); // We use the user's name (or ID) to label the face
+      formData.append("user_id", userId);
+      formData.append("workspace_id", workspaceId);
+      formData.append("name", characterName);
       formData.append("file", stream, { filename, contentType: mimetype });
 
       const response = await axios.post(
@@ -49,26 +51,37 @@ export class FaceRecognitionService {
           headers: { ...formData.getHeaders() },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
+          timeout: 60000, // 60s for model loading
         }
       );
 
       return { success: true, ...response.data };
     } catch (error: any) {
       logger.error("Face Registration Failed", { error: error.response?.data || error.message });
-      throw new Error(error.response?.data?.detail || "Failed to register face");
+      // Return a structured error so the resolver can handle it
+      return { 
+        success: false, 
+        message: error.response?.data?.message || "Failed to register face" 
+      };
     }
   }
 
   /**
-   * Send image to Python for Verification (Login)
+   * Verify a face (Accepts Promise<Upload>)
    */
-  async verifyFace(image: Upload) {
+  async verifyFace(
+    userId: string, 
+    workspaceId: string, 
+    image: Promise<Upload> // <--- CHANGED TYPE HERE
+  ) {
     try {
+      // Await the upload promise here
       const { createReadStream, filename, mimetype } = await image;
       const stream = createReadStream();
 
       const formData = new FormData();
-      // Python API expects 'file'
+      formData.append("user_id", userId);
+      formData.append("workspace_id", workspaceId);
       formData.append("file", stream, { filename, contentType: mimetype });
 
       const response = await axios.post(
@@ -76,30 +89,35 @@ export class FaceRecognitionService {
         formData,
         {
           headers: { ...formData.getHeaders() },
-          validateStatus: (status) => status < 500, // Handle 401 (Denied) manually
+          validateStatus: (status) => status < 500, // Handle 401s manually
+          timeout: 60000, // 60s
         }
       );
 
-      // The Python API returns:
-      // 200 OK: { access: "GRANTED", user: "Jon Snow", ... }
-      // 401 Unauthorized: { access: "DENIED", error: "...", ... }
+      const { access, user, emotion_detected, error, message } = response.data;
 
-      if (response.data.access === "GRANTED") {
+      if (access === "GRANTED") {
         return {
           success: true,
-          matchedUser: response.data.user, // The name stored in Python
+          matchedUser: user, 
           confidence: response.data.confidence,
-          emotion: response.data.emotion_detected
+          emotion: emotion_detected
         };
       } else {
         return {
           success: false,
-          error: response.data.error || "Face not recognized",
-          emotion: response.data.message
+          error: error || "Face not recognized",
+          emotion: message // Contains "User looked 'fear'" etc.
         };
       }
 
     } catch (error: any) {
+      // Check for timeout
+      if (error.code === 'ECONNABORTED') {
+         logger.error("❌ Python Service Timed Out");
+         return { success: false, error: "Service warming up, please try again." };
+      }
+      
       logger.error("Face Verification Error", { error: error.message });
       throw new Error("Could not connect to biometric engine.");
     }

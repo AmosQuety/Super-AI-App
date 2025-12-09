@@ -8,9 +8,29 @@ import FaceSettings from "../components/settings/FaceSettings";
 import { User, Mail, Lock, Save, Loader2, LogOut } from "lucide-react";
 
 export default function ProfilePage() {
-  const { signOut } = useAuth();
+
   const { addToast } = useToast();
-  const { data, loading, error } = useQuery(GET_ME);
+  
+  const {user , token , isAuthenticated , signOut, isLoading: authLoading } = useAuth();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔐 Profile Page Auth State:', {
+      user,
+      token: token ? 'Present' : 'Missing',
+      isAuthenticated,
+      localStorageToken: localStorage.getItem('authToken')
+    });
+  }, [user, token, isAuthenticated]);
+
+  const { data, loading, error, refetch } = useQuery(GET_ME, {
+    fetchPolicy: 'network-only', // Force fresh request
+    skip: !token,
+    onError: (error) => {
+      console.error('❌ GET_ME Query Error:', error);
+      console.log('📝 Current localStorage token:', localStorage.getItem('authToken'));
+    }
+  });
 
   // Form States
   const [name, setName] = useState("");
@@ -56,7 +76,20 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin mr-2" /> Loading profile...</div>;
+  // Handle Auth Loading State specifically
+  if (authLoading || (!data && loading)) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-white">
+        <Loader2 className="animate-spin mr-2" /> Loading profile...
+      </div>
+    );
+  }
+
+   // If we are not loading, but have no data and no user, show a friendly message or redirect
+  if (!data?.me) {
+     return <div className="text-white text-center p-10">Please log in to view profile.</div>;
+  }
+  
   if (error) return <div className="text-red-500 text-center p-10">Error loading profile: {error.message}</div>;
 
   return (

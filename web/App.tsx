@@ -126,12 +126,13 @@ const AppRoutes = () => {
           path="voice"
           element={<VoiceTools userId={defaultUser.id} />}
         />
-      </Route>
 
-      <Route
-        path="/profile"
-        element={<ProfilePage />}
-      />
+        {/* Profile Route - ADDED INSIDE LAYOUT */}
+        <Route
+          path="profile"
+          element={<ProfilePage />}
+        />
+      </Route>
 
       {/* Redirect unknown routes to the main dashboard or login */}
       <Route path="*" element={<Navigate to="/" replace />} />

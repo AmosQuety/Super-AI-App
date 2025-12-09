@@ -2,7 +2,7 @@
 import * as dotenv from "dotenv";
 // Initialize environment variables
 dotenv.config();
-import express, { Application, Request, Response } from "express";
+import express, { Application, Request, Response, NextFunction } from "express";
 import { ApolloServer } from "apollo-server-express";
 import { PrismaClient } from "@prisma/client";
 
@@ -89,6 +89,10 @@ const startServer = async (): Promise<any> => {
         "http://127.0.0.1:3000",
         "http://localhost:8081",
         "exp://localhost:8081",
+
+         "http://10.117.54.213:5173", 
+        "http://10.117.54.213:3000",
+
         // Add Apollo Studio domains
         "https://studio.apollographql.com",
         "https://sandbox.apollo.dev",
@@ -121,6 +125,18 @@ const startServer = async (): Promise<any> => {
 
     // JSON body parser
     app.use(express.json());
+
+    // Debug middleware to log upload requests
+    app.use('/graphql', (req: Request, _res: Response, next: NextFunction) => {
+      if (req.method === 'POST') {
+        console.log('📨 Incoming GraphQL request:', {
+          contentType: req.headers['content-type'],
+          hasBody: !!req.body,
+          isMultipart: req.headers['content-type']?.includes('multipart/form-data'),
+        });
+      }
+      next();
+    });
 
     // GraphQL upload middleware
     app.use(graphqlUploadExpress(UPLOAD_CONFIG));

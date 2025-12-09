@@ -1,3 +1,4 @@
+// src/graphql/users.ts
 import { gql } from "@apollo/client";
 
 // ==================== Auth Queries ====================

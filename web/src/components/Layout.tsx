@@ -147,7 +147,10 @@ const Layout = () => {
             <div className="flex items-center space-x-2 lg:space-x-3">
               {user && (
                 <div className="hidden md:flex items-center space-x-3">
-                    <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50">
+                  <button 
+                      onClick={() => navigate("/profile")}>
+                    <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                        
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-white/10">
                             <User className="w-4 h-4 text-white" onClick={() => navigate("/profile")}/>
                         </div>
@@ -155,6 +158,7 @@ const Layout = () => {
                             {user.name || user.email}
                         </span>
                     </div>
+                    </button>
                     <button onClick={handleSignOut} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-slate-200 dark:border-slate-700/50" aria-label="Sign out" title="Sign out">
                         <LogOut className="w-4 h-4" />
                     </button>
@@ -198,15 +202,20 @@ const Layout = () => {
               {user && (
                 <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
                     <div className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800/50 mb-2">
+                        <button 
+                            onClick={() => navigate("/profile")}
+                            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors text-left mb-2"
+                          >
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-white/10">
                             <User className="w-4 h-4 text-white" />
                         </div>
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {user.name || user.email}
                         </span>
+                        </button>
                     </div>
                     <button onClick={handleSignOut} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                        <LogOut className="w-5 h-5" />
+                        <LogOut className="w-5 h-5" /> 
                         <span className="font-medium">Sign Out</span>
                     </button>
                     
