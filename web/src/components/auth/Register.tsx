@@ -6,8 +6,10 @@ import { useToast } from '../ui/toastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';;
-
+import { signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';
+import { FaceCapture } from "./FaceCapture"; 
+import { useMutation } from '@apollo/client/react'; 
+import { ADD_FACE } from '../../graphql/users'; 
 
 export default function RegisterScreen() {
   const { showSuccess, showError } = useToast();
@@ -15,6 +17,13 @@ export default function RegisterScreen() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // VIEW CONTROL
+  const [showFaceEnroll, setShowFaceEnroll] = useState(false);
+  const [faceLoading, setFaceLoading] = useState(false);
+
+  // Hook for adding face
+  const [addFaceMutation] = useMutation(ADD_FACE);
 
   const {
     register,
@@ -25,12 +34,16 @@ export default function RegisterScreen() {
     mode: 'onChange'
   });
 
+  // STEP 1: CREATE ACCOUNT
   const onSubmit = async (data: SignUpFormData) => {
     try {
       setIsLoading(true);
       await signUp(data);
-      showSuccess('Welcome!', 'Your account has been created successfully.');
-      navigate('/chat');
+      
+      // SUCCESS! Now switch to Face Enrollment View
+      showSuccess('Account Created!', 'One last step: Secure your account.');
+      setShowFaceEnroll(true);
+      
     } catch (error: any) {
       showError('Sign up failed', error.message || 'Please try again.');
     } finally {
@@ -38,12 +51,73 @@ export default function RegisterScreen() {
     }
   };
 
+  // STEP 2: ENROLL FACE
+  const handleFaceEnroll = async (file: File) => {
+    try {
+      setFaceLoading(true);
+      // We rely on the token already being in localStorage from the signUp() step
+      const { data } = await addFaceMutation({ variables: { image: file } });
+      
+      if (data.addFace.success) {
+        showSuccess('Biometrics Enabled', 'You can now use Face ID to login.');
+        navigate('/chat');
+      } else {
+        showError('Enrollment Failed', data.addFace.message);
+      }
+    } catch (err: any) {
+      showError('Error', err.message);
+    } finally {
+      setFaceLoading(false);
+    }
+  };
+
+  const skipEnrollment = () => {
+    navigate('/chat');
+  };
+
+  // ------------------------------------------
+  // VIEW 2: FACE ENROLLMENT (Post-Signup)
+  // ------------------------------------------
+  if (showFaceEnroll) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-800 rounded-3xl p-8 shadow-xl border border-slate-700 text-center animate-in fade-in zoom-in duration-300">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+               <User className="text-purple-400 w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Secure Your Account 📸</h2>
+            <p className="text-slate-400 text-sm">
+              Register your face now to enable instant login next time.
+            </p>
+          </div>
+          
+          <FaceCapture 
+            onCapture={handleFaceEnroll}
+            onCancel={skipEnrollment} 
+            loading={faceLoading}
+            mode="register"
+          />
+          
+          <button 
+            onClick={skipEnrollment}
+            className="mt-8 text-slate-500 hover:text-slate-300 text-xs uppercase tracking-widest hover:underline transition-all"
+          >
+            Skip for now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------
+  // VIEW 1: REGISTRATION FORM
+  // ------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
-      {/* Header */}
       <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
-          {/* Logo Section */}
+          
           <div className="text-center">
             <div className="mx-auto bg-gradient-to-br from-purple-500 to-pink-600 p-5 rounded-3xl w-20 h-20 flex items-center justify-center mb-6 shadow-2xl shadow-purple-500/30">
               <User size={36} className="text-white" />
@@ -56,109 +130,44 @@ export default function RegisterScreen() {
             </p>
           </div>
 
-          {/* Form Card */}
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-8 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/50">
             <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-              {/* Name Field */}
+              
+              {/* Name */}
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <input
-                    {...register('name')}
-                    type="text"
-                    id="name"
-                    placeholder="Enter your full name"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white transition-colors"
-                    autoComplete="name"
-                    autoCapitalize="words"
-                  />
-                </div>
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-                )}
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                <input {...register('name')} type="text" placeholder="John Doe" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
               </div>
 
-              {/* Email Field */}
+              {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <input
-                    {...register('email')}
-                    type="email"
-                    id="email"
-                    placeholder="Enter your email"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white transition-colors"
-                    autoComplete="email"
-                  />
-                </div>
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-                )}
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <input {...register('email')} type="email" placeholder="you@example.com" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
               </div>
 
-              {/* Password Field */}
+              {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Password
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Password</label>
                 <div className="relative">
-                  <input
-                    {...register('password')}
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    placeholder="Create a password"
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white transition-colors"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
+                  <input {...register('password')} type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Password must be at least 6 characters long
-                </p>
+                {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
               </div>
 
-              {/* Sign Up Button */}
-              <button
-                type="submit"
-                disabled={!isValid || isLoading}
-                className="w-full bg-blue-500 text-white py-3 px-4 rounded-xl hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-lg"
-              >
+              <button type="submit" disabled={!isValid || isLoading} className="w-full bg-blue-500 text-white py-3 px-4 rounded-xl hover:bg-blue-600 transition-colors font-semibold text-lg disabled:opacity-50">
                 {isLoading ? 'Creating Account...' : 'Sign Up'}
               </button>
             </form>
 
-            {/* Sign In Link */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Already have an account?
-              </p>
-              <Link
-                to="/login"
-                className="text-purple-500 font-semibold hover:text-purple-600 transition-colors text-base"
-              >
-                Sign In
-              </Link>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Already have an account?</p>
+              <Link to="/login" className="text-purple-500 font-semibold hover:text-purple-600">Sign In</Link>
             </div>
-          </div>
-
-          {/* App Version */}
-          <div className="text-center">
-            <p className="text-gray-400 dark:text-gray-500 text-xs">
-              Super AI App v1.0.0
-            </p>
           </div>
         </div>
       </div>

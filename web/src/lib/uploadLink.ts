@@ -1,34 +1,30 @@
 // web/src/lib/uploadLink.ts
 import { ApolloLink, Observable } from "@apollo/client";
-import { print } from "graphql"; // <--- Import the printer here!
+import { print } from "graphql"; 
 
 export function createUploadLink({ uri, headers = {} }: { uri: string; headers?: Record<string, string> }) {
   return new ApolloLink((operation) => {
     return new Observable((observer) => {
+      // 1. Get the context (This is where AuthLink put the token!)
       const context = operation.getContext();
       const fetchOptions = context.fetchOptions || {};
+      const contextHeaders = context.headers || {}; // <--- THIS HOLDS THE TOKEN
 
       const { variables, query } = operation;
 
-      // 1. Setup the FormData
       const body = new FormData();
-
-      // 2. Map to store file locations & array to hold files
       const map: Record<string, string[]> = {};
       const files: File[] = [];
 
-      // Helper to walk the tree, replace Files with null, and populate map/files
       const extractFiles = (tree: any, path: string[]): any => {
         if (!tree) return tree;
-
         if (typeof tree !== 'object') return tree;
 
         if (tree instanceof File) {
           const key = `${files.length}`;
           files.push(tree);
-          // GraphQL Upload spec requires the path to be variables.input.image etc.
           map[key] = [path.join('.')];
-          return null; // Replace file with null in the variables JSON
+          return null; 
         }
 
         if (Array.isArray(tree)) {
@@ -42,11 +38,8 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
         return newObj;
       };
 
-      // Perform extraction
       const cleanVariables = extractFiles(variables, ['variables']);
 
-      // 3. Append 'operations' FIRST
-      // We use the imported 'print' function here instead of require('graphql')
       const queryString = typeof query !== 'string' ? print(query) : query;
       
       body.append("operations", JSON.stringify({
@@ -54,22 +47,19 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
         variables: cleanVariables
       }));
 
-      // 4. Append 'map' SECOND
       body.append("map", JSON.stringify(map));
 
-      // 5. Append files LAST
       files.forEach((file, index) => {
         body.append(`${index}`, file, file.name);
       });
 
-      // 6. Send Request
+      // 2. Send Request with MERGED HEADERS
       fetch(uri, {
         method: "POST",
         body,
         headers: {
-          ...headers,
-          // Important: Do NOT set Content-Type here. 
-          // The browser automatically sets it to multipart/form-data with the correct boundary.
+          ...headers,        // Headers passed to the link factory
+          ...contextHeaders, // <--- CRITICAL: Add the Auth Token here!
         },
         ...fetchOptions,
       })

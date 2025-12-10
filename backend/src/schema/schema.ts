@@ -134,6 +134,8 @@ export const typeDefs = gql`
 
     # NEW: Hugging Face status
     aiImageGenerationStatus: AIImageGenerationStatus!
+
+    myWorkspaces: [Workspace!]!
   }
 
   type Mutation {
@@ -154,10 +156,13 @@ export const typeDefs = gql`
     deleteMessage(messageId: ID!): Boolean!
     
     # Face recognition
-    addFace(image: Upload!): GenericResponse!
+    addFace(image: Upload!, workspaceId: String, characterName: String): GenericResponse!
     loginWithFace(image: Upload!): FaceAuthPayload!
     removeFace: GenericResponse!
-    
+    compareFaces(image1: Upload!, image2: Upload!): CompareResult!
+    findFaceInCrowd(target: Upload!, crowd: Upload!): FindFaceResult!
+    verifyFaceInWorkspace(image: Upload!, workspaceId: String!): FaceAuthPayload!
+
     # AI content generation
     generateGeminiContent(prompt: String!): GeminiResponse!
     generateImage(userId: ID!, prompt: String!): ImageGeneration!
@@ -166,6 +171,11 @@ export const typeDefs = gql`
     # NEW: Hugging Face image generation (different names to avoid conflict)
     generateAIImage(input: AIImageGenerationInput!): AIImageGenerationResponse!
     generateAIImageVariants(prompt: String!): AIImageGenerationResponse!
+
+    analyzeFaceAttribute(image: Upload!): FaceAnalysisResult!
+
+    createWorkspace(name: String!, description: String): Workspace!
+    deleteWorkspace(id: ID!): Boolean!
 
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
   }
@@ -211,6 +221,57 @@ export const typeDefs = gql`
 
   type Subscription {
     messageAdded(chatId: ID!): Message
+  }
+
+  type FaceAnalysisResult {
+    success: Boolean!
+    data: FaceAttributes
+    error: String
+  }
+
+  type FaceAttributes {
+    age: Int
+    gender: String
+    emotion: String
+    emotion_score: Float
+  }
+
+  
+  type CompareResult {
+    success: Boolean!
+    data: CompareData
+    error: String
+  }
+
+  type CompareData {
+    verified: Boolean
+    distance: Float
+    similarity_score: Float
+    threshold: Float
+  }
+
+  type FindFaceResult {
+    success: Boolean!
+    matches: Int
+    processed_image: String # This will contain the Base64 image
+    error: String
+  }
+
+  type Workspace {
+    id: ID!
+    name: String!
+    faces: [Face!]
+    description: String
+    isDefault: Boolean!
+    faceCount: Int # Computed field
+    createdAt: DateTime!
+  }
+
+  type Face {
+    id: ID!
+    name: String!
+    imageUrl: String
+    createdAt: DateTime!
   }
 
   ${authTypeDefs}

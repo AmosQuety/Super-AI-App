@@ -9,6 +9,7 @@ import { subscriptionResolvers } from "./subscriptionResolvers";
 import { sendMessageWithResponse } from "./sendMessageWithResponse";
 import { AppContext } from "./types/context";
 import { imageGenerationResolvers } from "./imageGenerationResolvers";
+import { workspaceResolvers } from "./workspaceResolvers";
 
 export const resolvers: IResolvers = {
   ...scalarResolvers,
@@ -18,6 +19,7 @@ export const resolvers: IResolvers = {
     ...authResolvers.Query,
     ...queryResolvers,
     ...imageGenerationResolvers.Query,
+    ...workspaceResolvers.Query,
   },
 
   Mutation: {
@@ -25,6 +27,7 @@ export const resolvers: IResolvers = {
     ...mutationResolvers,
     ...sendMessageWithResponse,
     ...imageGenerationResolvers.Mutation,
+     ...workspaceResolvers.Mutation
   },
   
   User: { 
@@ -39,6 +42,8 @@ export const resolvers: IResolvers = {
   Message: { 
     ...messageResolvers 
   },
+
+  Workspace: workspaceResolvers.Workspace ,
 
   ImageGeneration: {
     user: async (parent: any, _: any, context: AppContext) => {

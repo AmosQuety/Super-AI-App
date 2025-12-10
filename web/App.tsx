@@ -14,6 +14,8 @@ import ImageGenerator from "./src/components/ImageGenerator";
 import VoiceTools from "./src/components/VoiceTools";
 import "./index.css";
 import ProfilePage from "./src/pages/ProfilePage";
+import PlaygroundPage from "./src/pages/PlaygroundPage";
+import { WorkspaceProvider } from "./src/contexts/WorkspaceContext";
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -93,6 +95,7 @@ const AppRoutes = () => {
       <Route path="/" element={
         <ProtectedRoute>
           <Layout />
+          {/* <PlaygroundPage /> */}
         </ProtectedRoute>
       }>
         {/* Home Route */}
@@ -108,6 +111,11 @@ const AppRoutes = () => {
             />
           }
         />
+
+        <Route 
+            path="/playground" 
+            element={<PlaygroundPage /> } 
+            />
         
         {/* Voice Screen Route */}
         <Route 
@@ -146,11 +154,13 @@ export default function App() {
     <ThemeProvider>
     <ToastProvider>
       <AuthProvider>
+        <WorkspaceProvider>
         <Router>
           <div className="App">
             <AppRoutes />
           </div>
         </Router>
+        </WorkspaceProvider>
       </AuthProvider>
     </ToastProvider>
     </ThemeProvider>

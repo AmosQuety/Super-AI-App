@@ -135,6 +135,9 @@ export default function LoginScreen() {
                   <ScanFace className="w-5 h-5" />
                   Login with Face ID
                 </button>
+                <p className="text-center text-xs text-gray-500 mt-2">
+                  * Face ID must be enabled in your profile settings first.
+                </p>
 
                 {/* Sign In Button */}
                 <button
@@ -150,7 +153,8 @@ export default function LoginScreen() {
             {/* Sign Up Link */}
             <p className="text-center text-gray-400 mt-6">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-purple-400 hover:text-purple-300 font-medium transition">
+              
+              <Link to="/register" className="text-purple-400 hover:text-purple-300 font-medium transition">
                 Sign Up
               </Link>
             </p>

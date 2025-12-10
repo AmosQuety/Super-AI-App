@@ -122,4 +122,92 @@ export class FaceRecognitionService {
       throw new Error("Could not connect to biometric engine.");
     }
   }
+
+  /**
+   * Phase 2: Magic Mirror Analysis
+   */
+  async analyzeFace(image: Promise<Upload>) {
+    try {
+      const { createReadStream, filename, mimetype } = await image;
+      const stream = createReadStream();
+
+      const formData = new FormData();
+      formData.append("file", stream, { filename, contentType: mimetype });
+
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/analyze`,
+        formData,
+        {
+          headers: { ...formData.getHeaders() },
+          timeout: 30000, 
+        }
+      );
+
+      return response.data; // { success: true, data: { age: 25, ... } }
+
+    } catch (error: any) {
+      logger.error("Face Analysis Error", { error: error.message });
+      throw new Error("Could not analyze face.");
+    }
+  }
+
+  async compareFaces(image1: Promise<Upload>, image2: Promise<Upload>) {
+    try {
+      const file1 = await image1;
+      const file2 = await image2;
+
+      const formData = new FormData();
+      formData.append("file1", file1.createReadStream(), { filename: file1.filename, contentType: file1.mimetype });
+      formData.append("file2", file2.createReadStream(), { filename: file2.filename, contentType: file2.mimetype });
+
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/compare`,
+        formData,
+        {
+         headers: { ...formData.getHeaders()  },
+        maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+         timeout: 60000,
+        }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error("Comparison failed: " + error.message);
+    }
+  }
+
+  
+  /**
+   * Experiment 3: Find Me in Crowd
+   */
+  async findFaceInCrowd(target: Promise<Upload>, crowd: Promise<Upload>) {
+    try {
+      const file1 = await target;
+      const file2 = await crowd;
+
+      const formData = new FormData();
+      formData.append("target", file1.createReadStream(), { filename: file1.filename, contentType: file1.mimetype });
+      formData.append("crowd", file2.createReadStream(), { filename: file2.filename, contentType: file2.mimetype });
+
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/find-face`,
+        formData,
+        {
+          headers: { ...formData.getHeaders() },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 120000 // <--- Give it 2 minutes (Group photos are heavy!)
+        }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      // Check for timeout
+      if (error.code === 'ECONNABORTED') {
+         throw new Error("Processing took too long. Try a smaller group photo.");
+      }
+      throw new Error("Find Face Error: " + error.message);
+    }
+  }
 }

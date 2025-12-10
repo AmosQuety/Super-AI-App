@@ -11,48 +11,74 @@ const faceService = new FaceRecognitionService();
 export const faceAuthMutations = {
   
   // ==========================================
-  // REGISTER (Enrollment)
+  // REGISTER (Enrollment) - Updated for Workspaces
   // ==========================================
   addFace: async (
     _: any,
-    { image }: { image: Promise<Upload> },
+    // Update arguments to accept workspace details
+    { image, workspaceId, characterName }: { image: Promise<Upload>, workspaceId?: string, characterName?: string },
     context: AppContext
   ) => {
     if (!context.user) throw new AuthenticationError("Login required.");
 
-    // 1. Health Check
     const health = await faceService.checkHealth();
     if (!health.isOnline) return { success: false, message: "Biometric engine offline." };
 
     try {
-      // 2. Identify User
-      const currentUser = await context.prisma.user.findUnique({
-        where: { id: context.user.id },
-        select: { name: true, email: true }
-      });
+      // 1. Determine Target Workspace
+      // If no workspaceId provided, default to "global" (for Main App Login)
+      const targetWorkspace = workspaceId || "global";
       
-      if (!currentUser?.email) return { success: false, message: "User email not found." };
+      // 2. Determine Name
+      // If global, use User Email. If workspace, use provided Character Name (e.g. "Jon Snow")
+      let targetName = "";
+      
+      if (targetWorkspace === "global") {
+         const currentUser = await context.prisma.user.findUnique({
+            where: { id: context.user.id },
+            select: { email: true }
+         });
+         targetName = currentUser?.email || "";
+      } else {
+         targetName = characterName || "Unknown Character";
+      }
 
-      // 3. Call Service (Global Registration)
-      // We pass the PROMISE 'image' directly now
+      if (!targetName) return { success: false, message: "Could not determine identity name." };
+
+      logger.info(`📸 Registering '${targetName}' to workspace '${targetWorkspace}'`);
+
+      // 3. Call Service
       const result = await faceService.registerFace(
         context.user.id,        
-        "global",               
-        currentUser.email,      
+        targetWorkspace,        // <--- Dynamic ID passed here
+        targetName,             // <--- Dynamic Name passed here
         image 
       );
 
-      // 4. Handle Result
+      // 4. Update Database
       if (result.success) {
-        await context.prisma.user.update({
-            where: { id: context.user.id },
-            data: { hasFaceRegistered: true }
-        });
+        
+        if (targetWorkspace === "global") {
+            // Main Login Enrollment
+            await context.prisma.user.update({
+                where: { id: context.user.id },
+                data: { hasFaceRegistered: true }
+            });
+        } else {
+            // Playground Character Enrollment
+            // Record this face in the Face table linked to the Workspace
+            await context.prisma.face.create({
+                data: {
+                    name: targetName,
+                    imageUrl: `${context.user.id}/${targetWorkspace}/${targetName}.jpg`,
+                    workspaceId: targetWorkspace
+                }
+            });
+        }
 
-        logger.info("✅ Face registration successful", { userId: context.user.id });
         return {
           success: true,
-          message: `Face ID enabled! System now holds ${result.total_faces} identities.`,
+          message: `Successfully added ${targetName} to ${targetWorkspace === 'global' ? 'Face Login' : 'Workspace'}.`,
         };
       } 
       
@@ -65,7 +91,7 @@ export const faceAuthMutations = {
   },
 
   // ==========================================
-  // LOGIN (Verification)
+  // LOGIN (Global Verification) - Keep as is
   // ==========================================
   loginWithFace: async (
     _: any,
@@ -73,75 +99,117 @@ export const faceAuthMutations = {
     context: AppContext
   ) => {
     logger.info("🔐 Face login attempt...");
-
-    // 1. Health Check
     const health = await faceService.checkHealth();
     if (!health.isOnline) return { success: false, message: "Service offline. Use password." };
 
     try {
-      // 2. Call Service (Global Verification)
-      // We send "global" because we don't know who the user is yet
-      const verification = await faceService.verifyFace(
-        "global", 
-        "global", 
-        image
-      );
+      // Always verify against "global" for login
+      const verification = await faceService.verifyFace("global", "global", image);
 
-      // 3. Handle Result
       if (verification.success && verification.matchedUser) {
-        logger.info(`✅ Match Found: ${verification.matchedUser}`);
-
-        // Find user by EMAIL (because we saved email as the name in addFace)
         const foundUser = await context.prisma.user.findUnique({
           where: { email: verification.matchedUser },       
         });
 
-        if (!foundUser) return { success: false, message: "Face recognized, but account not found." };
+        if (!foundUser) return { success: false, message: "Account not found." };
         if (!foundUser.isActive) return { success: false, message: "Account disabled." };
 
-        // Generate Token
         const token = SecurityConfig.generateToken(foundUser);
-
-        // Update Stats
-        await context.prisma.user.update({
-            where: { id: foundUser.id },
-            data: { lastLoginAt: new Date() }
-        });
+        await context.prisma.user.update({ where: { id: foundUser.id }, data: { lastLoginAt: new Date() } });
 
         return {
           success: true,
           token: token,
           user: foundUser,
-          message: `Welcome back, ${foundUser.name}! (Mood: ${verification.emotion})`,
+          message: `Welcome back, ${foundUser.name}! (${verification.emotion})`,
         };
       } 
       
-      // 4. Failure
-      logger.warn(`⛔ Login Failed: ${verification.error || verification.emotion}`);
       return {
         success: false,
         token: null,
         user: null,
-        message: verification.emotion ? `Liveness Failed: ${verification.emotion}` : "Face not recognized.",
+        message: verification.emotion ? `Liveness: ${verification.emotion}` : "Face not recognized.",
       };
 
     } catch (error: any) {
       logger.error("Login Error:", error.message);
-      return { success: false, message: "Biometric processing error." };
+      return { success: false, message: "Login failed." };
     }
   },
 
   // ==========================================
-  // REMOVE
+  // WORKSPACE VERIFICATION (Playground Testing) - NEW!
+  // ==========================================
+  verifyFaceInWorkspace: async (
+    _: any,
+    { image, workspaceId }: { image: Promise<Upload>, workspaceId: string },
+    context: AppContext
+  ) => {
+    if (!context.user) throw new AuthenticationError("Login required");
+
+    try {
+      logger.info(`🧪 Testing recognition in workspace: ${workspaceId}`);
+
+      // Call service with specific Workspace ID
+      const verification = await faceService.verifyFace(
+        context.user.id, 
+        workspaceId, // <--- Pass the specific workspace
+        image
+      );
+
+      if (verification.success) {
+        return {
+            success: true,
+            message: `Match Found: ${verification.matchedUser} (${verification.confidence}%)`,
+            user: { name: verification.matchedUser } as any, // Mock user object for UI
+            token: null // No token needed for playground test
+        };
+      } else {
+        return {
+            success: false,
+            message: `No Match Found in this workspace.`,
+            user: null,
+            token: null
+        };
+      }
+
+    } catch (error: any) {
+      logger.error("Workspace Verify Error:", error.message);
+      return { success: false, message: "Verification failed." };
+    }
+  },
+
+  // ==========================================
+  // OTHER MUTATIONS
   // ==========================================
   removeFace: async (_: any, __: any, context: AppContext) => {
     if (!context.user) throw new AuthenticationError("Unauthorized");
-    
-    await context.prisma.user.update({
-        where: { id: context.user.id },
-        data: { hasFaceRegistered: false }
-    });
-
+    await context.prisma.user.update({ where: { id: context.user.id }, data: { hasFaceRegistered: false } });
     return { success: true, message: "Face ID disabled." };
+  },
+
+  analyzeFaceAttribute: async (_: any, { image }: { image: Promise<Upload> }, _context: AppContext) => {
+    return await faceService.analyzeFace(image);
+  },
+
+  compareFaces: async (_: any, { image1, image2 }: any, _context: AppContext) => {
+    try {
+      const health = await faceService.checkHealth();
+      if (!health.isOnline) return { success: false, error: "Biometric engine is offline." };
+      const result = await faceService.compareFaces(image1, image2);
+      return { success: result.success, data: result.data, error: null };
+    } catch (error: any) {
+      return { success: false, error: "Comparison failed: " + error.message, data: null };
+    }
+  },
+
+  findFaceInCrowd: async (_: any, { target, crowd }: any, _context: AppContext) => {
+    try {
+      const result = await faceService.findFaceInCrowd(target, crowd);
+      return { success: result.success, matches: result.matches, processed_image: result.processed_image, error: null };
+    } catch (error: any) {
+      return { success: false, matches: 0, processed_image: null, error: error.message };
+    }
   },
 };
