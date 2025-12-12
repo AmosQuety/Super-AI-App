@@ -15,10 +15,12 @@ import {
   ChevronRight,
   LogOut,
   User,
-  Home
+  Home,
+  ScanFace
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth"; 
 import { useTheme } from "../contexts/ThemeContext";
+
 
 // Navigation data
 const navigation = [
@@ -40,6 +42,12 @@ const navigation = [
     icon: Mic,
     description: "Interact with AI using natural voice commands."
   },
+  {
+    name: "Face Playground",
+    href: "/playground",
+    icon: ScanFace,
+    description: "Experiment with the AI using the different visual tools"
+  }
 ];
 
 
