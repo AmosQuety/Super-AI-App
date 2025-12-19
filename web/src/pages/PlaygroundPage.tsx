@@ -7,6 +7,7 @@ import CharacterManager from "../components/playground/CharacterManager";
 import WorkspaceSelector from "../components/playground/WorkspaceSelector";
 import { Sparkles, Users, Search, FlaskConical } from "lucide-react";
 import { motion } from "framer-motion";
+import { ErrorBoundary } from "../components/ui/ErrorBoundary/ErrorBoundary";
 
 export default function PlaygroundPage() {
   const [activeTab, setActiveTab] = useState<"mirror" | "twin" | "find">("mirror");
@@ -35,9 +36,10 @@ export default function PlaygroundPage() {
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white p-4 md:p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0B0F19] to-[#0B0F19]">
       <div className="max-w-6xl mx-auto space-y-8">
-        
+        <ErrorBoundary>
         {/* TOP BAR */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-700">
+           
           <div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2 flex items-center gap-3">
               <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent">
@@ -86,9 +88,11 @@ export default function PlaygroundPage() {
                 <CharacterManager />
              </div>
           </div>
-
+    
         </div>
+        </ErrorBoundary>
       </div>
+      
     </div>
   );
 }

@@ -83,15 +83,7 @@ export const CHANGE_PASSWORD = gql`
   }
 `;
 
-// ==================== Face Auth ====================
-export const ADD_FACE = gql`
-  mutation AddFace($image: Upload!) {
-    addFace(image: $image) {
-      success
-      message
-    }
-  }
-`;
+
 
 export const LOGIN_WITH_FACE = gql`
   mutation LoginWithFace($image: Upload!) {
@@ -118,5 +110,26 @@ export const REMOVE_FACE = gql`
     }
   }
 `;
+
+export const ADD_WORKSPACE_CHARACTER = gql`
+  mutation AddWorkspaceCharacter($image: Upload!, $workspaceId: ID!, $name: String!) {
+    addWorkspaceCharacter(image: $image, workspaceId: $workspaceId, name: $name) {
+      success
+      message
+    }
+  }
+`;
+
+
+export const REGISTER_USER_FACE = gql`
+  mutation RegisterUserFace($image: Upload!) {
+    registerUserFace(image: $image) {
+      success
+      message
+    }
+  }
+`;
+
+
 
 

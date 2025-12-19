@@ -156,7 +156,8 @@ export const typeDefs = gql`
     deleteMessage(messageId: ID!): Boolean!
     
     # Face recognition
-    addFace(image: Upload!, workspaceId: String, characterName: String): GenericResponse!
+    registerUserFace(image: Upload!): GenericResponse!
+    addWorkspaceCharacter(image: Upload!, workspaceId: ID!, name: String!): GenericResponse!
     loginWithFace(image: Upload!): FaceAuthPayload!
     removeFace: GenericResponse!
     compareFaces(image1: Upload!, image2: Upload!): CompareResult!

@@ -146,8 +146,27 @@ export class FaceRecognitionService {
       return response.data; // { success: true, data: { age: 25, ... } }
 
     } catch (error: any) {
-      logger.error("Face Analysis Error", { error: error.message });
-      throw new Error("Could not analyze face.");
+      //  Log the real error for you (The Developer)
+      logger.error("Face Analysis Internal Error", { 
+        message: error.message,
+        code: error.code 
+      });
+
+      //  Return a clean error for the USER
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error("Biometric Engine is offline. Please start the Python server.");
+      }
+      if (error.code === 'ECONNABORTED') {
+        throw new Error("Analysis timed out. The model is loading, please try again in 10 seconds.");
+      }
+      
+      //  Handle Python Exceptions (e.g. 500 or 400)
+      if (error.response?.data?.error) {
+         throw new Error(`AI Error: ${error.response.data.error}`);
+      }
+
+      throw new Error("Could not analyze face. Please ensure lighting is good.");
+    
     }
   }
 

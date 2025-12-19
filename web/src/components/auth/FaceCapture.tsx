@@ -63,10 +63,10 @@ export const FaceCapture: React.FC<FaceCaptureProps> = ({
         </button>
       </div>
 
-      <div className="relative w-full max-w-sm aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 flex items-center justify-center group">
+      <div className="relative w-full max-w-sm h-64 bg-black rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 flex items-center justify-center group">
         
         {imgSrc ? (
-          <img src={imgSrc} alt="captured" className="w-full h-full object-cover" />
+          <img src={imgSrc} alt="captured" className="w-full h-full object-contain bg-black" />
         ) : useWebcam ? (
           <>
             <Webcam

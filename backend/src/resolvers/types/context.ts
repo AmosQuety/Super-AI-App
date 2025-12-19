@@ -11,6 +11,20 @@ import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
 import { ImageGenerationService } from "../../services/imageGenerationService";
 import { HuggingFaceService } from '../../services/huggingface.service'; // Add this import
+import prisma from "../../lib/db";
+
+// ============================================
+// SINGLETON SERVICES (Created once, reused)
+// ============================================
+// These services don't depend on prisma or request-specific data
+// They're initialized once when the module loads and reused for all requests
+const singletonServices = {
+  faceRecognitionService: new FaceRecognitionService(),
+  geminiAIService: new GeminiAIService(),
+  imageGenerationService: new ImageGenerationService(),
+  huggingFaceService: HuggingFaceService.getInstance(), // Add this - use getInstance() for singleton
+};
+
 
 export interface Upload {
   filename: string;
@@ -41,62 +55,15 @@ export interface AppContext {
   pubsub?: any;
 }
 
-// ============================================
-// SINGLETON SERVICES (Created once, reused)
-// ============================================
-// These services don't depend on prisma or request-specific data
-// They're initialized once when the module loads and reused for all requests
-const singletonServices = {
-  faceRecognitionService: new FaceRecognitionService(),
-  geminiAIService: new GeminiAIService(),
-  imageGenerationService: new ImageGenerationService(),
-  huggingFaceService: HuggingFaceService.getInstance(), // Add this - use getInstance() for singleton
+export const disconnectPrisma = async () => {
+  await prisma.$disconnect();
 };
 
-// ============================================
-// SHARED PRISMA CLIENT (Optional but recommended)
-// ============================================
-// Creating a new PrismaClient on every request is expensive
-// Better to reuse a single instance
-let prismaInstance: PrismaClient | null = null;
-
-function getPrismaClient(): PrismaClient {
-  if (!prismaInstance) {
-    console.log('🔧 Creating new Prisma Client with URL:', process.env.DATABASE_URL);
-    
-    prismaInstance = new PrismaClient({
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL
-        }
-      },
-      log: process.env.NODE_ENV === 'development' 
-        ? ['query', 'error', 'warn'] 
-        : ['error'],
-    });
-    
-    // Test the connection immediately
-    prismaInstance.$connect()
-      .then(() => console.log('✅ Prisma connected successfully'))
-      .catch((err) => console.error('❌ Prisma connection failed:', err));
-  }
-  return prismaInstance;
-}
-
-// Graceful shutdown handler
-export async function disconnectPrisma() {
-  if (prismaInstance) {
-    await prismaInstance.$disconnect();
-    prismaInstance = null;
-  }
-}
 
 // ============================================
 // CONTEXT CREATION
 // ============================================
 export async function createContext({ req, connection }: any): Promise<AppContext> {
-  // Reuse the same Prisma client across all requests
-  const prisma = getPrismaClient();
   
   let token: string | undefined;
   
@@ -112,6 +79,7 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   // Authenticate user
   let user: AuthenticatedUser | null = null;
   if (token) {
+    // Pass the singleton prisma to the auth function
     const rawUser = await authenticateToken(prisma, token);
     if (rawUser) {
       user = {
@@ -136,9 +104,7 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   return {
     prisma,
     user,
-    // Spread singleton services (reused across requests)
     ...singletonServices,
-    // Spread request-specific services (new for each request)
     ...requestServices,
   };
 }

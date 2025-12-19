@@ -16,6 +16,12 @@ import "./index.css";
 import ProfilePage from "./src/pages/ProfilePage";
 import PlaygroundPage from "./src/pages/PlaygroundPage";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceContext";
+import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
+import ErrorMonitor from "./src/lib/ErrorMonitor";
+
+// Init Sentry (if env var exists)
+ErrorMonitor.init();
+
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -153,6 +159,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <ToastProvider>
+      <ErrorBoundary>
       <AuthProvider>
         <WorkspaceProvider>
         <Router>
@@ -162,6 +169,7 @@ export default function App() {
         </Router>
         </WorkspaceProvider>
       </AuthProvider>
+      </ErrorBoundary>
     </ToastProvider>
     </ThemeProvider>
   );

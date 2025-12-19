@@ -328,20 +328,10 @@ async sendMessageWithResponse(
 }
 
 // Face Recognition
-async addFace(image: any) {
-  try {
-    const data = await this.executeGraphQL(ADD_FACE, { image }, true);
-    
-    if (!data?.addFace) {
-      throw new Error('Invalid add face response');
-    }
-    
-    return data.addFace;
-  } catch (error: any) {
-    console.error('Add face failed:', error);
-    throw new Error(error.message || 'Failed to register face');
-  }
+async registerFace(image: any) {
+  // 
 }
+
 
 async removeFace() {
   try {

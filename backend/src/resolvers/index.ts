@@ -44,6 +44,7 @@ export const resolvers: IResolvers = {
   },
 
   Workspace: workspaceResolvers.Workspace ,
+  Face: workspaceResolvers.Face ,
 
   ImageGeneration: {
     user: async (parent: any, _: any, context: AppContext) => {

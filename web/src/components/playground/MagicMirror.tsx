@@ -2,15 +2,19 @@ import React, { useState } from "react";
 import { useMutation } from "@apollo/client/react";
 import { ANALYZE_FACE } from "../../graphql/playground";
 import { FaceCapture } from "../auth/FaceCapture";
-import { Loader2, Sparkles, RefreshCcw, User, Smile, Activity, Camera } from "lucide-react";
+import { Loader2, Sparkles, RefreshCcw, User, Smile, Activity, Camera, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion"; 
 import { useDelight } from "../../hooks/useDelight";
+import { useToast } from "../ui/toastContext";
 
 export default function MagicMirror() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
   const [analyzeMutation, { loading }] = useMutation(ANALYZE_FACE);
   const { triggerSuccess } = useDelight();
+  const {addToast} = useToast();
+   //  Track specific error state for the UI
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleCapture = async (file: File) => {
     try {
@@ -19,11 +23,36 @@ export default function MagicMirror() {
         setAnalysis(data.analyzeFaceAttribute.data);
         setIsFlipped(true); // Trigger the flip!
         triggerSuccess(); // 🎉 BOOM!
-        
+
+        addToast({ 
+            type: 'success', 
+            title: 'Scan Complete', 
+            message: 'Biometric profile generated successfully.' 
+        });
+      } else {
+        // 4. Handle Logic Failure (Backend said "No")
+        throw new Error(data.analyzeFaceAttribute.error || "Analysis failed.");
       }
+        
+      
     } catch (err) {
-      console.error(err);
-      alert("Analysis failed. Is the Python Brain running?");
+      console.error("Magic Mirror Error:", err);
+      
+      //  Friendly Error Mapping
+      let friendlyMsg = "Something went wrong.";
+      if (err.message.includes("fetch")) friendlyMsg = "Cannot connect to the AI Brain. Is the server running?";
+      if (err.message.includes("face")) friendlyMsg = "No face detected. Please center your face and try again.";
+      if (err.message.includes("500")) friendlyMsg = "The AI is overloaded. Please wait a moment.";
+
+      setErrorMessage(friendlyMsg); // Show in UI
+      
+      // Show Toast
+      addToast({ 
+        type: 'error', 
+        title: 'Scan Failed', 
+        message: friendlyMsg 
+      });
+    
     }
   };
 
@@ -40,6 +69,18 @@ export default function MagicMirror() {
         </h2>
         <p className="text-slate-400">Let the AI read your face.</p>
       </div>
+
+       {/*  Display Error Message nicely if it exists */}
+      {errorMessage && (
+        <motion.div 
+            initial={{ opacity: 0, y: -10 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-3 text-red-200"
+        >
+            <AlertTriangle className="shrink-0" />
+            <p className="text-sm font-medium">{errorMessage}</p>
+        </motion.div>
+      )}
 
       <div className="relative w-full h-[600px]">
         <motion.div

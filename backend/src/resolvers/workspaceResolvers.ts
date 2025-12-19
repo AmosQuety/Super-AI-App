@@ -57,5 +57,40 @@ export const workspaceResolvers = {
         orderBy: { createdAt: 'desc' }
       });
     }
+  },
+
+
+
+  Face: {
+    imageUrl: (parent: any) => {
+      const SUPABASE_URL = process.env.SUPABASE_URL; 
+      const dbPath = parent.imageUrl || parent.filePath;
+      
+      // 1. Check if Env Var exists
+      if (!SUPABASE_URL) {
+          console.error("❌ ERROR: SUPABASE_URL is missing in Node .env file!");
+          return null; 
+      }
+
+      
+      if (!dbPath) {
+          console.error("❌ ERROR: No image path found in database for face:", parent.name);
+          return null;
+      }
+
+       // If Python returned a full URL (rare), use it
+      if (dbPath && dbPath.startsWith("http")) return dbPath;
+      
+
+      // 3. Construct URL
+      if (dbPath.startsWith("http")) return dbPath;
+      
+      const fullUrl = `${SUPABASE_URL}/storage/v1/object/public/biometric_faces/${dbPath}`;
+      
+      // 4. Log it so you can click it in the terminal
+      console.log("🔗 Generated URL:", fullUrl);
+      
+      return fullUrl;
+    }
   }
 };

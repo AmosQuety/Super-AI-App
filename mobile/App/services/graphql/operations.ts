@@ -182,15 +182,7 @@ export const CHAT_HISTORY = gql`
   }
 `;
 
-// Face recognition operations
-export const ADD_FACE = gql`
-  mutation AddFace($image: Upload!) {
-    addFace(image: $image) {
-      success
-      message
-    }
-  }
-`;
+
 
 export const REMOVE_FACE = gql`
   mutation RemoveFace {

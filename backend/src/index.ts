@@ -1,11 +1,11 @@
-// src/index.ts 
+// src/index.ts
 import * as dotenv from "dotenv";
 // Initialize environment variables
 dotenv.config();
 import express, { Application, Request, Response, NextFunction } from "express";
 import { ApolloServer } from "apollo-server-express";
-import { PrismaClient } from "@prisma/client";
-
+import prisma from "./lib/db";
+import { GraphQLError } from 'graphql';
 import { graphqlUploadExpress } from "graphql-upload-minimal";
 import { typeDefs } from "./schema/schema";
 import { resolvers } from "./resolvers/index";
@@ -26,29 +26,7 @@ import {
   securityLoggingMiddleware,
   performanceMiddleware 
 } from './middleware/logging';
-import * as fs from 'fs';
-import * as path from 'path';
 
-
-
-// Initialize Prisma Client (this will be replaced by the shared instance in context)
-const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
-});
-
-const dbPath = path.join(process.cwd(), 'prisma', 'dev.db');
-console.log('Checking database at:', dbPath);
-console.log('Database exists:', fs.existsSync(dbPath));
-
-if (fs.existsSync(dbPath)) {
-  try {
-    // Try to access the file
-    fs.accessSync(dbPath, fs.constants.R_OK | fs.constants.W_OK);
-    console.log('✅ Database file is readable and writable');
-  } catch (err) {
-    console.error('❌ Cannot access database file:', err);
-  }
-}
 
 console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
@@ -88,11 +66,13 @@ const startServer = async (): Promise<any> => {
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8081",
+        "http://10.178.83.213:5173",
         "exp://localhost:8081",
 
-         "http://10.117.54.213:5173", 
-        "http://10.117.54.213:3000",
+         
 
+        // "http://172.16.0.78:5173",
+        // "http://172.16.0.78:3000",
         // Add Apollo Studio domains
         "https://studio.apollographql.com",
         "https://sandbox.apollo.dev",
@@ -107,6 +87,11 @@ const startServer = async (): Promise<any> => {
         "apollographql-client-version",
       ],
     };
+
+    // Helper to decide if error is safe to show
+      const isExposedError = (code: string) => {
+        return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(code);
+      };
 
     app.options("*", cors(corsOptions));
     app.use(cors(corsOptions));
@@ -143,7 +128,7 @@ const startServer = async (): Promise<any> => {
 
     app.use(errorLoggingMiddleware);
 
-    // Add this route to your Express app (before Apollo middleware)
+    // Add this route before Apollo middleware
     app.get("/debug-tables", async (_req: Request, res: Response) => {
       try {
         const tables = await prisma.$queryRaw`
@@ -225,17 +210,51 @@ const startServer = async (): Promise<any> => {
           }
         }
       ],
-      formatError: (error) => {
-        logger.error('GraphQL Error', { error });
-        
-        // Don't expose internal errors in production
-        if (process.env.NODE_ENV === 'production' && !error.extensions?.code) {
-          return new Error('Internal server error');
-        }
-        
-        return error;
-      }
+      
+
+      formatError: (error: GraphQLError) => {
+    // 1. Extract details from the single error object
+    const code = error.extensions?.code || 'INTERNAL_SERVER_ERROR';
+    // In this version, originalError is nested inside the error object
+    const originalError = error.originalError as any; 
+    const errorId = originalError?.errorId || `err_${Date.now()}`;
+
+    // 2. Log the full nasty error on the server
+    logger.error(`[${code}] ${error.message}`, {
+      errorId,
+      stack: originalError?.stack,
+      path: error.path,
+      locations: error.locations
     });
+
+    // 3. Production: Mask internal server errors
+    if (process.env.NODE_ENV === 'production') {
+      // If it's not a user error (like "Wrong Password"), hide it.
+      if (!isExposedError(code as string)) {
+        return {
+          message: "Internal Server Error",
+          extensions: { 
+            code: 'INTERNAL_SERVER_ERROR',
+            errorId 
+          }
+        };
+      }
+    }
+
+    // 4. Development: Return everything
+    // We reconstruct the object to ensure it matches GraphQLFormattedError structure
+    return {
+      message: error.message,
+      locations: error.locations,
+      path: error.path,
+      extensions: {
+        ...error.extensions,
+        errorId
+      }
+    };
+  },
+
+  });
 
     // Start Apollo Server
     await apolloServerInstance.start();

@@ -1,5 +1,5 @@
 // src/resolvers/mutations/faceAuthMutations.ts
-import { AuthenticationError } from "apollo-server-express";
+import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { AppContext } from "../types/context";
 import { Upload } from "../types/upload";
 import { SecurityConfig } from "../../auth/security"; 
@@ -11,87 +11,105 @@ const faceService = new FaceRecognitionService();
 export const faceAuthMutations = {
   
   // ==========================================
-  // REGISTER (Enrollment) - Updated for Workspaces
+  // 1. REGISTER USER FACE (Login Security)
   // ==========================================
-  addFace: async (
+  registerUserFace: async (
     _: any,
-    // Update arguments to accept workspace details
-    { image, workspaceId, characterName }: { image: Promise<Upload>, workspaceId?: string, characterName?: string },
+    { image }: { image: Promise<Upload> },
     context: AppContext
   ) => {
     if (!context.user) throw new AuthenticationError("Login required.");
 
-    const health = await faceService.checkHealth();
-    if (!health.isOnline) return { success: false, message: "Biometric engine offline." };
-
     try {
-      // 1. Determine Target Workspace
-      // If no workspaceId provided, default to "global" (for Main App Login)
-      const targetWorkspace = workspaceId || "global";
+      // Get User Email
+      const currentUser = await context.prisma.user.findUnique({
+        where: { id: context.user.id },
+        select: { email: true }
+      });
       
-      // 2. Determine Name
-      // If global, use User Email. If workspace, use provided Character Name (e.g. "Jon Snow")
-      let targetName = "";
-      
-      if (targetWorkspace === "global") {
-         const currentUser = await context.prisma.user.findUnique({
-            where: { id: context.user.id },
-            select: { email: true }
-         });
-         targetName = currentUser?.email || "";
-      } else {
-         targetName = characterName || "Unknown Character";
-      }
+      if (!currentUser?.email) return { success: false, message: "User email not found." };
 
-      if (!targetName) return { success: false, message: "Could not determine identity name." };
+      logger.info(`🔐 Enrolling User Face for Login: ${currentUser.email}`);
 
-      logger.info(`📸 Registering '${targetName}' to workspace '${targetWorkspace}'`);
-
-      // 3. Call Service
+      // HARDCODED "global" - Cannot fail
       const result = await faceService.registerFace(
         context.user.id,        
-        targetWorkspace,        // <--- Dynamic ID passed here
-        targetName,             // <--- Dynamic Name passed here
+        "global",               
+        currentUser.email,      
         image 
       );
 
-      // 4. Update Database
       if (result.success) {
-        
-        if (targetWorkspace === "global") {
-            // Main Login Enrollment
-            await context.prisma.user.update({
-                where: { id: context.user.id },
-                data: { hasFaceRegistered: true }
-            });
-        } else {
-            // Playground Character Enrollment
-            // Record this face in the Face table linked to the Workspace
-            await context.prisma.face.create({
-                data: {
-                    name: targetName,
-                    imageUrl: `${context.user.id}/${targetWorkspace}/${targetName}.jpg`,
-                    workspaceId: targetWorkspace
-                }
-            });
-        }
-
-        return {
-          success: true,
-          message: `Successfully added ${targetName} to ${targetWorkspace === 'global' ? 'Face Login' : 'Workspace'}.`,
-        };
+        await context.prisma.user.update({
+            where: { id: context.user.id },
+            data: { hasFaceRegistered: true }
+        });
+        return { success: true, message: "Face Login enabled successfully." };
       } 
       
       return { success: false, message: result.message };
 
     } catch (error: any) {
-      logger.error("AddFace Error:", error.message);
-      return { success: false, message: "Biometric enrollment failed." };
+      logger.error("RegisterUserFace Error:", error.message);
+      return { success: false, message: "Enrollment failed." };
     }
   },
 
   // ==========================================
-  // LOGIN (Global Verification) - Keep as is
+  // 2. ADD WORKSPACE CHARACTER (Playground)
+  // ==========================================
+   addWorkspaceCharacter: async (
+    _: any,
+    { image, workspaceId, name }: { image: Promise<Upload>, workspaceId: string, name: string },
+    context: AppContext
+  ) => {
+    if (!context.user) throw new AuthenticationError("Login required.");
+    
+    if (!workspaceId || !name) {
+        throw new UserInputError("Workspace ID and Name are required.");
+    }
+
+    try {
+      logger.info(`🎭 Adding Character '${name}' to Workspace '${workspaceId}'`);
+
+      const result = await faceService.registerFace(
+        context.user.id,        
+        workspaceId,        
+        name,             
+        image 
+      );
+
+      if (result.success) {
+        // FIX: Ensure we use the path from Python (result.image_path)
+        // If Python didn't return it (older version), we fallback to manual string.
+        const finalPath = result.image_path || `${context.user.id}/${workspaceId}/${name}.jpg`;
+        
+        console.log("📝 Saving Face Path from Python:", finalPath); 
+
+        await context.prisma.face.create({
+            data: {
+                name: name,
+                imageUrl: finalPath, 
+                workspaceId: workspaceId
+            }
+        });
+
+        return { success: true, message: `Added ${name} to workspace.` };
+      } 
+      
+      return { success: false, message: result.message };
+
+    } catch (error: any) {
+      logger.error("AddCharacter Error:", error.message);
+      return { success: false, message: "Failed to add character." };
+    }
+  },
+
+
+  
+
+  // ==========================================
+  // LOGIN (Global Verification) 
   // ==========================================
   loginWithFace: async (
     _: any,

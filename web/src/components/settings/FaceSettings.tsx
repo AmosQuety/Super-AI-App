@@ -1,31 +1,44 @@
 // src/components/settings/FaceSettings.tsx
 import React, { useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { ADD_FACE, GET_ME, REMOVE_FACE } from "../../graphql/users";
+import { gql } from "@apollo/client";
+import { GET_ME, REMOVE_FACE } from "../../graphql/users"; // GET_ME and REMOVE_FACE are standard
 import { FaceCapture } from "../auth/FaceCapture";
 import { useToast } from "../ui/toastContext";
-import { Shield, Trash2, CheckCircle, ScanFace, AlertTriangle } from "lucide-react";
+import { Shield, Trash2, CheckCircle, ScanFace } from "lucide-react";
+
+// 👇 NEW SPECIFIC MUTATION FOR LOGIN
+const REGISTER_USER_FACE = gql`
+  mutation RegisterUserFace($image: Upload!) {
+    registerUserFace(image: $image) {
+      success
+      message
+    }
+  }
+`;
 
 export default function FaceSettings() {
   const { addToast } = useToast();
   const [isCapturing, setIsCapturing] = useState(false);
   
-  // Get current status
   const { data, refetch } = useQuery(GET_ME);
   const hasFace = data?.me?.hasFaceRegistered;
 
-  const [addFaceMutation, { loading: adding }] = useMutation(ADD_FACE);
+  // 👇 USE THE NEW MUTATION
+  const [registerUserFace, { loading: adding }] = useMutation(REGISTER_USER_FACE);
   const [removeFaceMutation, { loading: removing }] = useMutation(REMOVE_FACE);
 
   const handleRegister = async (file: File) => {
     try {
-      const { data } = await addFaceMutation({ variables: { image: file } });
-      if (data.addFace.success) {
-        addToast({ type: 'success', title: 'Biometrics Enabled', message: data.addFace.message });
+      // 👇 SIMPLE CALL: No workspace ID needed
+      const { data } = await registerUserFace({ variables: { image: file } });
+      
+      if (data.registerUserFace.success) {
+        addToast({ type: 'success', title: 'Biometrics Enabled', message: data.registerUserFace.message });
         setIsCapturing(false);
-        refetch(); // Refresh UI to show "Active"
+        refetch(); 
       } else {
-        addToast({ type: 'error', title: 'Enrollment Failed', message: data.addFace.message });
+        addToast({ type: 'error', title: 'Enrollment Failed', message: data.registerUserFace.message });
       }
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message });
@@ -33,7 +46,7 @@ export default function FaceSettings() {
   };
 
   const handleRemove = async () => {
-    if(!window.confirm("Are you sure you want to disable Face ID? You will need to use your password.")) return;
+    if(!window.confirm("Disable Face ID? You will need your password to login.")) return;
     try {
       const { data } = await removeFaceMutation();
       if (data.removeFace.success) {
@@ -82,7 +95,7 @@ export default function FaceSettings() {
             <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700 text-sm text-slate-400 flex gap-3">
                 <Shield className="w-5 h-5 text-indigo-400 shrink-0" />
                 <p>
-                    We use <strong>Liveness Detection</strong> (Smile Check) to ensure no one can unlock your account with a photo of you. Your face data is encrypted.
+                    We use <strong>Liveness Detection</strong> (Smile Check) to ensure security. Your face data is encrypted.
                 </p>
             </div>
           

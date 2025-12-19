@@ -49,8 +49,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (data: SignInFormData) => {
     try {
       setIsLoading(true);
-       const response = await fetch('http://10.117.54.213:4001/graphql', {
-      // const response = await fetch('http://localhost:4001/graphql', {
+      //  const response = await fetch('http://172.16.0.78:4001/graphql', {
+      const response = await fetch('http://localhost:4001/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,8 +106,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (data: SignUpFormData) => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://10.117.54.213:4001/graphql', {
-      // const response = await fetch('http://localhost:4001/graphql', {
+      // const response = await fetch('http://10.117.54.213:4001/graphql', {
+      const response = await fetch('http://localhost:4001/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

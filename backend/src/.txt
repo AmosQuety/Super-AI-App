@@ -1,13 +1,28 @@
+the token(i think) gets expired quiclky-- am just guessing. here is the issue. 
+Even after recently logging in, after a certain operation when i chill for like 30 mins and 
+come back am asked to login again . 
+this might be very annoying for the users. what can we do to solve this
 
 
-Long-term (Scalability)
-Implement Redis for session storage and caching
-
-Add distributed tracing with OpenTelemetry
-
-Set up monitoring with Prometheus/Grafana
-
-Implement circuit breakers for external services
 
 
+
+
+While restricting biometric registration to a single "official" profile section is a standard security practice, it may not address the underlying technical issue if your playground and production systems share the same database.
+Why the Overwrite is Happening
+The core problem is likely shared data storage. If your "playground" (testing environment) and your "biometric/login system" (production environment) both write to the same user record or facial template database, adding a face in one will naturally overwrite the other. 
+Is Limiting Registration to "Profile" the Best Solution?
+Restricting the registration point is a good security measure, but it is only a partial solution for your technical conflict.
+Pros: It ensures that only "vetted" images are used for actual authentication, preventing low-quality "playground" tests from ruining login reliability.
+Cons: If the underlying code still points to the same database field, you may still accidentally overwrite data if you ever need to test registration features in the playground. 
+Recommended Best Practices (2025)
+To permanently solve this without losing your "playground" functionality, implement the following:
+Separate Databases (Environment Isolation): Use a separate database or collection for your playground. Testing data should never touch production login credentials.
+Versioned Biometric Templates: Instead of having one face_template field per user, use an array or a related table that stores multiple templates. You can then tag them (e.g., type: "login" or type: "playground_test").
+Profile-Only Registration: As you suggested, limit the "Official Biometric" registration to a secure, authenticated profile page. This follows the Principle of Least Privilege, ensuring that experimental areas (the playground) cannot modify sensitive authentication data.
+Use Hashed Templates: Ensure you are storing mathematical representations (hashes/templates) rather than raw images to comply with modern data privacy standards like GDPR or CCPA. 
+Summary of Action Steps
+Restrict: Move all "Login Face" registration to the secure user profile section only.
+Isolate: Ensure your playground writes to a different database or uses a specific "test" flag in your user records so it does not interfere with the active_login_face.
+Validate: Only allow the active_login_face to be updated after a successful secondary authentication (e.g., password or OTP). 
 

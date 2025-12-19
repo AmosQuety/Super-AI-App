@@ -9,7 +9,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';
 import { FaceCapture } from "./FaceCapture"; 
 import { useMutation } from '@apollo/client/react'; 
-import { ADD_FACE } from '../../graphql/users'; 
+import { gql } from '@apollo/client';
+
+const REGISTER_USER_FACE = gql`
+  mutation RegisterUserFace($image: Upload!) {
+    registerUserFace(image: $image) {
+      success
+      message
+    }
+  }
+`;
 
 export default function RegisterScreen() {
   const { showSuccess, showError } = useToast();
@@ -17,13 +26,13 @@ export default function RegisterScreen() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  
   // VIEW CONTROL
   const [showFaceEnroll, setShowFaceEnroll] = useState(false);
   const [faceLoading, setFaceLoading] = useState(false);
 
   // Hook for adding face
-  const [addFaceMutation] = useMutation(ADD_FACE);
+  const [registerFace] = useMutation(REGISTER_USER_FACE);
 
   const {
     register,
@@ -56,13 +65,13 @@ export default function RegisterScreen() {
     try {
       setFaceLoading(true);
       // We rely on the token already being in localStorage from the signUp() step
-      const { data } = await addFaceMutation({ variables: { image: file } });
+      const { data } = await registerFace({ variables: { image: file } });
       
-      if (data.addFace.success) {
+      if (data.registerUserFace.success) {
         showSuccess('Biometrics Enabled', 'You can now use Face ID to login.');
         navigate('/chat');
       } else {
-        showError('Enrollment Failed', data.addFace.message);
+        showError('Enrollment Failed', data.registerUserFace.message);
       }
     } catch (err: any) {
       showError('Error', err.message);
