@@ -27,7 +27,7 @@ export const messageMutations = {
       throw new UserInputError("Chat not found");
     }
 
-    if (chat.userId !== context.user.id) {
+    if (chat.userId !== context.user.userId) {
       throw new AuthenticationError("You can only add messages to your own chats");
     }
 
@@ -73,7 +73,7 @@ export const messageMutations = {
         throw new UserInputError("Message not found");
       }
 
-      if (message.chat.userId !== context.user.id) {
+      if (message.chat.userId !== context.user.userId) {
         throw new AuthenticationError("You can only delete your own messages");
       }
 

@@ -5,12 +5,11 @@ import { AppContext } from "../types/context";
 export const imageMutations = {
   generateImage: async (
     _: any,
-    { userId, prompt }: { userId: string; prompt: string },
+    {  prompt }: {  prompt: string },
     context: AppContext
   ) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to generate images");
-    }
+    if (!context.user) throw new AuthenticationError("You must be logged in to generate images");
+     const userId = context.user.userId; 
 
     if (!prompt || prompt.trim().length === 0) {
       throw new UserInputError("Prompt cannot be empty");

@@ -7,7 +7,7 @@ export const workspaceResolvers = {
       if (!context.user) throw new AuthenticationError("Login required");
       
       return await context.prisma.workspace.findMany({
-        where: { userId: context.user.id },
+        where: { userId: context.user.userId },
         orderBy: { createdAt: 'asc' }, // Default first
         include: { _count: { select: { faces: true } } }
       });
@@ -22,7 +22,7 @@ export const workspaceResolvers = {
         data: {
           name,
           description,
-          userId: context.user.id,
+          userId: context.user.userId,
           isDefault: false
         }
       });
@@ -34,7 +34,7 @@ export const workspaceResolvers = {
       const workspace = await context.prisma.workspace.findUnique({ where: { id } });
       
       // Security: Only owner can delete, and cannot delete default
-      if (!workspace || workspace.userId !== context.user.id) throw new Error("Not found");
+      if (!workspace || workspace.userId !== context.user.userId) throw new Error("Not found");
       if (workspace.isDefault) throw new Error("Cannot delete default workspace");
 
       // 1. Delete faces in DB

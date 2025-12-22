@@ -7,9 +7,9 @@ export enum UserRole {
   MODERATOR = 'MODERATOR',
 }
 
-// Create a minimal context interface for authorization
+// FIX: Update interface to match JWTPayload (userId instead of id)
 export interface AuthContext {
-  user: { id: string; email: string; role?: string } | null;
+  user: { userId: string; email: string; role?: string } | null;
 }
 
 export class AuthorizationService {
@@ -23,8 +23,6 @@ export class AuthorizationService {
   static requireRole(context: AuthContext, requiredRole: UserRole) {
     const user = this.requireAuth(context);
     
-    // In a real implementation, you'd check user.role from database
-    // For now, we'll assume all users have USER role unless specified
     const userRole: UserRole = (user as any).role as UserRole || UserRole.USER;
     
     const roleHierarchy: Record<UserRole, number> = {
@@ -43,9 +41,8 @@ export class AuthorizationService {
   static requireOwnership(context: AuthContext, resourceUserId: string) {
     const user = this.requireAuth(context);
     
-    // Allow access if user owns the resource or is admin
-    if (user.id !== resourceUserId) {
-      // Check if user is admin (you'd get this from database in real implementation)
+    // FIX: use userId instead of id
+    if (user.userId !== resourceUserId) {
       const userRole = (user as any).role || UserRole.USER;
       if (userRole !== UserRole.ADMIN) {
         throw new ForbiddenError('Access denied. You can only access your own resources.');
@@ -56,10 +53,12 @@ export class AuthorizationService {
   static requireSelfOrAdmin(context: AuthContext, targetUserId: string) {
     const user = this.requireAuth(context);
     
-    if (user.id !== targetUserId) {
+    // FIX: use userId instead of id
+    if (user.userId !== targetUserId) {
       const userRole = (user as any).role || UserRole.USER;
       if (userRole !== UserRole.ADMIN) {
         throw new ForbiddenError('Access denied. You can only access your own profile.');
       }
     }
-}}
+  }
+}

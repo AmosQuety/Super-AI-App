@@ -25,7 +25,7 @@ export const authResolvers = {
       const user = AuthorizationService.requireAuth(context);
 
       const dbUser = await context.prisma.user.findUnique({
-        where: { id: user.id },
+        where: { id: user.userId},
       });
 
       if (!dbUser) {
@@ -172,7 +172,7 @@ export const authResolvers = {
           where: { email: args.email.toLowerCase().trim() },
         });
         
-        if (existingUser && existingUser.id !== user.id) {
+        if (existingUser && existingUser.id !== user.userId) {
           throw new UserInputError("Email is already taken");
         }
         
@@ -180,7 +180,7 @@ export const authResolvers = {
       }
 
       const updatedUser = await context.prisma.user.update({
-        where: { id: user.id },
+        where: { id: user.userId},
         data: updateData,
       });
 
@@ -202,7 +202,7 @@ export const authResolvers = {
       }
 
       const dbUser = await context.prisma.user.findUnique({
-        where: { id: user.id },
+        where: { id: user.userId},
       });
 
       if (!dbUser) {
@@ -227,7 +227,7 @@ export const authResolvers = {
       const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
       await context.prisma.user.update({
-        where: { id: user.id },
+        where: { id: user.userId},
         data: { password: hashedNewPassword },
       });
 

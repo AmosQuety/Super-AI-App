@@ -23,7 +23,7 @@ export const faceAuthMutations = {
     try {
       // Get User Email
       const currentUser = await context.prisma.user.findUnique({
-        where: { id: context.user.id },
+        where: { id: context.user.userId },
         select: { email: true }
       });
       
@@ -33,7 +33,7 @@ export const faceAuthMutations = {
 
       // HARDCODED "global" - Cannot fail
       const result = await faceService.registerFace(
-        context.user.id,        
+        context.user.userId,        
         "global",               
         currentUser.email,      
         image 
@@ -41,7 +41,7 @@ export const faceAuthMutations = {
 
       if (result.success) {
         await context.prisma.user.update({
-            where: { id: context.user.id },
+            where: { id: context.user.userId },
             data: { hasFaceRegistered: true }
         });
         return { success: true, message: "Face Login enabled successfully." };
@@ -73,7 +73,7 @@ export const faceAuthMutations = {
       logger.info(`🎭 Adding Character '${name}' to Workspace '${workspaceId}'`);
 
       const result = await faceService.registerFace(
-        context.user.id,        
+        context.user.userId,        
         workspaceId,        
         name,             
         image 
@@ -82,7 +82,7 @@ export const faceAuthMutations = {
       if (result.success) {
         // FIX: Ensure we use the path from Python (result.image_path)
         // If Python didn't return it (older version), we fallback to manual string.
-        const finalPath = result.image_path || `${context.user.id}/${workspaceId}/${name}.jpg`;
+        const finalPath = result.image_path || `${context.user.userId}/${workspaceId}/${name}.jpg`;
         
         console.log("📝 Saving Face Path from Python:", finalPath); 
 
@@ -171,7 +171,7 @@ export const faceAuthMutations = {
 
       // Call service with specific Workspace ID
       const verification = await faceService.verifyFace(
-        context.user.id, 
+        context.user.userId, 
         workspaceId, // <--- Pass the specific workspace
         image
       );
@@ -203,7 +203,7 @@ export const faceAuthMutations = {
   // ==========================================
   removeFace: async (_: any, __: any, context: AppContext) => {
     if (!context.user) throw new AuthenticationError("Unauthorized");
-    await context.prisma.user.update({ where: { id: context.user.id }, data: { hasFaceRegistered: false } });
+    await context.prisma.user.update({ where: { id: context.user.userId }, data: { hasFaceRegistered: false } });
     return { success: true, message: "Face ID disabled." };
   },
 

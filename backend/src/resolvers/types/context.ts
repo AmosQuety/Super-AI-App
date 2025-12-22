@@ -1,17 +1,18 @@
 // src/resolvers/types/context.ts 
+import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { FaceRecognitionService } from "../../services/faceRecognitionService";
 import { GeminiAIService } from "../../services/geminiAIService";
 import { ChatService } from "../../services/chatService";
 import { UserService } from "../../services/userService";
 import { MessageService } from "../../services/messageService";
-import { authenticateToken } from "../auth/resolvers";
 import { UserRole } from "../../auth/authorization";
 import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
 import { ImageGenerationService } from "../../services/imageGenerationService";
-import { HuggingFaceService } from '../../services/huggingface.service'; // Add this import
+import { HuggingFaceService } from '../../services/huggingface.service'; 
 import prisma from "../../lib/db";
+import {JWTPayload, SecurityConfig } from "../../auth/security"; 
 
 // ============================================
 // SINGLETON SERVICES (Created once, reused)
@@ -41,7 +42,10 @@ export interface AuthenticatedUser {
 
 export interface AppContext {
   prisma: PrismaClient;
-  user: AuthenticatedUser | null;
+  user: JWTPayload | null;
+  req: Request;
+  res: Response;
+ 
   // Services
   faceRecognitionService: FaceRecognitionService;
   geminiAIService: GeminiAIService;
@@ -77,17 +81,17 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   }
   
   // Authenticate user
-  let user: AuthenticatedUser | null = null;
+  let user: JWTPayload | null = null;
   if (token) {
-    // Pass the singleton prisma to the auth function
-    const rawUser = await authenticateToken(prisma, token);
-    if (rawUser) {
-      user = {
-        id: rawUser.id,
-        email: rawUser.email,
-        role: rawUser.role as UserRole,
-      };
+    try {
+      user = SecurityConfig.verifyToken(token);
+    } catch (error) {
+      // Invalid token/ token expired, user remains null
+      console.warn("Invalid or expired token");
+
     }
+    
+    
   }
 
   // Create request-specific services
@@ -104,6 +108,8 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   return {
     prisma,
     user,
+    req,
+    res: req ?.res,
     ...singletonServices,
     ...requestServices,
   };

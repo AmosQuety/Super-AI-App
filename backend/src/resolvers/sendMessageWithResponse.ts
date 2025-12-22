@@ -151,7 +151,7 @@ export const sendMessageWithResponse = {
       throw new UserInputError("Chat not found");
     }
 
-    if (chat.userId !== context.user.id) {
+    if (chat.userId !== context.user.userId) {
       throw new AuthenticationError("You can only send messages to your own chats");
     }
 

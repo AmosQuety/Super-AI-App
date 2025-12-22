@@ -129,48 +129,10 @@ const startServer = async (): Promise<any> => {
     app.use(errorLoggingMiddleware);
 
     // Add this route before Apollo middleware
-    app.get("/debug-tables", async (_req: Request, res: Response) => {
-      try {
-        const tables = await prisma.$queryRaw`
-          SELECT name FROM sqlite_master WHERE type='table'
-        `;
-        
-        res.json({
-          success: true,
-          tables: tables,
-          database: process.env.DATABASE_URL
-        });
-      } catch (error: any) {
-        res.json({ 
-          success: false,
-          error: error.message 
-        });
-      }
-    });
-
-    app.get("/debug-db-location", async (_req: Request, res: Response) => {
-      const fs = require('fs');
-      const path = require('path');
-      
-      const possiblePaths = [
-        path.join(__dirname, '../../dev.db'), // ../dev.db from src directory
-        path.join(__dirname, '../../prisma/dev.db'), // prisma/dev.db from src directory
-        path.join(process.cwd(), '../dev.db'), // ../dev.db from backend root
-        path.join(process.cwd(), 'prisma/dev.db'), // prisma/dev.db from backend root
-      ];
-      
-      const results = possiblePaths.map(dbPath => ({
-        path: dbPath,
-        exists: fs.existsSync(dbPath),
-        absolute: path.resolve(dbPath)
-      }));
-      
-      res.json({
-        currentWorkingDir: process.cwd(),
-        envDatabaseUrl: process.env.DATABASE_URL,
-        databaseLocations: results
-      });
-    });
+  app.get("/debug-tables", async (_req: Request, _res: Response) => {
+    
+    // const tables = await prisma.$queryRaw`SELECT ...`; 
+});
 
 
     // CREATE EXECUTABLE SCHEMA

@@ -17,7 +17,10 @@ export const chatMutations = {
       throw new AuthenticationError("You must be logged in to create a chat");
     }
 
-    // Check if user exists first
+    // Optional: Security check to ensure user isn't creating chat for someone else
+    // if (args.userId !== context.user.userId) throw new AuthenticationError("Unauthorized");
+
+    // Check if user exists first (We can skip this if we trust the Token, but safer to keep)
     const userExists = await context.prisma.user.findUnique({
       where: { id: args.userId },
     });
@@ -58,7 +61,8 @@ export const chatMutations = {
       throw new UserInputError("Chat not found");
     }
 
-    if (chat.userId !== context.user.id) {
+    // 👇 FIX: Use .userId instead of .id
+    if (chat.userId !== context.user.userId) {
       throw new AuthenticationError("You can only update your own chats");
     }
 
@@ -86,7 +90,8 @@ export const chatMutations = {
       throw new UserInputError("Chat not found");
     }
 
-    if (chat.userId !== context.user.id) {
+    // 👇 FIX: Use .userId instead of .id
+    if (chat.userId !== context.user.userId) {
       throw new AuthenticationError("You can only delete your own chats");
     }
 

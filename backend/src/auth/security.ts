@@ -7,6 +7,8 @@ export interface JWTPayload {
   email: string;
   role: string;
   sessionId: string;
+  iat?: number;
+  exp?: number;
 }
 
 export class SecurityConfig {
