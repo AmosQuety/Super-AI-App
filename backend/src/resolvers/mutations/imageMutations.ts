@@ -1,6 +1,7 @@
 // src/resolvers/mutations/imageMutations.ts - UPDATED
 import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { AppContext } from "../types/context";
+import { checkUserRateLimit } from "../../auth/UserRateLimit";
 
 export const imageMutations = {
   generateImage: async (
@@ -10,6 +11,8 @@ export const imageMutations = {
   ) => {
     if (!context.user) throw new AuthenticationError("You must be logged in to generate images");
      const userId = context.user.userId; 
+
+    checkUserRateLimit(userId, 'image');
 
     if (!prompt || prompt.trim().length === 0) {
       throw new UserInputError("Prompt cannot be empty");

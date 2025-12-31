@@ -1,286 +1,168 @@
-// src/services/geminiAIService.ts - FIXED VERSION
-import axios, { AxiosError } from "axios";
+// src/services/geminiAIService.ts
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
-import { InputValidator } from "../IntelligentMatcher/safety/InputValidator";
+import axios from "axios"; // <--- We need Axios for discovery
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_TIMEOUT = 30000; // 30 seconds
+// 1. Load Keys
+const ALL_KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "").split(",").map(k => k.trim()).filter(k => k);
 
 export class GeminiAPIError extends Error {
-  constructor(
-    message: string,
-    public statusCode?: number,
-    public errorType?: string,
-    public retryable?: boolean
-  ) {
+  constructor(message: string, public statusCode: number = 500) {
     super(message);
     this.name = 'GeminiAPIError';
   }
 }
 
+// Type definition for the REST API response
+type GeminiModel = {
+  name: string;
+  supportedGenerationMethods?: string[];
+  state?: string; // "ACTIVE" | "DEPRECATED"
+};
+
 export class GeminiAIService {
   private breaker = new CircuitBreaker();
-  private currentModel: string = 'gemini-pro-latest';
-  private lastModelCheck: number = 0;
-  private readonly MODEL_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+  private cachedModelName: string | null = null;
 
-  private async discoverBestModel(): Promise<string> {
-    const now = Date.now();
-    
-    if (now - this.lastModelCheck < this.MODEL_CHECK_INTERVAL) {
-      console.log(`🔄 Using cached model: ${this.currentModel}`);
-      return this.currentModel;
-    }
+  constructor() {
+    if (ALL_KEYS.length === 0) console.warn("⚠️ No Gemini API Keys found");
+  }
 
-    console.log('🔍 Discovering available Gemini models...');
+  private getRandomKey() {
+    if (ALL_KEYS.length === 0) throw new GeminiAPIError("No Gemini API Keys configured", 500);
+    const randomIndex = Math.floor(Math.random() * ALL_KEYS.length);
+    return ALL_KEYS[randomIndex];
+  }
+
+  private getClient(key: string) {
+    return new GoogleGenerativeAI(key);
+  }
+
+  // 👇 FIXED: Use Axios to list models because SDK doesn't support it
+  private async resolveBestModel(): Promise<string> {
+    if (this.cachedModelName) return this.cachedModelName;
+
+    console.log("🔍 Auto-detecting best Gemini model via REST API...");
     
+    // Pick a key for discovery
+    const key = this.getRandomKey();
+
     try {
+      // Direct REST call to Google
       const response = await axios.get(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`,
-        { timeout: 10000 }
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`
       );
 
-      const models = response.data.models || [];
-      console.log(`📊 Found ${models.length} available models`);
+      const models = response.data.models as GeminiModel[];
 
-      const preferredModels = [
-        models.find((model: any) => model.name.includes('pro-latest')),
-        models.find((model: any) => model.name.includes('flash-latest')),
-        models.find((model: any) => 
-          model.name.includes('gemini-2.5-pro') && 
-          !model.name.includes('preview') && 
-          !model.name.includes('exp')
-        ),
-        models.find((model: any) => 
-          model.name.includes('gemini-2.5-flash') && 
-          !model.name.includes('preview') && 
-          !model.name.includes('exp')
-        ),
-      ].filter(Boolean);
+      // 1. Filter for usable text generation models
+      const usableModels = models.filter(m => 
+        // Must support generation
+        m.supportedGenerationMethods?.includes("generateContent") &&
+        // Must be pro or flash (avoid vision-only or ultra-legacy ones)
+        (m.name.includes("gemini") || m.name.includes("pro") || m.name.includes("flash"))
+      );
 
-      const bestModel = preferredModels[0];
-      
-      if (bestModel) {
-        const modelName = bestModel.name.replace('models/', '');
-        console.log(`🎯 Selected model: ${modelName}`);
-        this.currentModel = modelName;
-        this.lastModelCheck = now;
-        return modelName;
+      if (!usableModels.length) {
+        console.warn("⚠️ No active models found via API, falling back to default.");
+        return "gemini-1.5-flash";
       }
 
-      console.warn('⚠️ No preferred models found, using default');
-      return 'gemini-pro-latest';
+      // 2. Score them
+      const scoreModel = (name: string) => {
+        const n = name.toLowerCase();
+        
+        // 🛑 DOWNGRADE 2.5-Pro (It has 0 quota on free tier often)
+        if (n.includes("2.5-pro")) return 0; 
 
-    } catch (error: any) {
-      console.error('❌ Model discovery failed:', error.message);
-      console.log('🔄 Falling back to cached/default model');
-      return this.currentModel;
+        // 🚀 PREFER FLASH (High limits, fast, good for RAG)
+        if (n.includes("1.5-flash")) return 100; 
+        if (n.includes("flash")) return 90;
+
+        // ⚠️ USE PRO CAUTIOUSLY (Lower limits)
+        if (n.includes("1.5-pro")) return 50;
+        if (n.includes("pro")) return 40;
+        
+        return 10;
+      };
+
+      // 3. Sort by score
+      const ranked = usableModels
+        .map(m => ({ name: m.name, score: scoreModel(m.name) }))
+        .sort((a, b) => b.score - a.score);
+
+      const bestModel = ranked[0].name;
+      console.log(`✅ Best Model Selected: ${bestModel}`);
+      
+      // The API returns "models/gemini-1.5-pro", but SDK usually wants just "gemini-1.5-pro"
+      // However, SDK handles "models/" prefix fine usually. Let's keep it clean:
+      this.cachedModelName = bestModel.replace("models/", ""); 
+      return this.cachedModelName!;
+
+    } catch (error) {
+      console.error("❌ Model Discovery Failed:", error);
+      return "gemini-1.5-flash"; // Safe Fallback
     }
   }
 
-  private async getModel(): Promise<string> {
-    return await this.discoverBestModel();
-  }
+  // 1. Chat Generation
+  async generateContent(prompt: string): Promise<string> {
+    if (!prompt.trim()) throw new GeminiAPIError("Prompt cannot be empty", 400);
 
-  async generateContent(prompt: string) {
-    console.log(`🔍 Validating prompt (length: ${prompt?.length || 0})`);
-    console.log(`📝 Prompt preview: "${prompt?.substring(0, 100)}..."`);
-
-    // Enhanced validation
-    if (!prompt || typeof prompt !== 'string') {
-      throw new GeminiAPIError("Prompt must be a string", 400, "VALIDATION_ERROR", false);
-    }
-
-    const trimmedPrompt = prompt.trim();
-    if (trimmedPrompt.length === 0) {
-      throw new GeminiAPIError("Prompt cannot be empty", 400, "VALIDATION_ERROR", false);
-    }
-
-    // Input validation
-    try {
-      const validation = InputValidator.validateInput(trimmedPrompt);
-      console.log(`🔍 InputValidator result:`, validation);
+    return await this.breaker.execute(async () => {
+      try {
+        const currentKey = this.getRandomKey();
+        const genAI = this.getClient(currentKey);
+        
+        // Dynamic Model Selection
+        const modelName = await this.resolveBestModel();
+        
+        console.log(`📤 Sending prompt to ${modelName}...`);
       
-      if (!validation.valid && trimmedPrompt.length === 0) {
-        throw new GeminiAPIError("Prompt validation failed", 400, "VALIDATION_ERROR", false);
-      }
-    } catch (validatorError: any) {
-      console.error('❌ InputValidator error:', validatorError.message);
-      if (trimmedPrompt.length === 0) {
-        throw new GeminiAPIError("Prompt validation failed", 400, "VALIDATION_ERROR", false);
-      }
-    }
-
-    if (!GEMINI_API_KEY) {
-      throw new GeminiAPIError("Gemini API key not configured", 500, "CONFIGURATION_ERROR", false);
-    }
-
-    const modelName = await this.getModel();
-    console.log(`🚀 Using model: ${modelName}`);
-    console.log(`📤 Sending prompt to Gemini (${trimmedPrompt.length} chars)...`);
-
-    try {
-      // CRITICAL FIX: Remove TimeoutManager wrapper, let axios handle timeout directly
-      const response = await this.breaker.execute(async () => {
         try {
-          return await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              contents: [{ parts: [{ text: trimmedPrompt }] }],
-            },
-            {
-              headers: { "Content-Type": "application/json" },
-              timeout: GEMINI_TIMEOUT,
-              // Add timeout config for better control
-              timeoutErrorMessage: `Gemini API timeout after ${GEMINI_TIMEOUT}ms`,
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            return response.text();
+        } catch (innerError: any) {
+            // 🚨 IF PRO FAILS, RETRY WITH FLASH
+            if (innerError.message?.includes("429") && !modelName.includes("flash")) {
+                console.warn(`⚠️ ${modelName} hit rate limit. Retrying with gemini-1.5-flash...`);
+                const safeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await safeModel.generateContent(prompt);
+                const response = await result.response;
+                return response.text();
             }
-          );
-        } catch (axiosError: any) {
-          // Handle axios timeout specifically
-          if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
-            throw new GeminiAPIError(
-              "AI service timeout - the request took too long. Please try again.",
-              408,
-              "TIMEOUT_ERROR",
-              true
-            );
-          }
-          // Re-throw other axios errors to be handled below
-          throw axiosError;
+            throw innerError; // Throw other errors
         }
-      });
-
-      if (response.status !== 200) {
-        console.error(`❌ Gemini API returned status ${response.status}`);
-        
-        let errorMessage = "AI service temporarily unavailable";
-        let errorType = "API_ERROR";
-        let retryable = true;
-
-        switch (response.status) {
-          case 400:
-            errorMessage = "Invalid request to AI service";
-            errorType = "BAD_REQUEST";
-            retryable = false;
-            break;
-          case 401:
-            errorMessage = "AI service authentication failed";
-            errorType = "AUTH_ERROR";
-            retryable = false;
-            break;
-          case 403:
-            errorMessage = "AI service access denied";
-            errorType = "ACCESS_DENIED";
-            retryable = false;
-            break;
-          case 408:
-            errorMessage = "AI service timeout - please try again";
-            errorType = "TIMEOUT_ERROR";
-            retryable = true;
-            break;
-          case 429:
-            errorMessage = "AI service rate limit exceeded - please wait";
-            errorType = "RATE_LIMIT";
-            retryable = true;
-            break;
-          case 500:
-            errorMessage = "AI service internal error";
-            errorType = "SERVER_ERROR";
-            retryable = true;
-            break;
-          case 503:
-            errorMessage = "AI service temporarily unavailable";
-            errorType = "SERVICE_UNAVAILABLE";
-            retryable = true;
-            break;
-        }
-
-        throw new GeminiAPIError(errorMessage, response.status, errorType, retryable);
-      }
-
-      if (!response.data?.candidates?.length) {
-        console.error('❌ No candidates returned from Gemini API');
-        throw new GeminiAPIError(
-          "No response generated by AI service",
-          500,
-          "EMPTY_RESPONSE",
-          true
-        );
-      }
-
-      const aiResponse = response.data.candidates[0].content.parts[0].text;
-      console.log(`✅ Gemini response received (${aiResponse?.length || 0} chars)`);
-
-      return aiResponse;
-
-    } catch (error: any) {
-      console.error('❌ Gemini API call failed:', error.message);
       
-      // If it's already our custom error, re-throw it
-      if (error instanceof GeminiAPIError) {
-        throw error;
-      }
-
-      // Handle circuit breaker errors
-      if (error.message === 'Circuit breaker is open') {
-        throw new GeminiAPIError(
-          "AI service is temporarily unavailable due to repeated failures. Please try again in a moment.",
-          503,
-          "CIRCUIT_BREAKER_OPEN",
-          true
-        );
-      }
-
-      // Handle axios errors
-      if (error.isAxiosError || error.code) {
-        const axiosError = error as AxiosError;
-        const statusCode = axiosError.response?.status || 500;
-        const errorMessage = (axiosError.response?.data as any)?.error?.message || error.message;
-        
-        // Specific handling for timeout
-        if (error.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
-          throw new GeminiAPIError(
-            "AI service timeout - the request took too long. Please try again with a shorter message.",
-            408,
-            "TIMEOUT_ERROR",
-            true
-          );
+      } catch (error: any) {
+        console.error("Gemini Generation Error:", error.message);
+        if (error.message?.includes("429")) {
+          throw new GeminiAPIError("Rate limit exceeded. Please try again.", 429);
         }
-
-        // Network errors
-        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-          throw new GeminiAPIError(
-            "Cannot reach AI service - please check your internet connection",
-            503,
-            "NETWORK_ERROR",
-            true
-          );
+        if (error.message?.includes("not found")) {
+            this.cachedModelName = null; // Clear cache to retry discovery
         }
-        
-        throw new GeminiAPIError(
-          `AI service error: ${errorMessage}`,
-          statusCode,
-          "NETWORK_ERROR",
-          statusCode >= 500
-        );
+        throw new GeminiAPIError(error.message || "AI Service Failed", 500);
       }
+    });
+  }
 
-      // Generic error
-      throw new GeminiAPIError(
-        `AI service error: ${error.message}`,
-        500,
-        "UNKNOWN_ERROR",
-        true
-      );
+  // 2. RAG Embeddings
+  async getEmbedding(text: string): Promise<number[]> {
+    try {
+      const cleanText = text.replace(/\n/g, " ");
+      const currentKey = this.getRandomKey();
+      const genAI = this.getClient(currentKey);
+      
+      const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+      
+      const result = await model.embedContent(cleanText);
+      return result.embedding.values;
+    } catch (error: any) {
+      console.error("Gemini Embedding Error:", error.message);
+      throw new GeminiAPIError("Failed to generate embedding", 500);
     }
-  }
-
-  getCurrentModel(): string {
-    return this.currentModel;
-  }
-
-  async refreshModel(): Promise<string> {
-    this.lastModelCheck = 0;
-    return await this.discoverBestModel();
   }
 }

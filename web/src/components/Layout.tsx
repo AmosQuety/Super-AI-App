@@ -16,7 +16,8 @@ import {
   LogOut,
   User,
   Home,
-  ScanFace
+  ScanFace,
+  FileText
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth"; 
 import { useTheme } from "../contexts/ThemeContext";
@@ -48,6 +49,13 @@ const navigation = [
     icon: ScanFace,
     description: "Experiment with the AI using the different visual tools"
   }
+  ,
+  // {
+  //   name: "Document Uploader",
+  //   href: "/document-uploader",
+  //   icon: FileText,
+  //   description: "Upload documents to enhance AI knowledge."
+  // }
 ];
 
 

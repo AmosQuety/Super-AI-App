@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from "react";
 import { Plus, Search, MessageSquare, LogOut, User } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
+import DocumentUploader from "./DocumentUploader";
 
 interface ChatSession {
   id: string;
@@ -176,6 +177,7 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
           </div>
         </div>
       </div>
+      
     </aside>
   );
 };

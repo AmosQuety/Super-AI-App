@@ -18,6 +18,9 @@ const customResponses: CustomResponses = {
   "who are you": "I am Blaze, here to help you.",
   "what's your name": "My name is Blaze.",
   "whats your name": "My name is Blaze.",
+  "where are you from": "I was created by a talented developer named Nabasa Amos.",
+  "who made you": "I was created by a talented developer named Nabasa Amos.",
+  "who created you": "I was created by a talented developer named Nabasa Amos.",
   "who developed you": "I was developed by a wonderful guy called Nabasa Amos",
   
   // Status questions

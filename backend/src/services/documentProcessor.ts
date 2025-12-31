@@ -1,52 +1,67 @@
-// apps/backend/src/services/documentProcessor.ts - FIXED VERSION
+// src/services/documentProcessor.ts
 import axios from 'axios';
-import pdf from 'pdf-parse';
+
+// 1. Use the new library
+const pdf = require('pdf-extraction');
 
 export class DocumentProcessor {
+  
+  chunkText(text: string, chunkSize: number = 1000): string[] {
+    const chunks: string[] = [];
+    let currentChunk = "";
+    const sentences = text.split(/([.?!])\s+/);
+
+    for (const sentence of sentences) {
+      if ((currentChunk + sentence).length > chunkSize) {
+        chunks.push(currentChunk);
+        currentChunk = sentence;
+      } else {
+        currentChunk += (currentChunk ? " " : "") + sentence;
+      }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+    
+    return chunks;
+  }
+
   async extractTextFromUrl(fileUrl: string, mimeType: string): Promise<string> {
     try {
-      // Download file from Cloudinary
+      console.log(`📥 Downloading file for extraction: ${fileUrl}`);
       const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
       const fileBuffer = Buffer.from(response.data);
 
       return await this.extractText(fileBuffer, mimeType);
-    } catch (error: any) { // FIX: Add type annotation
-      console.error('Error downloading file:', error);
+    } catch (error: any) {
+      console.error('Error downloading file:', error.message);
       return `[Unable to process file: ${error.message}]`;
     }
   }
 
   async extractText(fileBuffer: Buffer, mimeType: string): Promise<string> {
     try {
-      switch (mimeType) {
-        case 'application/pdf':
-          return await this.extractFromPDF(fileBuffer);
-        case 'text/plain':
-          return fileBuffer.toString('utf-8');
-        case 'image/jpeg':
-        case 'image/png':
-          return await this.extractFromImageOCR(fileBuffer);
-        default:
-          return `[File type: ${mimeType} - Content extraction not fully implemented]`;
+      if (mimeType === 'application/pdf') {
+        console.log("📄 Processing PDF with pdf-extraction...");
+        
+        // pdf-extraction takes the buffer directly
+        const data = await pdf(fileBuffer);
+        
+        const cleanText = data.text
+            .replace(/\n\s*\n/g, '\n') // Remove multiple empty lines
+            .trim();
+            
+        console.log(`✅ PDF Extracted: ${cleanText.length} characters`);
+        return cleanText;
+      } 
+      else if (mimeType.startsWith('text/')) {
+        return fileBuffer.toString('utf-8');
       }
-    } catch (error: any) { // FIX: Add type annotation
-      console.error(`Error extracting text from ${mimeType}:`, error);
-      return `[Error processing ${mimeType} file]`;
+      
+      console.warn(`⚠️ Unsupported File Type: ${mimeType}`);
+      return "";
+    } catch (error: any) {
+      console.error("Extraction Error:", error);
+      // Log the full error to help debug if it fails again
+      throw new Error(`Failed to extract text: ${error.message}`);
     }
-  }
-
-  private async extractFromPDF(fileBuffer: Buffer): Promise<string> {
-    try {
-      const data = await pdf(fileBuffer);
-      return data.text || '[No text content found in PDF]';
-    } catch (error: any) { // FIX: Add type annotation
-      console.error('PDF extraction error:', error);
-      return '[PDF content extraction failed]';
-    }
-  }
-
-  private async extractFromImageOCR(_fileBuffer: Buffer): Promise<string> { // FIX: Add underscore to unused parameter
-    // For now, return placeholder until you implement OCR
-    return '[Image OCR - implement with Tesseract.js for full functionality]';
   }
 }

@@ -106,15 +106,27 @@ model Document {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  title     String?
-  content   String
-  summary   String?
+ filename  String
+  fileType  String   
+  fileUrl   String   
+  chunks    DocumentChunk[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([createdAt])
   @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  content    String   // The actual text of this chunk
+  chunkIndex Int      // To keep order (1, 2, 3...)
+  
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
 }
 
 model Workspace {
@@ -146,6 +158,20 @@ model Face {
   
   // We track when this face was enrolled
   createdAt   DateTime @default(now())
+}
+
+model FaceEmbedding {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id")
+  workspaceId String   @map("workspace_id")
+  name        String
+  imagePath   String?  @map("image_path")
+  
+  embedding   Unsupported("vector(512)")?
+  
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("face_embeddings")
 }
 
 model ExperimentLog {

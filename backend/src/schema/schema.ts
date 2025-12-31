@@ -178,6 +178,8 @@ export const typeDefs = gql`
     createWorkspace(name: String!, description: String): Workspace!
     deleteWorkspace(id: ID!): Boolean!
 
+    uploadDocument(file: Upload!): GenericResponse!
+    
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
   }
 

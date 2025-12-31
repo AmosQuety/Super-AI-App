@@ -18,6 +18,7 @@ import PlaygroundPage from "./src/pages/PlaygroundPage";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceContext";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
+import DocumentUploader from "./src/components/chat/DocumentUploader";
 
 // Init Sentry (if env var exists)
 ErrorMonitor.init();
@@ -146,7 +147,16 @@ const AppRoutes = () => {
           path="profile"
           element={<ProfilePage />}
         />
+
+        <Route
+          path="document-uploader"
+          element={<DocumentUploader />}
+        />
       </Route>
+
+      
+      
+
 
       {/* Redirect unknown routes to the main dashboard or login */}
       <Route path="*" element={<Navigate to="/" replace />} />

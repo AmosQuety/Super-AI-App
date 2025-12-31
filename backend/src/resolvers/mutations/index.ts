@@ -5,6 +5,7 @@ import { messageMutations } from "./messageMutations";
 import { faceAuthMutations } from "./faceAuthMutations";
 import { geminiMutations } from "./geminiMutations";
 import { imageMutations } from "./imageMutations"; // ADD THIS
+import { documentMutations } from "./documentMutations";
 
 export const mutationResolvers = {
   ...userMutations,
@@ -13,4 +14,5 @@ export const mutationResolvers = {
   ...faceAuthMutations,
   ...geminiMutations,
   ...imageMutations, 
+  ...documentMutations,
 };

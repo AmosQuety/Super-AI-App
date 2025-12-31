@@ -1,291 +1,157 @@
-// src/resolvers/sendMessageWithResponse.ts - ENHANCED VERSION
-import { AuthenticationError, UserInputError, ApolloError } from "apollo-server-express";
+// src/resolvers/sendMessageWithResponse.ts
+import { AuthenticationError, ApolloError } from "apollo-server-express"; // Removed unused UserInputError
 import { AppContext } from "./types/context";
 import { IntelligentMatcher, createIntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
 import { pubsub } from './subscriptionResolvers';
 import { DocumentProcessor } from "../services/documentProcessor";
-import { GeminiAPIError } from "../services/geminiAIService"; // ADD THIS IMPORT
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
+import { checkUserRateLimit } from "../auth/UserRateLimit"; // Import it
 
-// lazy initialization of IntelligentMatcher : create matcher only when needed
+
+// Lazy init for Matcher
 let intelligentMatcher: IntelligentMatcher | null = null;
-const matcherCircuitBreaker = new CircuitBreaker(3, 60000); // 3 failures, 1 minute cooldown
+const matcherCircuitBreaker = new CircuitBreaker(3, 60000);
 
 const getIntelligentMatcher = async (): Promise<IntelligentMatcher> => {
   if (!intelligentMatcher) {
-    console.log("🔄 Initializing IntelligentMatcher...");
-    intelligentMatcher = createIntelligentMatcher(customResponses, {
-      optimizeFor: "speed", // Use speed-optimized configuration
-      debugMode: false,
-    });
-    console.log("✅ IntelligentMatcher initialized");
+    intelligentMatcher = createIntelligentMatcher(customResponses, { optimizeFor: "speed", debugMode: false });
   }
   return intelligentMatcher;
 }
 
-
 const documentProcessor = new DocumentProcessor();
-
-// Enhanced prompt builder
-const buildEnhancedPrompt = (
-  userMessage: string, 
-  fileContent: string, 
-  fileName?: string, 
-  fileType?: string
-): string => {
-
-  const cleanedFileContent = fileContent?.trim() || '';
-  const cleanedUserMessage = userMessage?.trim() || '';
-
-  if (!cleanedFileContent || 
-      cleanedFileContent.startsWith('[Unable to process') || 
-      cleanedFileContent.startsWith('[Error processing')) {
-    
-    if (cleanedUserMessage) {
-      return `${cleanedUserMessage}\n\n[Note: Attached file "${fileName}" could not be processed]`;
-    }
-    
-    return `Please help me with the file "${fileName}" (${fileType}). I've attached it but it couldn't be fully processed. Can you provide general guidance?`;
-  }
-
-  if (cleanedUserMessage && cleanedFileContent) {
-    return `User Request: ${cleanedUserMessage}
-
-Attached File: ${fileName} (${fileType})
-
-File Content:
-${cleanedFileContent}
-
-Please analyze the file content and respond to the user's request.`;
-  }
-
-  if (cleanedFileContent) {
-    return `Please analyze this file and provide a comprehensive summary:
-
-File Name: ${fileName}
-File Type: ${fileType}
-
-Content:
-${cleanedFileContent}
-
-Provide insights, key points, and any relevant analysis.`;
-  }
-
-  return "Hello! How can I help you today?";
-};
-
-// REFACTOR: Enhanced error mapper for frontend consumption
-const mapErrorForFrontend = (error: Error) => {
-  if (error instanceof GeminiAPIError) {
-    return {
-      message: error.message,
-      code: error.statusCode?.toString() || '500',
-      type: error.errorType || 'UNKNOWN_ERROR',
-      retryable: error.retryable !== false,
-      details: `AI Service Error: ${error.message}`
-    };
-  }
-
-  // Handle other known error types
-  if (error.message.includes('timeout')) {
-    return {
-      message: 'Request timeout - please try again',
-      code: '408',
-      type: 'TIMEOUT_ERROR',
-      retryable: true,
-      details: 'The AI service took too long to respond'
-    };
-  }
-
-  if (error.message.includes('network') || error.message.includes('fetch')) {
-    return {
-      message: 'Network connection issue - please check your connection',
-      code: '503',
-      type: 'NETWORK_ERROR',
-      retryable: true,
-      details: 'Unable to reach the AI service'
-    };
-  }
-
-  // Default error
-  return {
-    message: 'An unexpected error occurred',
-    code: '500',
-    type: 'UNKNOWN_ERROR',
-    retryable: false,
-    details: error.message
-  };
-};
 
 export const sendMessageWithResponse = {
   sendMessageWithResponse: async (
     _: any,
-    { 
-      chatId, 
-      content, 
-      imageUrl, 
-      fileName, 
-      fileUri, 
-      fileMimeType 
-    }: { 
-      chatId: string; 
-      content: string;
-      imageUrl?: string;
-      fileName?: string;
-      fileUri?: string;
-      fileMimeType?: string;
-    },
+    { chatId, content, imageUrl, fileName, fileUri, fileMimeType }: any,
     context: AppContext
   ) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to send a message");
-    }
+    if (!context.user) throw new AuthenticationError("Login required");
 
-    // Verify the chat exists and belongs to the user
-    const chat = await context.prisma.chat.findUnique({
-      where: { id: chatId },
-    });
-
-    if (!chat) {
-      throw new UserInputError("Chat not found");
-    }
-
-    if (chat.userId !== context.user.userId) {
-      throw new AuthenticationError("You can only send messages to your own chats");
-    }
+    checkUserRateLimit(context.user.userId, 'chat'); 
+    
+    // 1. Verify Chat Ownership
+    const chat = await context.prisma.chat.findUnique({ where: { id: chatId } });
+    if (!chat || chat.userId !== context.user.userId) throw new AuthenticationError("Unauthorized");
 
     try {
-      let finalContent = content?.trim() || '';
+      let finalPrompt = content?.trim() || '';
       let hasFileAttachment = false;
-      let extractedText = '';
 
-      // Step 1: Process file attachment if present
+      // 2. Handle Immediate File Attachment (The "Chat with File" feature)
       if (fileUri && fileMimeType) {
         try {
-          console.log(`📁 Processing attached file: ${fileName}, Type: ${fileMimeType}`);
-          
-          extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
-          
-          console.log(`✅ File processed. Extracted ${extractedText?.length || 0} characters`);
-          
-          // Enhance the prompt with file context
-          finalContent = buildEnhancedPrompt(content, extractedText, fileName, fileMimeType);
+          // Use the extractTextFromUrl method (ensure it exists in DocumentProcessor now)
+          const extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
+          finalPrompt = `User Request: ${finalPrompt}\n\nAttached File Content:\n${extractedText}`;
           hasFileAttachment = true;
-          
-          console.log(`🔧 Enhanced prompt length: ${finalContent.length} characters`);
-          
-        } catch (fileError: any) {
-          console.error('❌ File processing failed:', fileError.message);
-          
-          // Build a fallback prompt
-          finalContent = content?.trim() 
-            ? `${content}\n\n[Note: Could not process attached file "${fileName}"]`
-            : `[User attached file: ${fileName} (${fileMimeType}) - processing failed]`;
+        } catch (e: any) {
+          console.error("File processing error:", e);
         }
       }
 
-      // Validate finalContent before proceeding
-      if (!finalContent || finalContent.trim().length === 0) {
-        finalContent = "Hello! I've sent you a message.";
-        console.warn('⚠️ Empty prompt detected, using fallback');
+      // 3. RAG SEARCH (The "Long Term Memory") 🧠
+      // If no direct attachment, check the Vector Database for relevant knowledge
+      if (!hasFileAttachment && finalPrompt.length > 5) {
+        try {
+          console.log("🔍 Searching knowledge base for:", finalPrompt.substring(0, 50));
+          
+          // A. Generate Embedding
+          const queryEmbedding = await context.geminiAIService.getEmbedding(finalPrompt);
+          const vectorString = `[${queryEmbedding.join(",")}]`;
+
+          // B. Search Supabase
+          // 👇 CHANGE 1: Lower threshold to 0.3 (Very permissive)
+          const relatedChunks: any[] = await context.prisma.$queryRaw`
+            SELECT content, similarity 
+            from match_documents(
+              ${vectorString}::vector, 
+              0.3,  
+              5, 
+              ${context.user.userId}
+            )
+          `;
+
+          // 👇 CHANGE 2: Log exactly what it found
+          console.log("📊 RAG Debug Results:");
+          relatedChunks.forEach((c, i) => {
+             console.log(`   Chunk ${i} (${(c.similarity * 100).toFixed(1)}% match): ${c.content.substring(0, 50)}...`);
+          });
+
+          
+          if (relatedChunks.length > 0) {
+            console.log(`✅ Found ${relatedChunks.length} relevant memory chunks.`);
+            
+            const knowledgeContext = relatedChunks.map(c => c.content).join("\n---\n");
+            
+       // C. Inject Context into Prompt
+           finalPrompt = `
+You are a helpful AI assistant with access to the user's personal documents.
+
+CONTEXT FROM DOCUMENTS:
+${knowledgeContext}
+
+USER QUESTION:
+${finalPrompt}
+
+INSTRUCTIONS:
+1. If the user's question is related to the CONTEXT above, use it to answer accurately.
+2. If the question is general (like "Hi", "Tell me a joke", or general knowledge) and NOT related to the documents, IGNORE the context and answer normally using your own knowledge.
+3. Do not mention "I found this in the documents" unless necessary. Just answer naturally.
+`;
+
+          }
+        } catch (ragError) {
+          console.error("⚠️ RAG Search failed (ignoring):", ragError);
+        }
       }
 
-      console.log(`📤 Final prompt to Gemini (${finalContent.length} chars): ${finalContent.substring(0, 150)}...`);
-
-      // Step 2: Add user message with file metadata
+      // 4. Save User Message
       const userMessage = await context.prisma.message.create({
         data: {
           chatId,
           role: "user",
           content: content || `[Attached: ${fileName}]`,
-          imageUrl: imageUrl || null,
-          fileName: fileName || null,
-          fileUri: fileUri || null,
-          fileMimeType: fileMimeType || null,
+          imageUrl, fileName, fileUri, fileMimeType
         },
       });
 
-      let aiResponse: string;
-      let usedCustomResponse = false;
-
-      // Step 3: Try intelligent matcher first (only for text without files)
-      if (!hasFileAttachment && content?.trim()) {
-        try {
-          // use circuit breaker to avoid repeated failures
-
-          const matchResult = await matcherCircuitBreaker.execute(async () => {
-            const matcher = await getIntelligentMatcher();
-            return await matcher.findBestMatch(content.trim());
-          });
-
-          if (matchResult.match && matchResult.confidence >= 0.7) {
-            aiResponse = matchResult.suggestedResponse || "I'm here to help!";
-            usedCustomResponse = true;
-            console.log("✅ Used custom response:", matchResult.match);
-          } else {
-            // Fall back to Gemini AI
-            aiResponse = await context.geminiAIService.generateContent(finalContent);
-            console.log("🤖 Used Gemini AI (no match found)");
-          }
-        } catch (matcherError) {
-          console.log("⚠️ IntelligentMatcher error, using Gemini:", matcherError);
-          aiResponse = await context.geminiAIService.generateContent(finalContent);
-        }
-      } else {
-        // For file attachments, always use Gemini
-        console.log("📄 Sending to Gemini with file content...");
-        aiResponse = await context.geminiAIService.generateContent(finalContent);
-        console.log(`✅ Gemini response received (${aiResponse?.length || 0} chars)`);
+      // 5. Generate Response
+      let aiResponse = "";
+      
+      // Try Custom Matcher first (for simple "Hi", "Thanks")
+      if (!hasFileAttachment) {
+         try {
+            const matchResult = await matcherCircuitBreaker.execute(async () => {
+              const matcher = await getIntelligentMatcher();
+              return await matcher.findBestMatch(content);
+            });
+            if (matchResult.match && matchResult.confidence >= 0.8) {
+               // FIX: Ensure it's a string (fallback to empty string if null)
+               aiResponse = matchResult.suggestedResponse || "";
+            }
+         } catch (e) {}
       }
 
-      // Step 4: Add AI response message
+      // If no custom match (or custom match returned empty), ask Gemini
+      if (!aiResponse) {
+         aiResponse = await context.geminiAIService.generateContent(finalPrompt);
+      }
+
+      // 6. Save AI Response
       const aiMessage = await context.prisma.message.create({
-        data: {
-          chatId,
-          role: "assistant",
-          content: aiResponse,
-        },
+        data: { chatId, role: "assistant", content: aiResponse },
       });
 
-      // Step 5: Publish to subscription
-      await pubsub.publish('MESSAGE_ADDED', {
-        messageAdded: {
-          ...aiMessage,
-          chatId: chatId,
-        },
-      });
+      await pubsub.publish('MESSAGE_ADDED', { messageAdded: { ...aiMessage, chatId } });
 
-      return {
-        userMessage,
-        aiMessage,
-        usedCustomResponse,
-      };
+      return { userMessage, aiMessage, usedCustomResponse: false };
 
     } catch (error: any) {
-      console.error("❌ Error in sendMessageWithResponse:", error);
-      
-      // REFACTOR: Enhanced error handling with structured error information
-      const frontendError = mapErrorForFrontend(error);
-      
-      console.error("🔍 Error details for frontend:", {
-        originalError: error.message,
-        mappedError: frontendError,
-        stack: error.stack
-      });
-
-      // Use ApolloError for structured error handling
-      throw new ApolloError(
-        frontendError.message,
-        frontendError.code,
-        {
-          errorType: frontendError.type,
-          retryable: frontendError.retryable,
-          details: frontendError.details,
-          originalMessage: error.message,
-          timestamp: new Date().toISOString()
-        }
-      );
+      console.error("Chat Error:", error);
+      throw new ApolloError(error.message);
     }
   },
 };

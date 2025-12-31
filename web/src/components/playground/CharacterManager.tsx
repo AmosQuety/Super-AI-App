@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import  { useState } from "react";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
@@ -110,10 +110,10 @@ export default function CharacterManager() {
   if (!activeWorkspace) return null;
 
   return (
-    <div className="bg-slate-900/50 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+    <div className="bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
       
       {/* HEADER */}
-      <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/80 backdrop-blur-md">
+      <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 bg-white/5">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Users className="text-violet-400" /> 
@@ -147,7 +147,7 @@ export default function CharacterManager() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="p-6 bg-slate-950/30 min-h-[400px]">
+      <div className="p-6 min-h-[400px]">
         <AnimatePresence mode="wait">
           
           {/* === 1. LIST VIEW === */}
