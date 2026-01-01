@@ -126,6 +126,8 @@ model DocumentChunk {
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   
+  embedding  Unsupported("vector(768)")?
+
   createdAt  DateTime @default(now())
 }
 
