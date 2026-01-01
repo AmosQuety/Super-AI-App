@@ -1,10 +1,10 @@
 {
-  "name": "backend",
-  "version": "0.1.0",
+  "name": "super-ai-backend",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "build": "npx prisma migrate deploy && npx prisma generate && tsc",
     "start": "node dist/index.js",
     "seed": "ts-node prisma/seed.ts",
     "prisma:generate": "prisma generate",
