@@ -69,10 +69,6 @@ const startServer = async (): Promise<any> => {
         "http://10.178.83.213:5173",
         "exp://localhost:8081",
 
-         
-
-        // "http://172.16.0.78:5173",
-        // "http://172.16.0.78:3000",
         // Add Apollo Studio domains
         "https://studio.apollographql.com",
         "https://sandbox.apollo.dev",

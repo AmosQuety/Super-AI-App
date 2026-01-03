@@ -6,18 +6,44 @@ import {
   from,
   ApolloLink,
   Observable,
-  HttpLink, // Import HttpLink
-  split,    // Import split
+  HttpLink,
+  split,
+  type Operation,
 } from "@apollo/client";
-import { getMainDefinition } from "@apollo/client/utilities"; // Import utility
+import { getMainDefinition } from "@apollo/client/utilities";
 import { setContext } from "@apollo/client/link/context";
-import { onError } from "@apollo/client/link/error";
 import { RetryLink } from "@apollo/client/link/retry";
-import { createUploadLink } from "./uploadLink"; // Ensure this path is correct for your project
+import { ErrorLink } from "@apollo/client/link/error";
+import {
+  CombinedGraphQLErrors,
+  CombinedProtocolErrors,
+  ServerError,
+  ServerParseError,
+  LocalStateError,
+  UnconventionalError,
+} from "@apollo/client/errors";
+
+import { createUploadLink } from "./uploadLink";
+
+// Extend Vite's ImportMeta type
+declare global {
+  interface ImportMetaEnv {
+    VITE_GRAPHQL_URL?: string;
+    MODE: string;
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
 
 // phone IP address
 // const GRAPHQL_URL = "http://172.16.0.78:4001/graphql";
-const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
+// const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
+
+
+const GRAPHQL_URL = "https://super-ai-backend.onrender.com/graphql";
+
 
 console.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,
@@ -44,9 +70,9 @@ const terminalLink = split(
     const definition = getMainDefinition(query);
     return (
       definition.kind === 'OperationDefinition' &&
-      definition.operation === 'mutation' 
-      // You can add more logic here if needed, but usually 
-      // separating mutations is enough to catch file uploads 
+      definition.operation === 'mutation'
+      // You can add more logic here if needed, but usually
+      // separating mutations is enough to catch file uploads
       // if you assume only mutations have files.
     );
   },
@@ -71,10 +97,10 @@ const decrementRequest = () => {
 const authLink = setContext(async (_, { headers }) => {
   // Read token fresh from localStorage every time
   const token = localStorage.getItem('authToken');
-  
+
   // Debug log to ensure token exists when query fires
   if (!token) console.warn('⚠️ No auth token found in localStorage');
-  
+
   return {
     headers: {
       ...headers,
@@ -93,7 +119,9 @@ const retryLink = new RetryLink({
   },
   attempts: {
     max: 3,
-    retryIf: (error, _operation) => {
+    retryIf: (error, operation: Operation) => {
+      // Explicitly mark operation parameter to avoid unused warning
+      console.log('Retry attempt for operation:', operation.operationName);
       return !!error && (
         error.toString().includes('NetworkError') ||
         error.toString().includes('Failed to fetch')
@@ -102,53 +130,95 @@ const retryLink = new RetryLink({
   },
 });
 
+
+
 // Error handling
-const errorLink = onError(
-  ({ graphQLErrors, networkError, operation, forward }) => {
-    decrementRequest();
-    
-    console.log('❌ GraphQL Operation:', operation.operationName);
-    
-    if (graphQLErrors) {
-      graphQLErrors.forEach(({ message, locations, path, extensions }) => {
-        console.error(
-          `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
-        );
-        
-        if (extensions?.code === "UNAUTHENTICATED") {
-          console.warn("User authentication failed - redirecting to login");
-          
-          if (typeof window !== 'undefined') {
-            // Only clear and redirect if we are SURE it's not a temporary glitch
-            // Checks if the token is actually missing before nuking session
-            if (!localStorage.getItem('authToken')) {
-                const currentPath = window.location.pathname;
-                if (currentPath !== '/login') {
-                  window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
-                }
+const errorLink = new ErrorLink(({ error, operation }) => {
+  decrementRequest();
+
+  console.log("❌ GraphQL Operation:", operation.operationName);
+
+  //  GraphQL execution errors
+  if (CombinedGraphQLErrors.is(error)) {
+    error.errors.forEach(({ message, locations, path, extensions }) => {
+      console.error(
+        `[GraphQL error]: Message: ${message}, Location: ${JSON.stringify(
+          locations
+        )}, Path: ${path}`
+      );
+
+      if (extensions?.code === "UNAUTHENTICATED") {
+        console.warn("User authentication failed");
+
+        if (typeof window !== "undefined") {
+          if (!localStorage.getItem("authToken")) {
+            const currentPath = window.location.pathname;
+            if (currentPath !== "/login") {
+              window.location.href = `/login?returnTo=${encodeURIComponent(
+                currentPath
+              )}`;
             }
           }
         }
-      });
-    }
+      }
+    });
 
-    if (networkError) {
-      console.error(`[Network error]: ${networkError.message}`);
-    }
+    return;
   }
-);
 
+  //  Multipart / protocol errors
+  if (CombinedProtocolErrors.is(error)) {
+    error.errors.forEach(({ message, extensions }) => {
+      console.error(
+        `[Protocol error]: ${message}, Extensions: ${JSON.stringify(extensions)}`
+      );
+    });
+    return;
+  }
+
+  //  Server returned non-200
+  if (ServerError.is(error)) {
+    console.error(
+      `[Server error]: ${error.statusCode} - ${error.message}`
+    );
+    return;
+  }
+
+  //  JSON parse error
+  if (ServerParseError.is(error)) {
+    console.error("[Parse error]:", error.message);
+    return;
+  }
+
+  //  Local cache/state errors
+  if (LocalStateError.is(error)) {
+    console.error("[Local state error]:", error.message);
+    return;
+  }
+
+  // Anything weird
+  if (UnconventionalError.is(error)) {
+    console.error("[Unconventional error]:", error.message);
+    return;
+  }
+
+  //  Fallback
+  console.error("[Unknown error]:", error);
+});
+
+
+    
 // Tracking link
 const trackingLink = new ApolloLink((operation, forward) => {
   incrementRequest();
-  
+
   console.log('🚀 GraphQL Operation:', {
     name: operation.operationName,
     variables: operation.variables,
   });
-  
+
   const observable = forward(operation);
-  
+
   return new Observable((observer) => {
     const subscription = observable.subscribe({
       next: (response) => {
@@ -163,7 +233,7 @@ const trackingLink = new ApolloLink((operation, forward) => {
         observer.complete();
       },
     });
-    
+
     return () => subscription.unsubscribe();
   });
 });
