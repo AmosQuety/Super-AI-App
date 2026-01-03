@@ -14,7 +14,7 @@ export const fileResolvers = {
           content: extractedText,
           processedAt: new Date().toISOString()
         };
-      } catch (error) {
+      } catch (error: any) { // <--- FIX: Add ': any' here
         return {
           success: false,
           content: '',

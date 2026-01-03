@@ -1,11 +1,7 @@
 // src/middleware/authentication.ts
-
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/db'; // <--- Use Singleton (Fixes connection limit issues)
 import { logger } from '../utils/logger';
 import { createContext } from '../resolvers/types/context';
-
-
-const prisma = new PrismaClient();
 
 /**
  * GraphQL Context Enhancer - Adds additional auth features to your existing context
@@ -15,7 +11,7 @@ export class GraphQLAuthEnhancer {
    * Enhanced context creation with additional security features
    */
   static async createEnhancedContext({ req, connection }: any) {
-    const baseContext = await createContext({ req, connection }); // Your existing function
+    const baseContext = await createContext({ req, connection });
     
     return {
       ...baseContext,
@@ -34,7 +30,8 @@ export class GraphQLAuthEnhancer {
         getFreshUser: async () => {
           if (!baseContext.user) return null;
           return await prisma.user.findUnique({
-            where: { id: baseContext.user.id },
+            // 👇 FIX: Use userId instead of id
+            where: { id: baseContext.user.userId },
             select: { id: true, email: true, name: true, role: true, isActive: true }
           });
         },
@@ -43,7 +40,8 @@ export class GraphQLAuthEnhancer {
         logSecurityEvent: (event: string, details: any) => {
           logger.info('Security Event', {
             event,
-            userId: baseContext.user?.id,
+            // 👇 FIX: Use userId instead of id
+            userId: baseContext.user?.userId,
             ...details,
             timestamp: new Date().toISOString()
           });
@@ -70,7 +68,7 @@ export class GraphQLAuthEnhancer {
         
         userOperationCounts.set(key, count + 1);
         
-        // Reset counters periodically (in a real app, use Redis)
+        // Reset counters periodically
         setTimeout(() => {
           userOperationCounts.delete(key);
         }, 60000); // 1 minute
@@ -81,14 +79,8 @@ export class GraphQLAuthEnhancer {
   }
 }
 
-/**
- * GraphQL Directive-based authentication
- * (For future use with schema directives)
- */
 export const graphQLAuthDirectives = {
-  // This would be used in your schema with @auth, @hasRole, etc.
   authDirectiveTransformer: (schema: any) => {
-    // Implementation for schema directives
     return schema;
   }
 };
