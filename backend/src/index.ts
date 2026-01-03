@@ -1,6 +1,6 @@
 // src/index.ts
 import * as dotenv from "dotenv";
-// Initialize environment variables
+// Initialize environment variables .
 dotenv.config();
 import express, { Application, Request, Response, NextFunction } from "express";
 import { ApolloServer } from "apollo-server-express";
