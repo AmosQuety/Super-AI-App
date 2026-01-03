@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
-import { Camera, RefreshCw, X, UploadCloud, Image as ImageIcon } from "lucide-react";
+import { Camera, RefreshCw,  UploadCloud, Image as ImageIcon } from "lucide-react";
 
 interface FaceCaptureProps {
   onCapture: (file: File) => void;
@@ -11,9 +11,9 @@ interface FaceCaptureProps {
 
 export const FaceCapture: React.FC<FaceCaptureProps> = ({ 
   onCapture, 
-  onCancel, 
+   
   loading = false,
-  mode = "login" 
+ 
 }) => {
   const webcamRef = useRef<Webcam>(null);
   const [imgSrc, setImgSrc] = useState<string | null>(null);

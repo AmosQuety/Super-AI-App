@@ -1,5 +1,5 @@
 // src/components/auth/LoginScreen.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, ScanFace } from 'lucide-react';
 import { useToast } from '../ui/toastContext';
@@ -33,8 +33,16 @@ export default function LoginScreen() {
       await signIn(data);
       showSuccess('Welcome back!', 'You have successfully signed in.');
       navigate('/chat');
-    } catch (error: any) {
-      showError('Sign in failed', error.message || 'Please check your credentials.');
+    } catch (error: unknown) {
+       let errorMessage = "An unexpected error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      showError('Sign in failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -46,8 +54,17 @@ export default function LoginScreen() {
       const message = await loginWithFace(file);
       showSuccess('Access Granted', message || "Welcome back!"); // ✅ Using consistent toast methods
       navigate("/chat");
-    } catch (error: any) {
-      showError('Verification Failed', error.message); // ✅ Using consistent toast methods
+    } catch (error: unknown) {
+       let errorMessage = "An unexpected error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      showError('Verification Failed', errorMessage); 
+       // ✅ Using consistent toast methods
     } finally {
       setFaceLoading(false);
     }

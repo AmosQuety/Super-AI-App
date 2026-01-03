@@ -17,7 +17,7 @@ import { createUploadLink } from "./uploadLink"; // Ensure this path is correct 
 
 // phone IP address
 // const GRAPHQL_URL = "http://172.16.0.78:4001/graphql";
-const GRAPHQL_URL = "http://localhost:4001/graphql";
+const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
 
 console.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,

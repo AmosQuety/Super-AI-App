@@ -1,5 +1,5 @@
 // src/components/auth/RegisterScreen.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, User } from 'lucide-react';
 import { useToast } from '../ui/toastContext';
@@ -20,6 +20,13 @@ const REGISTER_USER_FACE = gql`
   }
 `;
 
+interface RegisterFaceData {
+  registerUserFace: {
+    success: boolean;
+    message: string;
+  };
+}
+
 export default function RegisterScreen() {
   const { showSuccess, showError } = useToast();
   const { signUp } = useAuth();
@@ -32,7 +39,7 @@ export default function RegisterScreen() {
   const [faceLoading, setFaceLoading] = useState(false);
 
   // Hook for adding face
-  const [registerFace] = useMutation(REGISTER_USER_FACE);
+  const [registerFace] = useMutation<RegisterFaceData>(REGISTER_USER_FACE);
 
   const {
     register,
@@ -53,8 +60,16 @@ export default function RegisterScreen() {
       showSuccess('Account Created!', 'One last step: Secure your account.');
       setShowFaceEnroll(true);
       
-    } catch (error: any) {
-      showError('Sign up failed', error.message || 'Please try again.');
+    } catch (error: unknown) {
+       let errorMessage = "An unexpected error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      showError('Sign up failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -67,14 +82,23 @@ export default function RegisterScreen() {
       // We rely on the token already being in localStorage from the signUp() step
       const { data } = await registerFace({ variables: { image: file } });
       
-      if (data.registerUserFace.success) {
+      if (data?.registerUserFace.success) {
         showSuccess('Biometrics Enabled', 'You can now use Face ID to login.');
         navigate('/chat');
       } else {
-        showError('Enrollment Failed', data.registerUserFace.message);
+        const msg = data?.registerUserFace.message || "Unknown error";
+        showError('Enrollment Failed', msg);
       }
-    } catch (err: any) {
-      showError('Error', err.message);
+    } catch (err: unknown) {
+       let errorMessage = "An unexpected error occurred";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === "string") {
+        errorMessage = err;
+      }
+
+      showError('Error', errorMessage);
     } finally {
       setFaceLoading(false);
     }
