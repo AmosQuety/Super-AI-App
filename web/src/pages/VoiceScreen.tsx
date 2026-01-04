@@ -1,4 +1,4 @@
-import React from "react";
+
 import VoiceTools from "../components/VoiceTools";
 
 export default function VoiceScreen() {

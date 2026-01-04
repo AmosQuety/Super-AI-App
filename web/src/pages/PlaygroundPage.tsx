@@ -1,4 +1,3 @@
-import React from "react";
 import PlaygroundGrid from "../components/playground/PlaygroundGrid";
 import CharacterManager from "../components/playground/CharacterManager";
 import WorkspaceSelector from "../components/playground/WorkspaceSelector";

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import {  useCallback } from 'react';
 import confetti from 'canvas-confetti';
 
 export const useDelight = () => {

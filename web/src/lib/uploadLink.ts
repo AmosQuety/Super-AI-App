@@ -1,14 +1,18 @@
 // web/src/lib/uploadLink.ts
 import { ApolloLink, Observable } from "@apollo/client";
+import type { Operation } from "@apollo/client"; // Type-only import
 import { print } from "graphql"; 
+import type { DocumentNode } from "graphql"; // Type-only import
+
+type TreeValue = File | unknown[] | Record<string, unknown> | string | number | boolean | null | undefined;
 
 export function createUploadLink({ uri, headers = {} }: { uri: string; headers?: Record<string, string> }) {
-  return new ApolloLink((operation) => {
+  return new ApolloLink((operation: Operation) => {
     return new Observable((observer) => {
       // 1. Get the context (This is where AuthLink put the token!)
       const context = operation.getContext();
       const fetchOptions = context.fetchOptions || {};
-      const contextHeaders = context.headers || {}; // <--- THIS HOLDS THE TOKEN
+      const contextHeaders = context.headers || {};
 
       const { variables, query } = operation;
 
@@ -16,10 +20,14 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
       const map: Record<string, string[]> = {};
       const files: File[] = [];
 
-      const extractFiles = (tree: any, path: string[]): any => {
-        if (!tree) return tree;
+      const extractFiles = (tree: TreeValue, path: string[]): TreeValue => {
+        // Handle null/undefined
+        if (tree === null || tree === undefined) return tree;
+        
+        // Handle primitive values
         if (typeof tree !== 'object') return tree;
 
+        // Handle File objects
         if (tree instanceof File) {
           const key = `${files.length}`;
           files.push(tree);
@@ -27,20 +35,29 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
           return null; 
         }
 
+        // Handle arrays
         if (Array.isArray(tree)) {
-          return tree.map((item, index) => extractFiles(item, [...path, `${index}`]));
+          return tree.map((item, index) => 
+            extractFiles(item as TreeValue, [...path, `${index}`])
+          );
         }
 
-        const newObj: any = {};
-        Object.keys(tree).forEach((key) => {
-          newObj[key] = extractFiles(tree[key], [...path, key]);
+        // Handle plain objects
+        const newObj: Record<string, TreeValue> = {};
+        Object.keys(tree as Record<string, TreeValue>).forEach((key) => {
+          newObj[key] = extractFiles(
+            (tree as Record<string, TreeValue>)[key], 
+            [...path, key]
+          );
         });
         return newObj;
       };
 
-      const cleanVariables = extractFiles(variables, ['variables']);
+      const cleanVariables = extractFiles(variables as TreeValue, ['variables']);
 
-      const queryString = typeof query !== 'string' ? print(query) : query;
+      const queryString = typeof query === 'string' 
+        ? query 
+        : print(query as DocumentNode);
       
       body.append("operations", JSON.stringify({
         query: queryString,
@@ -58,8 +75,8 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
         method: "POST",
         body,
         headers: {
-          ...headers,        // Headers passed to the link factory
-          ...contextHeaders, // <--- CRITICAL: Add the Auth Token here!
+          ...headers,
+          ...contextHeaders,
         },
         ...fetchOptions,
       })
@@ -75,14 +92,14 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
             const json = JSON.parse(text);
             observer.next(json);
             observer.complete();
-          } catch (e) {
+          } catch {
             console.error("❌ Invalid JSON response:", text);
             throw new Error("Invalid JSON response from server");
           }
         })
-        .catch((err) => {
-          console.error("❌ Upload fetch error:", err);
-          observer.error(err);
+        .catch((error) => {
+          console.error("❌ Upload fetch error:", error);
+          observer.error(error);
         });
     });
   });

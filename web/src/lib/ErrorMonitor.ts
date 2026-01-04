@@ -1,29 +1,52 @@
 // src/lib/ErrorMonitor.ts
 import * as Sentry from '@sentry/react';
 
+// Define a safer interface than 'any'
+interface ErrorContext {
+  [key: string]: unknown;
+  componentStack?: string;
+  userId?: string;
+  workspaceId?: string;
+  url?: string;
+}
+
+// Define environment variable interface
+interface ViteEnv {
+  VITE_SENTRY_DSN?: string;
+  VITE_APP_ENV?: string;
+  MODE?: string;
+}
+
+// Type-safe environment variable access
+const env = import.meta.env as unknown as ViteEnv;
+
 class ErrorMonitor {
   static isInitialized = false;
 
   static init() {
-    if (import.meta.env.VITE_SENTRY_DSN && !this.isInitialized) {
+    const sentryDsn = env.VITE_SENTRY_DSN;
+    
+    if (sentryDsn && !this.isInitialized) {
       Sentry.init({
-        dsn: import.meta.env.VITE_SENTRY_DSN,
+        dsn: sentryDsn,
         integrations: [
           Sentry.browserTracingIntegration(),
           Sentry.replayIntegration(),
         ],
         tracesSampleRate: 1.0,
+        environment: env.VITE_APP_ENV || 'development',
       });
       this.isInitialized = true;
       console.log('✅ Error Monitoring Initialized');
     }
   }
 
-  static capture(error: Error, context: Record<string, any> = {}) {
+  static capture(error: Error, context: ErrorContext = {}) {
     const errorId = `err_${Date.now().toString(36)}`;
 
     // 1. Log to Console (Dev)
-    if (import.meta.env.DEV) {
+    const isDev = env.MODE === 'development';
+    if (isDev) {
       console.group(`🚨 Error Captured [${errorId}]`);
       console.error(error);
       console.info('Context:', context);

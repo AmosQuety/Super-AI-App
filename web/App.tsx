@@ -1,8 +1,8 @@
-// App.tsx - Fixed version
+// App.tsx 
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./src/contexts/AuthContext";
-import { ThemeProvider } from "./src/contexts/ThemeContext"
+import { ThemeProvider } from "./src/contexts/ThemeProvider"
 import { useAuth } from "./src/hooks/useAuth";
 import { ToastProvider } from "./src/components/ui/Toast";
 import Layout from "./src/components/Layout";
@@ -15,7 +15,7 @@ import VoiceTools from "./src/components/VoiceTools";
 import "./index.css";
 import ProfilePage from "./src/pages/ProfilePage";
 import PlaygroundPage from "./src/pages/PlaygroundPage";
-import { WorkspaceProvider } from "./src/contexts/WorkspaceContext";
+import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
 import DocumentUploader from "./src/components/chat/DocumentUploader";

@@ -5,10 +5,18 @@ import { GET_ME, UPDATE_PROFILE, CHANGE_PASSWORD } from "../graphql/users";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../components/ui/toastContext";
 import FaceSettings from "../components/settings/FaceSettings";
-import { User, Mail, Lock, Save, Loader2, LogOut } from "lucide-react";
+import { User,  Lock, Save, Loader2, LogOut } from "lucide-react";
+
+// Minimal type definition - only what's needed to fix errors
+interface UserData {
+  id: string;
+  name?: string; // Make optional since it might be undefined
+  email: string;
+  role: string;
+  [key: string]: unknown;
+}
 
 export default function ProfilePage() {
-
   const { addToast } = useToast();
   
   const {user , token , isAuthenticated , signOut, isLoading: authLoading } = useAuth();
@@ -23,14 +31,19 @@ export default function ProfilePage() {
     });
   }, [user, token, isAuthenticated]);
 
-  const { data, loading, error, refetch } = useQuery(GET_ME, {
-    fetchPolicy: 'network-only', // Force fresh request
+  // FIX: Remove onError from useQuery options and handle error separately
+  const { data, loading, error, refetch } = useQuery<{ me: UserData }>(GET_ME, {
+    fetchPolicy: 'network-only',
     skip: !token,
-    onError: (error) => {
+  });
+
+  // FIX: Handle query error separately
+  useEffect(() => {
+    if (error) {
       console.error('❌ GET_ME Query Error:', error);
       console.log('📝 Current localStorage token:', localStorage.getItem('authToken'));
     }
-  });
+  }, [error]);
 
   // Form States
   const [name, setName] = useState("");
@@ -55,8 +68,12 @@ export default function ProfilePage() {
     try {
       await updateProfile({ variables: { name, email } });
       addToast({ type: 'success', title: 'Updated', message: 'Profile details updated.' });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message });
+      // Keep refetch available if needed
+      if (refetch) refetch();
+    } catch (err: unknown) {
+      // FIX: Proper error typing instead of any
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      addToast({ type: 'error', title: 'Error', message: errorMessage });
     }
   };
 
@@ -71,8 +88,10 @@ export default function ProfilePage() {
       });
       addToast({ type: 'success', title: 'Success', message: 'Password changed successfully.' });
       setPasswords({ current: "", new: "", confirm: "" });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message });
+    } catch (err: unknown) {
+      // FIX: Proper error typing instead of any
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      addToast({ type: 'error', title: 'Error', message: errorMessage });
     }
   };
 
@@ -92,6 +111,12 @@ export default function ProfilePage() {
   
   if (error) return <div className="text-red-500 text-center p-10">Error loading profile: {error.message}</div>;
 
+  // FIX: Create a typed variable to avoid repetitive data.me access
+  const me = data.me;
+
+  // FIX: Safe access to email first character
+  const firstLetter = me.name?.[0]?.toUpperCase() || me.email?.[0]?.toUpperCase() || 'U';
+
   return (
     <div className="min-h-screen bg-slate-900 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -100,14 +125,14 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-purple-500/20">
-              {data.me.name?.[0]?.toUpperCase() || data.me.email[0].toUpperCase()}
+              {firstLetter}
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">{data.me.name}</h1>
-              <p className="text-slate-400">{data.me.email}</p>
+              <h1 className="text-3xl font-bold text-white">{me.name || 'User'}</h1>
+              <p className="text-slate-400">{me.email}</p>
               <div className="flex gap-2 mt-2">
                 <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300 border border-slate-700 uppercase tracking-wider font-semibold">
-                    {data.me.role}
+                    {me.role}
                 </span>
               </div>
             </div>
