@@ -2,7 +2,7 @@
 import React, { useState, useRef, useCallback } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from "../../contexts/useTheme";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;

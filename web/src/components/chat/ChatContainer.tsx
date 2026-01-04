@@ -10,7 +10,7 @@ import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } 
 import { toast} from "react-toastify";
 import type { ToastOptions } from 'react-toastify';
 import { useAuth } from "../../hooks/useAuth";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";

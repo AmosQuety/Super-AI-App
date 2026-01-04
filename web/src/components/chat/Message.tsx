@@ -12,7 +12,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from "../../contexts/useTheme";
 
 interface MessageProps {
   message: {
