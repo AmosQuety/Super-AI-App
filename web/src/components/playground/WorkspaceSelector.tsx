@@ -1,6 +1,6 @@
 // src/components/playground/WorkspaceSelector.tsx
 import  { useState } from 'react';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useWorkspace } from '../../contexts/useWorkspace';
 import { useMutation } from '@apollo/client/react';
 import {  gql } from '@apollo/client';
 import { Plus,  Check, ChevronDown, Loader2 } from 'lucide-react';

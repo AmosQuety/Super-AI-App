@@ -5,7 +5,7 @@ import { AlertTriangle, RefreshCcw, Copy, Check, ChevronDown, ChevronRight, Bug 
 interface ErrorDisplayProps {
   error: Error;
   resetErrorBoundary?: () => void;
-  errorId?: string;
+  errorId?: string ;
 }
 
 export default function ErrorDisplay({ error, resetErrorBoundary, errorId }: ErrorDisplayProps) {

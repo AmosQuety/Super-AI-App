@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { useWorkspace } from "../../contexts/useWorkspace";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import { FaceCapture } from "../auth/FaceCapture";
