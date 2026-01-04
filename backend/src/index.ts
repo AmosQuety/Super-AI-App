@@ -69,6 +69,8 @@ const startServer = async (): Promise<any> => {
         "http://10.178.83.213:5173",
         "exp://localhost:8081",
 
+        "https://prism-vision.vercel.app",
+
         // Add Apollo Studio domains
         "https://studio.apollographql.com",
         "https://sandbox.apollo.dev",
