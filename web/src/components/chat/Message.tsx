@@ -26,7 +26,7 @@ interface MessageProps {
     retryCount?: number;
   };
   onDelete: (messageId: string) => void;
-  onRetry?: (message: any) => void;
+  onRetry?: (message: MessageProps['message']) => void;
   isThinking?: boolean;
   style?: React.CSSProperties;
 }

@@ -60,6 +60,7 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
           </svg>
         </div>
       </div> 
+      
 
       {/* Center title with enhanced styling */}
       <div className="absolute left-1/2 transform -translate-x-1/2 z-10 hidden md:block">

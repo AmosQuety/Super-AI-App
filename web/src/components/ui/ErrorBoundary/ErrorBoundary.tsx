@@ -1,5 +1,5 @@
 // src/components/ui/ErrorBoundary.tsx
-import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import  { Component, type ErrorInfo, type ReactNode } from "react";
 import ErrorMonitor from "../../../lib/ErrorMonitor";
 import ErrorDisplay from "../ErrorBoundary/ErrorDisplay";
 

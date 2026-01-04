@@ -1,5 +1,5 @@
 // src/components/ui/ErrorDisplay.tsx
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { AlertTriangle, RefreshCcw, Copy, Check, ChevronDown, ChevronRight, Bug } from 'lucide-react';
 
 interface ErrorDisplayProps {

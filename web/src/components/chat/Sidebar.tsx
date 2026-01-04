@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from "react";
 import { Plus, Search, MessageSquare, LogOut, User } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import DocumentUploader from "./DocumentUploader";
+import { useToast } from "../ui/toastContext";
+
 
 interface ChatSession {
   id: string;
@@ -22,7 +23,6 @@ interface ChatHistorySidebarProps {
 
 const Sidebar: React.FC<ChatHistorySidebarProps> = ({
   isOpen,
-  userId,
   onConversationSelected,
   onCreateNewConversation,
   chatSessions,
@@ -30,6 +30,7 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const { user, signOut } = useAuth();
+  const {  showError } = useToast();
 
   const filteredSessions = useMemo(() => {
     const sessionsCopy = [...chatSessions];
@@ -54,7 +55,16 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
         return 'Yesterday';
       }
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    } catch (error) {
+    } catch (error:unknown) {
+      let errorMessage = "An unexpected error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      showError('Date Formatting Error', errorMessage);
       return "Invalid Date";
     }
   };

@@ -1,9 +1,28 @@
 // src/components/ImageGenerator.tsx
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { useToast } from "./ui/toastContext";
+
+// --- TYPE DEFINITIONS ---
+interface AIImageStatusData {
+  aiImageGenerationStatus: {
+    available: boolean;
+    message: string;
+  };
+}
+
+interface GenerateImagesResult {
+  success: boolean;
+  images?: string[];
+  generationTime?: string;
+  error?: string;
+}
+
+interface GenerateImagesData {
+  generateAIImageVariants: GenerateImagesResult;
+}
 
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("");
@@ -14,7 +33,7 @@ export default function ImageGenerator() {
   const { addToast } = useToast();
 
   // Check AI service status on component mount
-  const { data: statusData, loading: statusLoading, error: statusError } = useQuery(GET_AI_IMAGE_STATUS, {
+  const { data: statusData, loading: statusLoading, error: statusError } = useQuery<AIImageStatusData>(GET_AI_IMAGE_STATUS, {
     fetchPolicy: 'network-only',
     pollInterval: 30000, // Re-check every 30 seconds
   });
@@ -28,7 +47,7 @@ export default function ImageGenerator() {
     });
   }, [statusData, statusLoading, statusError]);
 
-  const [generateImagesMutation] = useMutation(GENERATE_AI_IMAGE_VARIANTS, {
+  const [generateImagesMutation] = useMutation<GenerateImagesData>(GENERATE_AI_IMAGE_VARIANTS, {
     onError: (err) => {
       console.error("GraphQL error:", err);
       setError(err.message || "Failed to generate images");
@@ -47,7 +66,7 @@ export default function ImageGenerator() {
         variables: { prompt: prompt.trim() },
       });
 
-      if (data.generateAIImageVariants.success && data.generateAIImageVariants.images) {
+      if (data?.generateAIImageVariants.success && data.generateAIImageVariants.images) {
         setImages(data.generateAIImageVariants.images);
         
         addToast({
@@ -58,7 +77,7 @@ export default function ImageGenerator() {
 
         console.log(`✅ Generated ${data.generateAIImageVariants.images.length} images in ${data.generateAIImageVariants.generationTime}`);
       } else {
-        const errorMsg = data.generateAIImageVariants.error || "Unknown error";
+        const errorMsg = data?.generateAIImageVariants.error || "Unknown error";
         setError(errorMsg);
 
         addToast({
@@ -70,25 +89,26 @@ export default function ImageGenerator() {
         console.error("Generation failed:", errorMsg);
         
         // Fallback to Lorem Picsum for demo purposes
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.MODE === 'development') {
           const fallback = Array(4).fill(null).map((_, i) => 
             `https://picsum.photos/seed/${prompt.replace(/\s+/g, '-')}-${i}/512/512`
           );
           setImages(fallback);
         }
       }
-    } catch (err: any) {
-      console.error("Error generating images:", err);
-      setError(err.message || "Network error. Please check your connection.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Network error. Please check your connection.";
+      console.error("Error generating images:", error);
+      setError(errorMessage);
       
       addToast({
         type: 'error',
         title: 'Generation Error',
-        message: err.message || "Network error. Please check your connection.",
+        message: errorMessage,
       });
 
       // Fallback on error for development
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.MODE === 'development') {
         const fallback = Array(4).fill(null).map((_, i) => 
           `https://picsum.photos/seed/${prompt.replace(/\s+/g, '-')}-${i}/512/512`
         );
@@ -125,17 +145,15 @@ export default function ImageGenerator() {
         window.URL.revokeObjectURL(url);
       }
 
-      if (addToast) {
-        addToast({
-          type: 'success',
-          title: 'Download Complete',
-          message: `Image ${index + 1} downloaded successfully`,
-        });
-      }
+      addToast({
+        type: 'success',
+        title: 'Download Complete',
+        message: `Image ${index + 1} downloaded successfully`,
+      });
       
       console.log(`Downloaded image ${index + 1}`);
-    } catch (err) {
-      console.error("Download failed:", err);
+    } catch (error) {
+      console.error("Download failed:", error);
       setError("Failed to download image");
     } finally {
       setDownloading(null);

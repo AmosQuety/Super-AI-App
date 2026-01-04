@@ -4,15 +4,31 @@ import { COMPARE_FACES } from "../../graphql/playground";
 import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+// --- TYPE DEFINITIONS ---
+interface ComparisonResult {
+  verified: boolean;
+  similarity_score: number;
+}
+
+interface CompareFacesResult {
+  success: boolean;
+  data?: ComparisonResult;
+  error?: string;
+}
+
+interface CompareFacesData {
+  compareFaces: CompareFacesResult;
+}
+
 export default function TwinOMeter() {
   const [file1, setFile1] = useState<File | null>(null);
   const [file2, setFile2] = useState<File | null>(null);
   const [preview1, setPreview1] = useState<string | null>(null);
   const [preview2, setPreview2] = useState<string | null>(null);
   
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ComparisonResult | null>(null);
   
-  const [compareMutation, { loading }] = useMutation(COMPARE_FACES);
+  const [compareMutation, { loading }] = useMutation<CompareFacesData>(COMPARE_FACES);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
     if (e.target.files && e.target.files[0]) {
@@ -34,19 +50,19 @@ export default function TwinOMeter() {
         variables: { image1: file1, image2: file2 } 
       });
       
-      if (data.compareFaces.success) {
+      if (data?.compareFaces.success && data.compareFaces.data) {
         setResult(data.compareFaces.data);
       } else {
-        alert("Error: " + data.compareFaces.error);
+        alert("Error: " + (data?.compareFaces.error || "Comparison failed"));
       }
-    } catch (err: any) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       alert("Comparison failed. Check console.");
     }
   };
 
   // --- REUSABLE UPLOAD BOX ---
-  const UploadBox = ({ slot, preview, file }: { slot: 1 | 2, preview: string | null, file: File | null }) => (
+  const UploadBox = ({ slot, preview }: { slot: 1 | 2, preview: string | null, file: File | null }) => (
     <div className="relative group w-full aspect-square bg-slate-800 rounded-2xl border-2 border-dashed border-slate-600 hover:border-purple-500 transition-colors flex flex-col items-center justify-center overflow-hidden">
       {preview ? (
         <>

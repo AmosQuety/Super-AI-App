@@ -5,16 +5,28 @@ import { Upload, Search, Download, X, User, Users, Loader2, AlertCircle } from "
 import { motion } from "framer-motion";
 import { useDelight } from "../../hooks/useDelight";
 
+// --- TYPE DEFINITIONS ---
+interface FindFaceResult {
+  success: boolean;
+  matches: number;
+  processed_image: string;
+  error?: string;
+}
+
+interface FindFaceData {
+  findFaceInCrowd: FindFaceResult;
+}
+
 export default function FindMe() {
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [crowdFile, setCrowdFile] = useState<File | null>(null);
   const [targetPreview, setTargetPreview] = useState<string | null>(null);
   const [crowdPreview, setCrowdPreview] = useState<string | null>(null);
   const { triggerSuccess } = useDelight();
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<FindFaceResult | null>(null);
   
   // This mutation takes longer, so we handle loading state carefully
-  const [findMutation, { loading }] = useMutation(FIND_FACE);
+  const [findMutation, { loading }] = useMutation<FindFaceData>(FIND_FACE);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'target' | 'crowd') => {
     if (e.target.files && e.target.files[0]) {
@@ -40,14 +52,13 @@ export default function FindMe() {
         variables: { target: targetFile, crowd: crowdFile } 
       });
       
-      if (data.findFaceInCrowd.success) {
+      if (data?.findFaceInCrowd.success) {
         setResult(data.findFaceInCrowd);
-        
         triggerSuccess();
       } else {
-        alert("Error: " + data.findFaceInCrowd.error);
+        alert("Error: " + (data?.findFaceInCrowd.error || "Unknown error"));
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       alert("Scan failed. Check console for details.");
     }

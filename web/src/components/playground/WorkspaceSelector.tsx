@@ -1,9 +1,9 @@
 // src/components/playground/WorkspaceSelector.tsx
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useMutation } from '@apollo/client/react';
 import {  gql } from '@apollo/client';
-import { Plus, Box, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { Plus,  Check, ChevronDown, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../ui/toastContext';
 

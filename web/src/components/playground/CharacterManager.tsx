@@ -1,17 +1,53 @@
-import  { useState } from "react";
+import { useState } from "react";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import { FaceCapture } from "../auth/FaceCapture";
 import { useToast } from "../ui/toastContext";
-import { Plus, User, Search, Users, Sparkles, RefreshCw, X, CheckCircle2, XCircle, Fingerprint } from "lucide-react";
+import { Plus, User, Search, Users, Sparkles, RefreshCw, X, CheckCircle2, Fingerprint } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// --- TYPE DEFINITIONS ---
+interface Face {
+  id: string;
+  name: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  faces: Face[];
+}
+
+interface GetFacesData {
+  myWorkspaces: Workspace[];
+}
+
+interface AddCharacterData {
+  addWorkspaceCharacter: {
+    success: boolean;
+    message: string;
+  };
+}
+
+interface VerifyFaceData {
+  verifyFaceInWorkspace: {
+    success: boolean;
+    message: string;
+    user?: {
+      name: string;
+    };
+  };
+}
 
 // --- QUERIES ---
 const GET_FACES = gql`
   query GetWorkspaceFaces {
     myWorkspaces {
       id
+      name
       faces { id, name, imageUrl, createdAt }
     }
   }
@@ -44,63 +80,80 @@ export default function CharacterManager() {
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
   
   // New State for Test Results
-  const [testResult, setTestResult] = useState<{ success: boolean; name?: string; message?: string; confidence?: number } | null>(null);
+  const [testResult, setTestResult] = useState<{ 
+    success: boolean; 
+    name?: string; 
+    message?: string; 
+    confidence?: number 
+  } | null>(null);
 
-  const { data, loading, refetch } = useQuery(GET_FACES, {
+  const { data, loading, refetch } = useQuery<GetFacesData>(GET_FACES, {
     fetchPolicy: "network-only",
     skip: !activeWorkspace
   });
 
-  const [addCharacter, { loading: adding }] = useMutation(ADD_WORKSPACE_CHARACTER, {
+  const [addCharacter, { loading: adding }] = useMutation<AddCharacterData>(ADD_WORKSPACE_CHARACTER, {
     onCompleted: () => refetch()
   });
 
-  const [verifyFace, { loading: verifying }] = useMutation(VERIFY_IN_WORKSPACE);
+  const [verifyFace, { loading: verifying }] = useMutation<VerifyFaceData>(VERIFY_IN_WORKSPACE);
 
-  const currentFaces = data?.myWorkspaces.find((w: any) => w.id === activeWorkspace?.id)?.faces || [];
+  const currentFaces = data?.myWorkspaces.find((w: Workspace) => w.id === activeWorkspace?.id)?.faces || [];
 
   const handleEnroll = async (file: File) => {
     if (!charName.trim()) return addToast({ type: 'error', title: 'Missing Name', message: 'Name your character!' });
     
     try {
-      const { data } = await addCharacter({ 
+      const { data: responseData } = await addCharacter({ 
         variables: { image: file, workspaceId: activeWorkspace?.id, name: charName } 
       });
 
-      if (data.addWorkspaceCharacter.success) {
+      if (responseData?.addWorkspaceCharacter.success) {
         addToast({ type: 'success', title: 'Added', message: `${charName} joined the squad.` });
         setMode("view");
         setCharName("");
       } else {
-        addToast({ type: 'error', title: 'Error', message: data.addWorkspaceCharacter.message });
+        addToast({ type: 'error', title: 'Error', message: responseData?.addWorkspaceCharacter.message || 'Failed to add character' });
       }
-    } catch (e: any) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      addToast({ type: 'error', title: 'Error', message: 'Failed to add character' });
+    }
   };
 
   const handleTest = async (file: File) => {
     setTestResult(null); // Reset previous result
     try {
-      const { data } = await verifyFace({ variables: { image: file, workspaceId: activeWorkspace?.id } });
-      const response = data.verifyFaceInWorkspace;
+      const { data: responseData } = await verifyFace({ 
+        variables: { image: file, workspaceId: activeWorkspace?.id } 
+      });
+      
+      const response = responseData?.verifyFaceInWorkspace;
 
-      if (response.success) {
+      if (response?.success) {
         // Extract confidence from message "Match Found: Name (99.5%)"
         const match = response.message.match(/\(([^)]+)%\)/);
         const confidence = match ? parseFloat(match[1]) : 90;
 
         setTestResult({
-            success: true,
-            name: response.user?.name,
-            message: response.message,
-            confidence
+          success: true,
+          name: response.user?.name,
+          message: response.message,
+          confidence
         });
       } else {
         setTestResult({
-            success: false,
-            message: "No match found in this universe."
+          success: false,
+          message: "No match found in this universe."
         });
       }
-    } catch (e: any) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      setTestResult({
+        success: false,
+        message: "Error during verification"
+      });
+    }
   };
 
   const resetTest = () => {
@@ -172,7 +225,7 @@ export default function CharacterManager() {
               {loading ? (
                  <div className="col-span-2 flex items-center text-slate-500 gap-2"><RefreshCw className="animate-spin" size={16}/> Loading...</div>
               ) : (
-                currentFaces.map((face: any) => (
+                currentFaces.map((face: Face) => (
                   <div key={face.id} className="group bg-slate-800 rounded-2xl p-2 border border-slate-700 hover:border-violet-500 transition-all hover:-translate-y-1 shadow-lg relative overflow-hidden">
                     <div className="aspect-square bg-slate-950 rounded-xl mb-2 overflow-hidden relative border border-slate-700/50">
                         {face.imageUrl && !imgError[face.id] ? (

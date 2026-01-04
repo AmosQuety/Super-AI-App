@@ -1,11 +1,39 @@
 // src/components/settings/FaceSettings.tsx
-import React, { useState } from "react";
+import  { useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
-import { GET_ME, REMOVE_FACE } from "../../graphql/users"; // GET_ME and REMOVE_FACE are standard
+import { GET_ME, REMOVE_FACE } from "../../graphql/users";
 import { FaceCapture } from "../auth/FaceCapture";
 import { useToast } from "../ui/toastContext";
 import { Shield, Trash2, CheckCircle, ScanFace } from "lucide-react";
+
+// --- TYPE DEFINITIONS ---
+interface User {
+  id: string;
+  hasFaceRegistered?: boolean;
+}
+
+interface GetMeData {
+  me: User;
+}
+
+interface RegisterUserFaceResult {
+  success: boolean;
+  message: string;
+}
+
+interface RegisterUserFaceData {
+  registerUserFace: RegisterUserFaceResult;
+}
+
+interface RemoveFaceResult {
+  success: boolean;
+  message?: string;
+}
+
+interface RemoveFaceData {
+  removeFace: RemoveFaceResult;
+}
 
 // 👇 NEW SPECIFIC MUTATION FOR LOGIN
 const REGISTER_USER_FACE = gql`
@@ -21,40 +49,42 @@ export default function FaceSettings() {
   const { addToast } = useToast();
   const [isCapturing, setIsCapturing] = useState(false);
   
-  const { data, refetch } = useQuery(GET_ME);
+  const { data, refetch } = useQuery<GetMeData>(GET_ME);
   const hasFace = data?.me?.hasFaceRegistered;
 
   // 👇 USE THE NEW MUTATION
-  const [registerUserFace, { loading: adding }] = useMutation(REGISTER_USER_FACE);
-  const [removeFaceMutation, { loading: removing }] = useMutation(REMOVE_FACE);
+  const [registerUserFace, { loading: adding }] = useMutation<RegisterUserFaceData>(REGISTER_USER_FACE);
+  const [removeFaceMutation, { loading: removing }] = useMutation<RemoveFaceData>(REMOVE_FACE);
 
   const handleRegister = async (file: File) => {
     try {
       // 👇 SIMPLE CALL: No workspace ID needed
-      const { data } = await registerUserFace({ variables: { image: file } });
+      const { data: responseData } = await registerUserFace({ variables: { image: file } });
       
-      if (data.registerUserFace.success) {
-        addToast({ type: 'success', title: 'Biometrics Enabled', message: data.registerUserFace.message });
+      if (responseData?.registerUserFace.success) {
+        addToast({ type: 'success', title: 'Biometrics Enabled', message: responseData.registerUserFace.message });
         setIsCapturing(false);
         refetch(); 
       } else {
-        addToast({ type: 'error', title: 'Enrollment Failed', message: data.registerUserFace.message });
+        addToast({ type: 'error', title: 'Enrollment Failed', message: responseData?.registerUserFace.message || 'Registration failed' });
       }
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      addToast({ type: 'error', title: 'Error', message: errorMessage });
     }
   };
 
   const handleRemove = async () => {
     if(!window.confirm("Disable Face ID? You will need your password to login.")) return;
     try {
-      const { data } = await removeFaceMutation();
-      if (data.removeFace.success) {
+      const { data: responseData } = await removeFaceMutation();
+      if (responseData?.removeFace.success) {
         addToast({ type: 'success', title: 'Disabled', message: "Face ID removed." });
         refetch();
       }
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      addToast({ type: 'error', title: 'Error', message: errorMessage });
     }
   };
 

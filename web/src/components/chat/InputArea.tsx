@@ -1,5 +1,6 @@
 // src/components/chat/InputArea.tsx
-import React, { useState, useRef, ChangeEvent, KeyboardEvent, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
