@@ -1,5 +1,7 @@
-// src/contexts/AuthContext.tsx
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+
+import { createContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import type { SignInFormData, SignUpFormData } from '../types/auth';
 import { LOGIN_WITH_FACE } from '../graphql/users';
 import client from '../lib/apolloClient';
@@ -11,14 +13,23 @@ interface User {
 }
 
 interface AuthContextType {
-  user: { id: string; email: string; name: string } | null;
+  user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   signIn: (data: SignInFormData) => Promise<void>;
   signUp: (data: SignUpFormData) => Promise<void>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   loginWithFace: (file: File) => Promise<string>;
+}
+
+interface LoginWithFaceResult {
+  loginWithFace: {
+    success: boolean;
+    token: string;
+    user: User;
+    message?: string;
+  };
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,27 +43,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken');
     const userData = localStorage.getItem('userData');
-    
+
     if (storedToken && userData) {
       try {
         setToken(storedToken);
-        setUser(JSON.parse(userData));
+        setUser(JSON.parse(userData) as User);
       } catch (error) {
-        // Clear corrupted data
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
+        console.log("somethng went wrong parsing user data from storage", error);
       }
     }
+
     setIsLoading(false);
   }, []);
 
   const signIn = async (data: SignInFormData) => {
     try {
       setIsLoading(true);
-      //  const response = await fetch('http://172.16.0.78:4001/graphql', {
+
       const response = await fetch('https://super-ai-backend.onrender.com/graphql', {
-        // const response = await fetch('http://localhost:4001/graphql', {
-       
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,24 +92,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { user: userData, token: authToken } = result.data.login;
 
-       // 1. Set LocalStorage FIRST
-      // Store auth data
+      // 1. Store auth data FIRST
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('userData', JSON.stringify(userData));
 
-      // 2. Update React State
+      // 2. Update state
       setToken(authToken);
       setUser(userData);
 
-      // 3. Reset Apollo Client Store LAST
+      // 3. Reset Apollo cache LAST
       await client.resetStore();
 
-      setToken(authToken);
-      setUser(userData);
-
       console.log('✅ Login successful, token stored:', authToken);
-    } catch (error: any) {
-      throw new Error(error.message || 'Login failed');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new Error(error.message || 'Login failed');
+      }
+      throw new Error('Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +117,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (data: SignUpFormData) => {
     try {
       setIsLoading(true);
-      // const response = await fetch('http://10.117.54.213:4001/graphql', {
+
       const response = await fetch('https://super-ai-backend.onrender.com/graphql', {
-        // const response = await fetch('http://localhost:4001/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -140,28 +148,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { user: userData, token: authToken } = result.data.register;
 
-      // Store auth data
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('userData', JSON.stringify(userData));
 
       setToken(authToken);
       setUser(userData);
-    } catch (error: any) {
-      throw new Error(error.message || 'Registration failed');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new Error(error.message || 'Registration failed');
+      }
+      throw new Error('Registration failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   const signOut = async () => {
-    // 1. Clear LocalStorage
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
-    
-    // 2. Clear Apollo Cache completely
+
     await client.clearStore();
 
-    // 3. Update State
     setToken(null);
     setUser(null);
   };
@@ -169,54 +176,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithFace = async (file: File): Promise<string> => {
     try {
       setIsLoading(true);
-      const result = await client.mutate({
+
+      const result = await client.mutate<LoginWithFaceResult>({
         mutation: LOGIN_WITH_FACE,
         variables: { image: file },
         context: {
           headers: {
-            "apollo-require-preflight": "true",
+            'apollo-require-preflight': 'true',
           },
         },
       });
 
-      if (result.errors) {
-        throw new Error(result.errors[0].message);
-      }
-
-      const { success, token: authToken, user: userData, message } = result.data.loginWithFace;
+      const { success, token: authToken, user: userData, message } =
+        result.data!.loginWithFace;
 
       if (!success) {
-        throw new Error(message || "Face login failed");
+        throw new Error(message || 'Face login failed');
       }
 
-       // 1. Set Storage
+      // 1. Store auth data
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('userData', JSON.stringify(userData));
 
-      // 2. Set State
+      // 2. Update state
       setToken(authToken);
       setUser(userData);
 
-      // 3. CRITICAL: Reset Apollo Store here too!
+      // 3. Reset Apollo cache
       await client.resetStore();
 
-      return message || "Login successful";
-    } catch (error: any) {
-      console.error("Face Login Error:", error);
-      throw new Error(error.message || 'Face login failed');
+      return message || 'Login successful';
+    } catch (error: unknown) {
+      console.error('Face Login Error:', error);
+      if (error instanceof Error) {
+        throw new Error(error.message || 'Face login failed');
+      }
+      throw new Error('Face login failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     token,
     isAuthenticated: !!user && !!token,
+    isLoading,
     signIn,
     signUp,
     signOut,
-    isLoading,
     loginWithFace,
   };
 

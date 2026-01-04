@@ -1,5 +1,5 @@
 // src/components/VoiceTools.tsx
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { 
   Mic, 
   Square, 
@@ -10,13 +10,45 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  FileText,
   Pause
 } from "lucide-react";
+import { useToast } from "./ui/toastContext";
+
+// --- TYPE DEFINITIONS ---
+interface ISpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface ISpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface ISpeechRecognitionConstructor {
+  new(): ISpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: ISpeechRecognitionConstructor;
+    webkitSpeechRecognition?: ISpeechRecognitionConstructor;
+  }
+}
 
 const hasSpeechRecognition =
   typeof window !== "undefined" &&
-  // @ts-ignore
   (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 const hasSpeechSynthesis =
@@ -28,7 +60,7 @@ interface VoiceToolsProps {
 
 export default function VoiceTools({ userId }: VoiceToolsProps) {
   // STT (Speech to Text) State
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState("en-US");
   const [interimText, setInterimText] = useState("");
@@ -41,6 +73,7 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
   const [voiceURI, setVoiceURI] = useState<string>("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+   const {  showError } = useToast();
 
   // Load voices for TTS
   useEffect(() => {
@@ -73,14 +106,13 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
     if (!hasSpeechRecognition) return null;
     if (recognitionRef.current) return recognitionRef.current;
 
-    // @ts-ignore
-    const SR = (window.SpeechRecognition || window.webkitSpeechRecognition) as any;
-    const rec = new SR();
+    const SpeechRecognitionConstructor = (window.SpeechRecognition || window.webkitSpeechRecognition) as ISpeechRecognitionConstructor;
+    const rec = new SpeechRecognitionConstructor();
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = language;
 
-    rec.onresult = (event: any) => {
+    rec.onresult = (event: ISpeechRecognitionEvent) => {
       let interim = "";
       let final = finalText;
 
@@ -96,7 +128,7 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
       setFinalText(final);
     };
 
-    rec.onerror = (e: any) => {
+    rec.onerror = (e: ISpeechRecognitionErrorEvent) => {
       console.error("SpeechRecognition error:", e);
       setIsListening(false);
       
@@ -149,7 +181,7 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
     setCopied(false);
   }, []);
 
-  // FIXED: Save transcript as text file
+  // Save transcript as text file
   const handleSaveTranscript = useCallback(() => {
     if (!finalText.trim()) return;
     
@@ -246,15 +278,24 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch (error) {
-          // Ignore errors on cleanup
+        } catch (error: unknown) {
+          let errorMessage = "An unexpected error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      showError('Something went wrong', errorMessage); 
+          
         }
       }
       if (hasSpeechSynthesis) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [showError]);
 
   const supportedNotice = useMemo(() => {
     if (!hasSpeechRecognition && !hasSpeechSynthesis) {
