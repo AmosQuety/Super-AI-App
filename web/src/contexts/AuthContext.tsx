@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
 
-      const response = await fetch('https://super-ai-backend.onrender.com/graphql', {
+      const response = await fetch('https://super-ai-app.onrender.com/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
 
-      const response = await fetch('https://super-ai-backend.onrender.com/graphql', {
+      const response = await fetch('https://super-ai-app.onrender.com/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
