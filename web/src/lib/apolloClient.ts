@@ -42,7 +42,7 @@ declare global {
 // const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
 
 
-const GRAPHQL_URL = "https://super-ai-backend.onrender.com/graphql";
+const GRAPHQL_URL = "https://super-ai-app.onrender.com/graphql";
 
 
 console.log('🔧 Apollo Client Configuration:', {
