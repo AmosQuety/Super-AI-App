@@ -14,7 +14,7 @@ jobs:
         run: |
           # Pinging the /health endpoint. 
           # Since our /health endpoint runs "SELECT 1", this keeps Supabase awake too!
-          curl -I https://super-ai-backend.onrender.com/health
+          curl -I https://super-ai-app.onrender.com/health
           echo "Pung Render Backend"
 
       - name: Wake up Python Brain (Hugging Face)
