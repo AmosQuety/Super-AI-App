@@ -34,6 +34,8 @@ class ErrorMonitor {
           Sentry.replayIntegration(),
         ],
         tracesSampleRate: 1.0,
+        replaysSessionSampleRate: 0.1,
+        replaysOnErrorSampleRate: 1.0,
         environment: env.VITE_APP_ENV || 'development',
       });
       this.isInitialized = true;

@@ -1,7 +1,13 @@
 // src/index.ts
+
+// CRITICAL: Import Sentry instrument file FIRST, before everything else
+import "./utils/instrument"; // or import "./utils/sentry" if you updated that file
+import * as Sentry from "@sentry/node";
+
+// NOW import everything else
 import * as dotenv from "dotenv";
-// Initialize environment variables .
 dotenv.config();
+
 import express, { Application, Request, Response, NextFunction } from "express";
 import { ApolloServer } from "apollo-server-express";
 import prisma from "./lib/db";
@@ -26,7 +32,6 @@ import {
   securityLoggingMiddleware,
   performanceMiddleware 
 } from './middleware/logging';
-
 
 console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
@@ -68,10 +73,7 @@ const startServer = async (): Promise<any> => {
         "http://localhost:8081",
         "http://10.178.83.213:5173",
         "exp://localhost:8081",
-
         "https://prism-vision.vercel.app",
-
-        // Add Apollo Studio domains
         "https://studio.apollographql.com",
         "https://sandbox.apollo.dev",
       ],
@@ -87,9 +89,9 @@ const startServer = async (): Promise<any> => {
     };
 
     // Helper to decide if error is safe to show
-      const isExposedError = (code: string) => {
-        return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(code);
-      };
+    const isExposedError = (code: string) => {
+      return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(code);
+    };
 
     app.options("*", cors(corsOptions));
     app.use(cors(corsOptions));
@@ -127,11 +129,9 @@ const startServer = async (): Promise<any> => {
     app.use(errorLoggingMiddleware);
 
     // Add this route before Apollo middleware
-  app.get("/debug-tables", async (_req: Request, _res: Response) => {
-    
-    // const tables = await prisma.$queryRaw`SELECT ...`; 
-});
-
+    app.get("/debug-tables", async (_req: Request, _res: Response) => {
+      // const tables = await prisma.$queryRaw`SELECT ...`; 
+    });
 
     // CREATE EXECUTABLE SCHEMA
     const schema = makeExecutableSchema({ typeDefs, resolvers });
@@ -152,7 +152,7 @@ const startServer = async (): Promise<any> => {
     // Initialize Apollo Server with optimized context
     apolloServerInstance = new ApolloServer({
       schema,
-      context: createContext, // Uses the optimized createContext with singleton services
+      context: createContext,
       csrfPrevention: true,
       introspection: process.env.NODE_ENV !== 'production',
       cache: 'bounded',
@@ -170,51 +170,45 @@ const startServer = async (): Promise<any> => {
           }
         }
       ],
-      
 
       formatError: (error: GraphQLError) => {
-    // 1. Extract details from the single error object
-    const code = error.extensions?.code || 'INTERNAL_SERVER_ERROR';
-    // In this version, originalError is nested inside the error object
-    const originalError = error.originalError as any; 
-    const errorId = originalError?.errorId || `err_${Date.now()}`;
+        // Report to Sentry
+        Sentry.captureException(error);
 
-    // 2. Log the full nasty error on the server
-    logger.error(`[${code}] ${error.message}`, {
-      errorId,
-      stack: originalError?.stack,
-      path: error.path,
-      locations: error.locations
-    });
+        const code = error.extensions?.code || 'INTERNAL_SERVER_ERROR';
+        const originalError = error.originalError as any; 
+        const errorId = originalError?.errorId || `err_${Date.now()}`;
 
-    // 3. Production: Mask internal server errors
-    if (process.env.NODE_ENV === 'production') {
-      // If it's not a user error (like "Wrong Password"), hide it.
-      if (!isExposedError(code as string)) {
+        logger.error(`[${code}] ${error.message}`, {
+          errorId,
+          stack: originalError?.stack,
+          path: error.path,
+          locations: error.locations
+        });
+
+        if (process.env.NODE_ENV === 'production') {
+          if (!isExposedError(code as string)) {
+            return {
+              message: "Internal Server Error",
+              extensions: { 
+                code: 'INTERNAL_SERVER_ERROR',
+                errorId 
+              }
+            };
+          }
+        }
+
         return {
-          message: "Internal Server Error",
-          extensions: { 
-            code: 'INTERNAL_SERVER_ERROR',
-            errorId 
+          message: error.message,
+          locations: error.locations,
+          path: error.path,
+          extensions: {
+            ...error.extensions,
+            errorId
           }
         };
-      }
-    }
-
-    // 4. Development: Return everything
-    // We reconstruct the object to ensure it matches GraphQLFormattedError structure
-    return {
-      message: error.message,
-      locations: error.locations,
-      path: error.path,
-      extensions: {
-        ...error.extensions,
-        errorId
-      }
-    };
-  },
-
-  });
+      },
+    });
 
     // Start Apollo Server
     await apolloServerInstance.start();
@@ -233,7 +227,6 @@ const startServer = async (): Promise<any> => {
       {
         schema,
         context: async (ctx) => {
-          // Use the same optimized createContext function for consistency
           return createContext({ connection: ctx });
         },
         onConnect: () => {
@@ -249,7 +242,6 @@ const startServer = async (): Promise<any> => {
     // Enhanced health check endpoint
     app.get("/health", async (_req: Request, res: Response) => {
       try {
-        // Check database connection
         await prisma.$queryRaw`SELECT 1`;
         
         res.json({ 
@@ -283,6 +275,11 @@ const startServer = async (): Promise<any> => {
       });
     });
 
+    // Add Sentry debug endpoint
+    app.get("/debug-sentry", function mainHandler(req, res) {
+      throw new Error("My first Sentry error!");
+    });
+
     // Apply Apollo middleware to Express
     apolloServerInstance.applyMiddleware({
       app,
@@ -293,12 +290,24 @@ const startServer = async (): Promise<any> => {
     // Start the server
     const PORT = process.env.PORT || DEFAULT_PORT;
 
+    // The Sentry error handler must be registered before any other error middleware and after all controllers
+    Sentry.setupExpressErrorHandler(app);
+
+    // Optional fallthrough error handler
+    app.use(function onError(err: any, req: Request, res: Response, next: NextFunction) {
+      // The error id is attached to `res.sentry` to be returned
+      // and optionally displayed to the user for support.
+      res.statusCode = 500;
+      res.end((res as any).sentry + "\n");
+    });
+
     httpServerInstance.listen(PORT, () => {
       logger.info(`
           🚀 GraphQL Server ready at http://localhost:${PORT}${apolloServerInstance.graphqlPath}
           🔌 Subscriptions ready at ws://localhost:${PORT}/graphql
           🔍 Apollo Sandbox available at http://localhost:${PORT}/graphql
           🏥 Health check available at http://localhost:${PORT}/health
+          🐛 Sentry test endpoint at http://localhost:${PORT}/debug-sentry
       `);
       
       logger.info(`
@@ -308,35 +317,34 @@ const startServer = async (): Promise<any> => {
           ✅ GraphQL Service
           ✅ WebSocket Service
           ✅ Singleton Services (Face Recognition, Gemini AI)
+          ✅ Sentry Error Monitoring
       `);
     });
 
     return httpServerInstance;
   } catch (error) {
-  console.error("❌ CRITICAL SERVER STARTUP ERROR:");
-  console.error("Full error:", error);
-  
-  if (error instanceof Error) {
-    console.error("Error name:", error.name);
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
+    Sentry.captureException(error);
+    console.error("❌ CRITICAL SERVER STARTUP ERROR:");
+    console.error("Full error:", error);
+    
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
+    
+    logger.error("Error starting server:", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    process.exit(1);
   }
-  
-  logger.error("Error starting server:", { 
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined
-  });
-  process.exit(1);
-}
 };
 
-// ============================================
-// GRACEFUL SHUTDOWN HANDLER
-// ============================================
+// Rest of your shutdown handlers remain the same...
 const shutdown = async (signal: string) => {
   logger.info(`\n🛑 Received ${signal}. Shutting down gracefully...`);
   
-  // Prevent new connections
   if (httpServerInstance) {
     httpServerInstance.close(async () => {
       logger.info('✅ HTTP server closed');
@@ -344,29 +352,21 @@ const shutdown = async (signal: string) => {
   }
 
   try {
-    // 1. Stop WebSocket subscriptions
     if (subscriptionServerInstance) {
       subscriptionServerInstance.dispose();
       logger.info('✅ WebSocket subscriptions closed');
     }
 
-    // 2. Stop Apollo Server
     if (apolloServerInstance) {
       await apolloServerInstance.stop();
       logger.info('✅ Apollo Server stopped');
     }
 
-    // 3. Disconnect shared Prisma client from context
     await disconnectPrisma();
     logger.info('✅ Shared Prisma client disconnected');
 
-    // 4. Close the local Prisma instance used for health checks
     await prisma.$disconnect();
     logger.info('✅ Health check Prisma client disconnected');
-
-    // 5. Close Redis connection (if RateLimitService exposes a method)
-    // Note: You may need to add a shutdown method to RateLimitService
-    // RateLimitService.shutdown();
     
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);
@@ -376,11 +376,9 @@ const shutdown = async (signal: string) => {
   }
 };
 
-// Handle shutdown signals
 process.on("SIGINT", () => shutdown('SIGINT'));
 process.on("SIGTERM", () => shutdown('SIGTERM'));
 
-// Handle uncaught errors
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', { promise, reason });
 });
@@ -390,7 +388,6 @@ process.on('uncaughtException', (error) => {
   shutdown('UNCAUGHT_EXCEPTION');
 });
 
-// Start the application
 startServer().catch((error) => {
   logger.error('Failed to start server:', { error });
   process.exit(1);

@@ -22,7 +22,7 @@ import {
   LocalStateError,
   UnconventionalError,
 } from "@apollo/client/errors";
-
+import ErrorMonitor from "./ErrorMonitor";
 import { createUploadLink } from "./uploadLink";
 
 // Extend Vite's ImportMeta type
@@ -138,6 +138,18 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   console.log("❌ GraphQL Operation:", operation.operationName);
 
+  // 1. Capture Network Errors
+  if (error && 'networkError' in error && error.networkError) {
+      console.error(`[Network error]:`, error.networkError);
+      
+      // 👇 SEND TO SENTRY
+      ErrorMonitor.capture(error.networkError as Error, {
+          type: 'NetworkError',
+          operation: operation.operationName,
+          url: import.meta.env.VITE_GRAPHQL_URL
+      });
+  }
+
   //  GraphQL execution errors
   if (CombinedGraphQLErrors.is(error)) {
     error.errors.forEach(({ message, locations, path, extensions }) => {
@@ -146,6 +158,11 @@ const errorLink = new ErrorLink(({ error, operation }) => {
           locations
         )}, Path: ${path}`
       );
+      ErrorMonitor.capture(new Error(message), {
+            type: 'GraphQLError',
+            path: path?.join('.'),
+            code: extensions?.code
+        });
 
       if (extensions?.code === "UNAUTHENTICATED") {
         console.warn("User authentication failed");

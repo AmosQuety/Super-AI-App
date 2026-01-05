@@ -4,8 +4,11 @@ import App from "./App";
 import client from "./src/lib/apolloClient";
 import "./index.css";
 import { ApolloProvider } from "@apollo/client/react";
+import ErrorMonitor from "./src/lib/ErrorMonitor";
 
 const rootElement = document.getElementById("root")!;
+// Init Sentry
+ErrorMonitor.init();
 const root = ReactDOM.createRoot(rootElement);
 
 root.render(
