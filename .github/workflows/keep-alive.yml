@@ -1,0 +1,30 @@
+name: Keep Services Alive
+
+on:
+  schedule:
+    # Run every 14 minutes (Render sleeps at 15m)
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allows you to run it manually button
+
+jobs:
+  ping_services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Node Backend (Render) & Supabase
+        run: |
+          # Pinging the /health endpoint. 
+          # Since our /health endpoint runs "SELECT 1", this keeps Supabase awake too!
+          curl -I https://super-ai-backend.onrender.com/health
+          echo "Pung Render Backend"
+
+      - name: Wake up Python Brain (Hugging Face)
+        run: |
+          # Pinging the root endpoint
+          curl -I https://amosquety-biometric-brain.hf.space/
+          echo "Pung Hugging Face"
+
+      - name: Wake up Frontend (Vercel)
+        run: |
+          # Keeps Vercel edge cache warm
+          curl -I https://prism-vision.vercel.app/
+          echo "Pung Vercel Frontend"
