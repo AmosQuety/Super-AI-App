@@ -21,7 +21,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // const fileInputRef = useRef<HTMLInputElement>(null);
 
   // REFACTOR: Memoized text change handler with auto-resize
   const handleTextChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -45,11 +45,11 @@ const InputArea: React.FC<InputAreaProps> = ({
     }
   }, []);
 
-  const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    handleAttachmentChange(file);
-    if (e.target) e.target.value = "";
-  };
+  // const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0] || null;
+  //   handleAttachmentChange(file);
+  //   if (e.target) e.target.value = "";
+  // };
 
   // REFACTOR: Drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -183,7 +183,7 @@ const InputArea: React.FC<InputAreaProps> = ({
 
         <div className="flex items-end p-3 space-x-3">
           {/* Attachment Button */}
-          <button
+          {/* <button
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || !isOnline}
             className={`
@@ -206,7 +206,7 @@ const InputArea: React.FC<InputAreaProps> = ({
               disabled={disabled || !isOnline}
               accept="image/*,.pdf,.doc,.docx,.txt" 
             />
-          </button>
+          </button> */}
           
           {/* Text Input */}
           <div className="flex-1 relative">
@@ -215,7 +215,7 @@ const InputArea: React.FC<InputAreaProps> = ({
               placeholder={
                 !isOnline ? "Offline - waiting for connection..." :
                 disabled ? "AI is thinking..." : 
-                "Type your message... (or drag & drop files)"
+                "Type your message... "
               }
               className={`
                 w-full p-3 bg-transparent text-white placeholder-purple-200/60 
