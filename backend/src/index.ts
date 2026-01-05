@@ -1,7 +1,6 @@
 // src/index.ts
 
-// CRITICAL: Import Sentry instrument file FIRST, before everything else
-import "./utils/instrument"; // or import "./utils/sentry" if you updated that file
+import "./utils/sentry"; 
 import * as Sentry from "@sentry/node";
 
 // NOW import everything else
