@@ -8,8 +8,6 @@ import {
   Sparkles,
   Shield, 
   Zap,
-  Sun,
-  Moon,
   Menu,
   X,
   ChevronRight,
@@ -19,8 +17,7 @@ import {
   ScanFace,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth"; 
-// import { useTheme } from "../contexts/ThemeContext";
-import { useTheme } from "../contexts/useTheme";
+// import { useTheme } from "../contexts/useTheme";
 
 
 // Navigation data
@@ -82,7 +79,7 @@ const features = [
 ];
 
 const Layout = () => {
-  const { theme, toggleTheme } = useTheme();
+  // const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -182,7 +179,7 @@ const Layout = () => {
               )}
 
               {/* Updated theme toggle button */}
-          <button 
+          {/* <button 
             onClick={toggleTheme} 
             className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-all duration-200 group border border-slate-200 dark:border-slate-700/50" 
             aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"} 
@@ -192,7 +189,7 @@ const Layout = () => {
               <Sun className="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" /> : 
               <Moon className="h-5 w-5 group-hover:-rotate-180 transition-transform duration-500" />
             }
-          </button>
+          </button> */}
 
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors border border-slate-200 dark:border-slate-700/50" aria-label="Toggle menu">
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
