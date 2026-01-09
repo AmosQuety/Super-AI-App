@@ -7,7 +7,7 @@ Here is a comprehensive, production-grade README. Create a file named **`README.
 # 💎 Prism AI: The Biometric Intelligence Platform
 
 ![Project Banner](image.png)
-*(Replace this with a screenshot of your Dashboard/Playground)*
+
 
 **Prism AI** is a production-grade SaaS platform that combines **Computer Vision**, **Biometric Security**, and **Generative AI (RAG)** into a unified interface.
 
