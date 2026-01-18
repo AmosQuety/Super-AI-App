@@ -1,10 +1,10 @@
 // web/src/components/chat/ChatContainer.tsx
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import Message from "./Message";
 import InputArea from "./InputArea";
 import Sidebar from "./Sidebar";
-import { Bot, RefreshCw, WifiOff, Menu } from "lucide-react";
-
+import { Bot, RefreshCw, WifiOff, Menu, ArrowDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion"; 
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
 import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
 import { toast} from "react-toastify";
@@ -141,6 +141,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   } = useOptimisticMessages();
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false); 
+  const [isAtBottom, setIsAtBottom] = useState(true);  
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user: authUser } = useAuth();
@@ -250,6 +252,39 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  const handleScroll = useCallback(() => {
+    if (!chatContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // If user is more than 100px from bottom, show arrow
+    const isBottom = distanceToBottom < 100;
+    setIsAtBottom(isBottom);
+    setShowScrollButton(!isBottom);
+  }, []);
+
+  // 2. Auto-Scroll Logic (Smart Sticky Scroll)
+  useLayoutEffect(() => {
+    if (isAtBottom && chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "auto" // Use 'auto' for instant jump prevents flickering
+        });
+    }
+  }, [messages, isAtBottom]); // Run when messages change
+
+  // 3. Manual "Go Down" Button Click
+  const scrollToBottomManual = () => {
+    if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "smooth"
+        });
+        setShowScrollButton(false);
+    }
+  };
 
   // Sidebar Chats Data
   const sidebarChats = useMemo(() => {
@@ -469,7 +504,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           activeConversationId={conversationId}
         />
 
-        <main className="flex-1 flex flex-col min-w-0 h-full bg-transparent transition-all duration-300">
+        <main className="flex-1 flex flex-col min-w-0 h-full bg-transparent transition-all duration-300 relative">
           <div className="lg:hidden flex items-center justify-between p-4 bg-white/10 backdrop-blur">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-white">
               <Menu className="w-6 h-6" />
@@ -478,8 +513,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
             <div className="w-10"></div>
           </div>
 
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
-            <div className="max-w-4xl mx-auto w-full">
+          <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
+            <div className="max-w-4xl mx-auto w-full min-h-full flex flex-col justify-end">
               {historyLoading ? (
                 <div className="flex justify-center text-purple-300">Loading conversation...</div>
               ) : messages.length === 0 ? (
@@ -491,16 +526,19 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                   <p className="text-gray-400">Ask me anything!</p>
                 </div>
               ) : (
-                messages.map((message, index) => (
+                
+                messages.map((message) => (
                   <Message
                     key={message.id}
                     message={message}
                     onDelete={handleDeleteMessage}
                     onRetry={handleRetryMessage}
-                    style={{ animationDelay: `${index * 0.1}s` }}
+                    
                   />
                 ))
-              )}
+              )
+
+              }
               
               {aiState !== "idle" && (
                 <div className="flex justify-start py-4">
@@ -516,6 +554,22 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
               )}
             </div>
           </div>
+
+
+          <AnimatePresence>
+            {showScrollButton && (
+                <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    onClick={scrollToBottomManual}
+                    className="absolute bottom-24 right-8 p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg z-50 transition-colors"
+                >
+                    <ArrowDown size={20} />
+                    {/* Optional: Add badge for new messages count if you track it */}
+                </motion.button>
+            )}
+          </AnimatePresence>
 
           <div className="p-4 md:p-6">
             <div className="max-w-4xl mx-auto">

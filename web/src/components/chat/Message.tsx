@@ -323,4 +323,4 @@ const Message: React.FC<MessageProps> = ({
   );
 };
 
-export default Message;
+export default React.memo(Message);
