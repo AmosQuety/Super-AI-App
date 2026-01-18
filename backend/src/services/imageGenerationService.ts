@@ -1,4 +1,3 @@
-// src/services/imageGenerationService.ts
 import axios from 'axios';
 
 export interface ImageGenerationResult {
@@ -8,103 +7,96 @@ export interface ImageGenerationResult {
 }
 
 export class ImageGenerationService {
-  private huggingFaceApiKey: string;
+  // 1. Change to an array of keys
+  private huggingFaceApiKeys: string[];
   private huggingFaceModel = "stabilityai/stable-diffusion-2-1";
 
   constructor() {
-    this.huggingFaceApiKey = process.env.HUGGING_FACE_API_KEY || '';
+    // 2. Store all keys provided in the environment variable
+    const keys = process.env.HUGGING_FACE_API_KEYS?.split(',') || [];
+    this.huggingFaceApiKeys = keys.map(key => key.trim()).filter(key => key.length > 0);
     
-    if (!this.huggingFaceApiKey) {
-      console.warn('⚠️  HUGGING_FACE_API_KEY not found. Image generation will use mock service.');
+    if (this.huggingFaceApiKeys.length === 0) {
+      console.warn('⚠️  No HUGGING_FACE_API_KEYS found. Image generation will use mock service.');
+    } else {
+      console.log(`🔑 Loaded ${this.huggingFaceApiKeys.length} API keys for rotation.`);
     }
   }
 
   async generateImage(prompt: string): Promise<ImageGenerationResult> {
-    try {
-      // Clean and validate prompt
-      const cleanPrompt = this.sanitizePrompt(prompt);
-      
-      if (!this.huggingFaceApiKey) {
-        // Fallback to mock service if no API key
-        return await this.generateMockImage(cleanPrompt);
-      }
+    const cleanPrompt = this.sanitizePrompt(prompt);
 
-      console.log(`🖼️  Generating image for prompt: "${cleanPrompt}"`);
-      
-      // Call Hugging Face API
-      const response = await axios.post(
-        `https://api-inference.huggingface.co/models/${this.huggingFaceModel}`,
-        { inputs: cleanPrompt },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.huggingFaceApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          responseType: 'arraybuffer',
-          timeout: 30000, // 30 seconds timeout
-        }
-      );
-
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
-
-      // Convert image buffer to base64 data URL
-      const imageBuffer = Buffer.from(response.data);
-      const base64Image = imageBuffer.toString('base64');
-      const imageUrl = `data:image/jpeg;base64,${base64Image}`;
-
-      console.log('✅ Image generated successfully');
-      
-      return {
-        imageUrl,
-        status: 'SUCCESS'
-      };
-
-    } catch (error: any) {
-      console.error('❌ Image generation failed:', error.message);
-      
-      // Fallback to mock service on failure
-      return await this.generateMockImage(prompt);
+    // Fallback if no keys at all
+    if (this.huggingFaceApiKeys.length === 0) {
+      return await this.generateMockImage(cleanPrompt);
     }
+
+    // 3. Loop through all available keys
+    for (let i = 0; i < this.huggingFaceApiKeys.length; i++) {
+      const currentKey = this.huggingFaceApiKeys[i];
+      
+      try {
+        console.log(`🖼️  Generating (Key ${i + 1}/${this.huggingFaceApiKeys.length}) for: "${cleanPrompt}"`);
+        
+        const response = await axios.post(
+          `https://api-inference.huggingface.co{this.huggingFaceModel}`,
+          { inputs: cleanPrompt },
+          {
+            headers: {
+              'Authorization': `Bearer ${currentKey}`,
+              'Content-Type': 'application/json',
+            },
+            responseType: 'arraybuffer',
+            timeout: 30000,
+          }
+        );
+
+        if (response.status === 200) {
+          const imageBuffer = Buffer.from(response.data);
+          const base64Image = imageBuffer.toString('base64');
+          return {
+            imageUrl: `data:image/jpeg;base64,${base64Image}`,
+            status: 'SUCCESS'
+          };
+        }
+      } catch (error: any) {
+        const statusCode = error.response?.status;
+        
+        // 4. Check if key is exhausted (429 = Too Many Requests, 503 = Service Overloaded)
+        if (statusCode === 429 || statusCode === 503) {
+          console.warn(`⚠️  Key ${i + 1} exhausted (Status ${statusCode}). Trying next key...`);
+          continue; // Move to the next key in the for-loop
+        }
+
+        // For other errors (like invalid prompt), stop and show error
+        console.error(`❌ Permanent error with key ${i + 1}:`, error.message);
+        break; 
+      }
+    }
+
+    // 5. If the loop finishes and no key worked
+    console.error('🚫 All API keys exhausted or failed.');
+    return await this.generateMockImage(prompt);
   }
 
   private sanitizePrompt(prompt: string): string {
-    // Remove harmful content and limit length
     const bannedWords = ['nude', 'naked', 'explicit', 'porn', 'violence', 'gore'];
-    let cleanPrompt = prompt.trim().substring(0, 500); // Limit length
-    
-    // Filter out banned words
+    let cleanPrompt = prompt.trim().substring(0, 500);
     bannedWords.forEach(word => {
       const regex = new RegExp(word, 'gi');
       cleanPrompt = cleanPrompt.replace(regex, '[removed]');
     });
-
-    // Add quality improvements
     cleanPrompt += ', high quality, detailed, professional';
-    
     return cleanPrompt;
   }
 
   private async generateMockImage(_prompt: string): Promise<ImageGenerationResult> {
-    // Create a placeholder image using a mock service
-    // Using picsum.photos for placeholder images
-    const width = 512;
-    const height = 512;
-    const imageUrl = `https://picsum.photos/${width}/${height}?random=${Date.now()}`;
-    
+    const imageUrl = `https://picsum.photos{Date.now()}`;
     console.log('🔄 Using mock image service');
-    
-    // Simulate some processing time
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return {
-      imageUrl,
-      status: 'SUCCESS'
-    };
+    return { imageUrl, status: 'SUCCESS' };
   }
 
-  // Optional: Generate multiple images
   async generateMultipleImages(prompt: string, count: number = 4): Promise<ImageGenerationResult[]> {
     const promises = Array.from({ length: count }, () => this.generateImage(prompt));
     return Promise.all(promises);
