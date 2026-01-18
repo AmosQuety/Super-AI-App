@@ -225,24 +225,29 @@ const Layout = () => {
             {/* 3. BENTO GRID */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* LARGE CARD: Chat */}
+              {/* LARGE CARD: Chat (COMING SOON MODE) */}
               <div 
-                onClick={() => navigate('/chat')}
-                className="md:col-span-2 group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-8 transition-all cursor-pointer"
+                className="md:col-span-2 relative overflow-hidden bg-slate-900/30 border border-slate-800/50 rounded-3xl p-8 cursor-default"
               >
-                <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
-                   <ChevronRight className="text-blue-500" />
+                {/* Coming Soon Badge */}
+                <div className="absolute top-6 right-6 z-20">
+                   <span className="px-3 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded-full border border-slate-700 tracking-wider">
+                     COMING SOON
+                   </span>
                 </div>
-                <div className="relative z-10">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4">
-                    <MessageSquare className="w-6 h-6 text-blue-400" />
+
+                <div className="relative z-10 opacity-50 grayscale-[50%]">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-700/50">
+                    <MessageSquare className="w-6 h-6 text-slate-500" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Knowledge Brain</h3>
-                  <p className="text-slate-400 max-w-md">
+                  <h3 className="text-2xl font-bold text-slate-300 mb-2">Knowledge Brain</h3>
+                  <p className="text-slate-500 max-w-md">
                     Chat with your documents using RAG technology. Upload PDFs, ask questions, and get cited answers instantly.
                   </p>
                 </div>
-                <div className="absolute -bottom-4 -right-4 w-64 h-64 bg-blue-600/10 rounded-full blur-[100px] group-hover:bg-blue-600/20 transition-colors" />
+                
+                {/* Subtle, non-interactive decoration */}
+                <div className="absolute -bottom-4 -right-4 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
               </div>
 
               {/* TALL CARD: Biometrics */}
