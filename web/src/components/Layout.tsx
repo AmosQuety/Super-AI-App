@@ -17,6 +17,7 @@ import {
 import { useAuth } from "../hooks/useAuth"; 
 
 // --- CONFIGURATION ---
+const PRODUCT_NAME = "Xemora";
 
 const navigation = [
   { 
@@ -105,7 +106,7 @@ const Layout = () => {
                 </div>
                 <div className="hidden sm:block">
                   <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                    PRISM AI
+                    {PRODUCT_NAME}
                   </h1>
                 </div>
               </Link>

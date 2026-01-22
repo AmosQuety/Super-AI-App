@@ -1,29 +1,62 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
+    <!-- Basic Meta -->
     <meta charset="UTF-8" />
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Next-gen AI platform featuring Biometric Authentication, Computer Vision Playground, and RAG-powered Knowledge Chat." />
-    <meta name="theme-color" content="#020617" />
-    
-    <title>Prism | AI Biometric Lab</title>
+    <!-- Primary SEO -->
+    <title>Xemora – Unified AI Ecosystem for Biometric Security, Computer Vision & Generative Art</title>
+    <meta
+      name="description"
+      content="Xemora is a unified AI ecosystem combining biometric security, computer vision, document intelligence, and generative art."
+    />
 
-   
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <!-- Theme -->
+    <meta name="theme-color" content="#020617" />
+
+    <!-- Open Graph (Google, WhatsApp, LinkedIn) -->
+    <meta property="og:title" content="Xemora – Unified AI Ecosystem" />
+    <meta
+      property="og:description"
+      content="Xemora is a unified AI ecosystem for biometric security, computer vision, document intelligence, and generative art."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://prism-vision.vercel.app/" />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Xemora – Unified AI Ecosystem" />
+    <meta
+      name="twitter:description"
+      content="Unified AI ecosystem combining biometrics, vision, document chat, and generative art."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
-      body { font-family: 'Inter', sans-serif; }
+      body {
+        font-family: 'Inter', sans-serif;
+      }
     </style>
   </head>
-  
- 
+
   <body class="bg-slate-950 text-white antialiased">
+    <!-- React mounts here -->
     <div id="root"></div>
+
+    <!-- Vite entry -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

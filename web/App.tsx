@@ -1,8 +1,8 @@
-// App.tsx 
+// App.tsx
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./src/contexts/AuthContext";
-import { ThemeProvider } from "./src/contexts/ThemeProvider"
+import { ThemeProvider } from "./src/contexts/ThemeProvider";
 import { useAuth } from "./src/hooks/useAuth";
 import { ToastProvider } from "./src/components/ui/Toast";
 import Layout from "./src/components/Layout";
@@ -20,11 +20,18 @@ import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
 import DocumentUploader from "./src/components/chat/DocumentUploader";
 
-// Init Sentry (if env var exists)
+// ==============================
+// 🔹 PRODUCT CONFIG (single source of truth)
+// ==============================
+const PRODUCT_NAME = "Xemora";
+const PRODUCT_TAGLINE = "An intelligent AI workspace for chat, voice, and creation";
+
+// Init Error Monitoring
 ErrorMonitor.init();
 
-
+// ==============================
 // Loading Component
+// ==============================
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-950">
     <div className="text-center">
@@ -34,81 +41,90 @@ const LoadingSpinner = () => (
           <div className="w-12 h-12 bg-slate-950 rounded-lg"></div>
         </div>
       </div>
-      <div className="text-lg font-medium text-white">Loading...</div>
+      <div className="text-lg font-medium text-white">
+        Loading {PRODUCT_NAME}...
+      </div>
     </div>
   </div>
 );
 
-// Protected Route Component
+// ==============================
+// Route Guards
+// ==============================
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-  
+
+  if (isLoading) return <LoadingSpinner />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-// Public Route Component (redirects to home if already authenticated)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-  
+
+  if (isLoading) return <LoadingSpinner />;
   return !isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
 };
 
-// Home Content Component
+// ==============================
+// Home Content
+// ==============================
 const HomeContent = () => (
-  <div className="text-center py-16">
-    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-      Welcome to Super AI Assistant
-    </h2>
-    <p className="text-gray-600 dark:text-gray-300">
-      Select a feature from the navigation to get started
+  <section
+    className="text-center py-16"
+    aria-label={`${PRODUCT_NAME} overview`}
+  >
+    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+      Welcome to {PRODUCT_NAME}
+    </h1>
+    <p className="text-gray-600 dark:text-gray-300 max-w-xl mx-auto">
+      {PRODUCT_TAGLINE}. Choose a feature from the navigation to get started.
     </p>
-  </div>
+  </section>
 );
 
-// Main App Routes Component
+// ==============================
+// App Routes
+// ==============================
 const AppRoutes = () => {
   const { user: authUser, token: authToken } = useAuth();
-  
-  // Default values for development/fallback
+
   const defaultUser = {
     id: authUser?.id || "user-123",
-    username: authUser?.name || authUser?.email || "User"
+    username: authUser?.name || authUser?.email || "User",
   };
 
   return (
     <Routes>
-      {/* Public Routes - Outside Layout */}
-      <Route path="/login" element={
-        <PublicRoute>
-          <LoginScreen />
-        </PublicRoute>
-      } />
-      
-      <Route path="/register" element={
-        <PublicRoute>
-          <RegisterScreen />
-        </PublicRoute>
-      } />
+      {/* Public */}
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <LoginScreen />
+          </PublicRoute>
+        }
+      />
 
-      {/* Protected Routes - Inside Layout */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Layout />
-          {/* <PlaygroundPage /> */}
-        </ProtectedRoute>
-      }>
-        {/* Home Route */}
+      <Route
+        path="/register"
+        element={
+          <PublicRoute>
+            <RegisterScreen />
+          </PublicRoute>
+        }
+      />
+
+      {/* Protected */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<HomeContent />} />
 
-        {/* Chat Route */}
         <Route
           path="chat"
           element={
@@ -119,68 +135,38 @@ const AppRoutes = () => {
           }
         />
 
-        <Route 
-            path="/playground" 
-            element={<PlaygroundPage /> } 
-            />
-        
-        {/* Voice Screen Route */}
-        <Route 
-          path="voice-screen" 
-          element={<VoiceScreen />} 
-        />
-        
-        {/* Image Generation Route */}
-        <Route 
-          path="image" 
-          element={<ImageGenerator />} 
-        />
-        
-        {/* Voice Tools Route */}
-        <Route
-          path="voice"
-          element={<VoiceTools userId={defaultUser.id} />}
-        />
-
-        {/* Profile Route - ADDED INSIDE LAYOUT */}
-        <Route
-          path="profile"
-          element={<ProfilePage />}
-        />
-
-        <Route
-          path="document-uploader"
-          element={<DocumentUploader />}
-        />
+        <Route path="playground" element={<PlaygroundPage />} />
+        <Route path="voice-screen" element={<VoiceScreen />} />
+        <Route path="image" element={<ImageGenerator />} />
+        <Route path="voice" element={<VoiceTools userId={defaultUser.id} />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="document-uploader" element={<DocumentUploader />} />
       </Route>
 
-      
-      
-
-
-      {/* Redirect unknown routes to the main dashboard or login */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
-// Main App Component
+// ==============================
+// Main App
+// ==============================
 export default function App() {
   return (
     <ThemeProvider>
-    <ToastProvider>
-      <ErrorBoundary>
-      <AuthProvider>
-        <WorkspaceProvider>
-        <Router>
-          <div className="App">
-            <AppRoutes />
-          </div>
-        </Router>
-        </WorkspaceProvider>
-      </AuthProvider>
-      </ErrorBoundary>
-    </ToastProvider>
+      <ToastProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <WorkspaceProvider>
+              <Router>
+                <div className="App" data-product={PRODUCT_NAME}>
+                  <AppRoutes />
+                </div>
+              </Router>
+            </WorkspaceProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

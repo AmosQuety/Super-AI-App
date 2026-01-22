@@ -1,15 +1,9 @@
-This is the final touch! A professional `README.md` transforms your code from a "project" into a "product." It tells recruiters and developers exactly what you built and how complex the architecture is.
-
-Here is a comprehensive, production-grade README. Create a file named **`README.md`** in your root folder and paste this in.
-
-***
-
-# 💎 Prism AI: The Biometric Intelligence Platform
+# 💎 Xemora: The Biometric Intelligence Platform
 
 ![Project Banner](image.png)
 
 
-**Prism AI** is a production-grade SaaS platform that combines **Computer Vision**, **Biometric Security**, and **Generative AI (RAG)** into a unified interface.
+**Xemora** is a production-grade SaaS platform that combines **Computer Vision**, **Biometric Security**, and **Generative AI (RAG)** into a unified interface.
 
 It features a microservices architecture separating the "Manager" (Node.js) from the "Brain" (Python AI), enabling scalable face recognition, liveness detection, and document intelligence.
 
