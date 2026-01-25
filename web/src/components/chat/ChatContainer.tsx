@@ -245,6 +245,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
             behavior: 'smooth'
           });
         }
+        console.log("Scrolling to bottom", scrollToBottom);
       });
     }
   }, []);
