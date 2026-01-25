@@ -249,9 +249,10 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     }
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  // REMOVED redundant scroll logic that causes flickering
+  // useEffect(() => {
+  //   scrollToBottom();
+  // }, [messages, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     if (!chatContainerRef.current) return;
@@ -268,10 +269,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   // 2. Auto-Scroll Logic (Smart Sticky Scroll)
   useLayoutEffect(() => {
     if (isAtBottom && chatContainerRef.current) {
-        chatContainerRef.current.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: "auto" // Use 'auto' for instant jump prevents flickering
-        });
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isAtBottom]); // Run when messages change
 
@@ -283,6 +281,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
             behavior: "smooth"
         });
         setShowScrollButton(false);
+        setIsAtBottom(true);
     }
   };
 
@@ -514,7 +513,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           </div>
 
           <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
-            <div className="max-w-4xl mx-auto w-full min-h-full flex flex-col justify-end">
+            <div className="max-w-4xl mx-auto w-full min-h-full flex flex-col justify-start">
               {historyLoading ? (
                 <div className="flex justify-center text-purple-300">Loading conversation...</div>
               ) : messages.length === 0 ? (

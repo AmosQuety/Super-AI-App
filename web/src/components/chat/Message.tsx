@@ -141,7 +141,7 @@ const Message: React.FC<MessageProps> = ({
 
   return (
     <div 
-    className={`flex w-full mb-4 sm:mb-6 group ${isUserMessage ? "justify-end" : "justify-start"} animate-slide-in`}
+    className={`flex w-full mb-4 sm:mb-6 group ${isUserMessage ? "justify-end" : "justify-start"}`}
     style={style}
   >
     <div className={`flex items-end gap-2 sm:gap-3 max-w-[85%] sm:max-w-[75%] md:max-w-[70%] ${isUserMessage ? 'flex-row-reverse' : 'flex-row'}`}>
