@@ -44,6 +44,8 @@ declare global {
 
 const GRAPHQL_URL = "https://super-ai-app.onrender.com/graphql";
 
+// ✅ DEFINE PUBLIC ROUTES - These should NEVER redirect to login
+const PUBLIC_ROUTES = ['/', '/login', '/register'];
 
 console.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,
@@ -164,17 +166,21 @@ const errorLink = new ErrorLink(({ error, operation }) => {
             code: extensions?.code
         });
 
+      // ✅ FIXED: Only redirect to login if on a PROTECTED route
       if (extensions?.code === "UNAUTHENTICATED") {
         console.warn("User authentication failed");
 
         if (typeof window !== "undefined") {
-          if (!localStorage.getItem("authToken")) {
-            const currentPath = window.location.pathname;
-            if (currentPath !== "/login") {
-              window.location.href = `/login?returnTo=${encodeURIComponent(
-                currentPath
-              )}`;
-            }
+          const currentPath = window.location.pathname;
+          
+          // ✅ Check if we're on a public route - if so, DON'T redirect
+          const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
+          
+          if (!isPublicRoute && !localStorage.getItem("authToken")) {
+            console.log(`🔒 Redirecting from protected route ${currentPath} to login`);
+            window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
+          } else if (isPublicRoute) {
+            console.log(`✅ On public route ${currentPath}, not redirecting`);
           }
         }
       }
