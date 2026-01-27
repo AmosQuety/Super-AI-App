@@ -59,11 +59,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+// AuthOnlyRoute - Only redirects unauthenticated users from login/register
+// Does NOT redirect authenticated users from landing page
+const AuthOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) return <LoadingSpinner />;
-  return !isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+  // If already authenticated, redirect to dashboard instead of showing login/register
+  return !isAuthenticated ? <>{children}</> : <Navigate to="/dashboard" replace />;
 };
 
 // ==============================
@@ -96,25 +99,25 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Public Marketing Homepage */}
+      {/* Landing Page - Accessible to everyone, no redirects */}
       <Route path="/" element={<LandingPage />} />
 
-      {/* Public Auth Pages */}
+      {/* Auth Pages - Only redirect if ALREADY authenticated */}
       <Route
         path="/login"
         element={
-          <PublicRoute>
+          <AuthOnlyRoute>
             <LoginScreen />
-          </PublicRoute>
+          </AuthOnlyRoute>
         }
       />
 
       <Route
         path="/register"
         element={
-          <PublicRoute>
+          <AuthOnlyRoute>
             <RegisterScreen />
-          </PublicRoute>
+          </AuthOnlyRoute>
         }
       />
 
@@ -146,6 +149,7 @@ const AppRoutes = () => {
         <Route path="document-uploader" element={<DocumentUploader />} />
       </Route>
 
+      {/* Catch-all: redirect to landing page */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

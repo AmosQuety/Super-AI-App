@@ -60,7 +60,7 @@ const testimonials = [
     role: "Lead Engineer at TechStream"
   },
   {
-    quote: "The generative art tools are incredibly intuitive. It’s like having a digital artist at my fingertips.",
+    quote: "The generative art tools are incredibly intuitive. It's like having a digital artist at my fingertips.",
     author: "Marcus Thorne",
     role: "Creative Director"
   }
@@ -68,8 +68,13 @@ const testimonials = [
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
+  
+  // Define link destinations based on authentication status
   const authLink = isAuthenticated ? "/dashboard" : "/login";
   const registerLink = isAuthenticated ? "/dashboard" : "/register";
+
+  // NO AUTO-REDIRECT - Landing page remains accessible
+  // Users must manually click buttons to navigate
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-200">
@@ -187,7 +192,7 @@ export default function LandingPage() {
               <div className="bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 p-8 rounded-3xl border border-indigo-500/10">
                 <h2 className="text-3xl font-bold text-white mb-6">About Xemora</h2>
                 <p className="text-slate-400 mb-6 leading-relaxed">
-                  Xemora is more than just an AI tool; it’s a unified ecosystem designed to bridge the gap between complex engineering and intuitive user experiences.
+                  Xemora is more than just an AI tool; it's a unified ecosystem designed to bridge the gap between complex engineering and intuitive user experiences.
                 </p>
                 <p className="text-slate-400 mb-6 leading-relaxed">
                   We believe that biometric security, multi-modal communication, and generative creativity should exist in a single, secure environment. Whether you are a developer building the next big thing or a business securing your infrastructure, Xemora provides the building blocks.
@@ -261,7 +266,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 5. Footer */}
+      {/* 6. Footer */}
       <footer className="py-24 border-t border-white/5 bg-slate-950/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">

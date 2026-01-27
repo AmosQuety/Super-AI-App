@@ -113,14 +113,14 @@ export default function RegisterScreen() {
   // ------------------------------------------
   if (showFaceEnroll) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-800 rounded-3xl p-8 shadow-xl border border-slate-700 text-center animate-in fade-in zoom-in duration-300">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-slate-700/50 text-center">
           <div className="mb-6">
-            <div className="w-16 h-16 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-               <User className="text-purple-400 w-8 h-8" />
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+               <User className="text-white w-8 h-8" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Secure Your Account 📸</h2>
-            <p className="text-slate-400 text-sm">
+            <p className="text-gray-400 text-sm">
               Register your face now to enable instant login next time.
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function RegisterScreen() {
           
           <button 
             onClick={skipEnrollment}
-            className="mt-8 text-slate-500 hover:text-slate-300 text-xs uppercase tracking-widest hover:underline transition-all"
+            className="mt-8 text-gray-500 hover:text-gray-300 text-xs uppercase tracking-widest hover:underline transition-all"
           >
             Skip for now
           </button>
@@ -143,74 +143,112 @@ export default function RegisterScreen() {
     );
   }
 
+
   // ------------------------------------------
   // VIEW 1: REGISTRATION FORM
   // ------------------------------------------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
-      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          
-          <div className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          {/* Logo Section */}
+          <div className="mb-6">
             <Link to="/" className="inline-block">
-              <div className="mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-3xl w-20 h-20 flex items-center justify-center mb-6 shadow-2xl shadow-indigo-500/30 hover:scale-105 transition-transform">
-                <ScanFace size={36} className="text-white" />
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                <ScanFace className="w-8 h-8 text-white" />
               </div>
             </Link>
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-              Join Xemora
-            </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 font-medium">
-              Start your Unified AI journey today
-            </p>
           </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Join Xemora</h1>
+          <p className="text-gray-400 font-medium">Start your Unified AI journey today</p>
+        </div>
 
-          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-8 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/50">
-            <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-              
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
-                <input {...register('name')} type="text" placeholder="John Doe" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
-                <input {...register('email')} type="email" placeholder="you@example.com" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
-                {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Password</label>
-                <div className="relative">
-                  <input {...register('password')} type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" onClick={() => setShowPassword(!showPassword)}>
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-                {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
-              </div>
-
-              <button type="submit" disabled={!isValid || isLoading} className="w-full bg-blue-500 text-white py-3 px-4 rounded-xl hover:bg-blue-600 transition-colors font-semibold text-lg disabled:opacity-50">
-                {isLoading ? 'Creating Account...' : 'Sign Up'}
-              </button>
-            </form>
-
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-              <p className="text-gray-600 dark:text-gray-400 mb-4">Already have an account?</p>
-              <Link to="/login" className="text-purple-500 font-semibold hover:text-purple-600">Sign In</Link>
+        {/* Form Card */}
+        <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-slate-700/50">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            
+            {/* Name Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Full Name
+              </label>
+              <input
+                {...register('name')}
+                type="text"
+                placeholder="John Doe"
+                className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+              />
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-400">{errors.name.message}</p>
+              )}
             </div>
 
-            {/* Trust Footer */}
-            <div className="mt-8 flex justify-center gap-4 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-700 pt-6">
-              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Privacy Policy</Link>
-              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Terms of Service</Link>
-              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Security Center</Link>
+            {/* Email Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Email Address
+              </label>
+              <input
+                {...register('email')}
+                type="email"
+                placeholder="you@example.com"
+                className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
+              )}
             </div>
-          </div>
+
+            {/* Password Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Sign Up Button */}
+            <button
+              type="submit"
+              disabled={!isValid || isLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 rounded-xl hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Creating Account...' : 'Sign Up'}
+            </button>
+          </form>
+        </div>
+
+        {/* Sign In Link */}
+        <p className="text-center text-gray-400 mt-6">
+          Already have an account?{' '}
+          <Link to="/login" className="text-purple-400 hover:text-purple-300 font-medium transition">
+            Sign In
+          </Link>
+        </p>
+
+        {/* Trust Footer */}
+        <div className="mt-8 flex justify-center gap-4 text-xs text-gray-500 border-t border-slate-800 pt-6">
+          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Privacy Policy</Link>
+          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Terms of Service</Link>
+          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Security Center</Link>
         </div>
       </div>
     </div>
