@@ -13,6 +13,7 @@ import {
   Globe
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../hooks/useAuth';
 
 const features = [
   {
@@ -66,31 +67,37 @@ const testimonials = [
 ];
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
+  const authLink = isAuthenticated ? "/dashboard" : "/login";
+  const registerLink = isAuthenticated ? "/dashboard" : "/register";
+
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-200">
       {/* 1. Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <Link to="/" className="flex items-center space-x-3 group transition-transform hover:scale-[1.02]">
             <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               Xemora
             </span>
-          </div>
+          </Link>
           
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#about" className="hover:text-white transition-colors">About</a>
-            <Link to="/login" className="text-white hover:text-indigo-300 transition-colors">Login</Link>
+            <Link to={authLink} className="text-white hover:text-indigo-300 transition-colors">
+              {isAuthenticated ? "Dashboard" : "Login"}
+            </Link>
           </nav>
 
           <Link 
-            to="/register" 
+            to={registerLink} 
             className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 transition-all text-sm"
           >
-            Get Started Free
+            {isAuthenticated ? "Go to App" : "Get Started Free"}
           </Link>
         </div>
       </header>
@@ -122,16 +129,16 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link 
-                to="/register" 
+                to={registerLink} 
                 className="w-full sm:w-auto px-8 py-4 bg-white text-slate-950 rounded-2xl font-bold text-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
               >
-                Sign Up for Xemora <ArrowRight size={20} />
+                {isAuthenticated ? "Enter Workspace" : "Sign Up for Xemora"} <ArrowRight size={20} />
               </Link>
               <Link 
-                to="/login" 
+                to={authLink} 
                 className="w-full sm:w-auto px-8 py-4 bg-slate-800/50 backdrop-blur-md border border-slate-700 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-colors"
               >
-                View Demo
+                {isAuthenticated ? "View Dashboard" : "View Demo"}
               </Link>
             </div>
           </motion.div>
@@ -172,7 +179,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. Use Cases / Social Proof */}
+      {/* 4. About Section */}
+      <section id="about" className="py-24 border-t border-white/5 relative bg-[#0B0F19]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="lg:w-1/2">
+              <div className="bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 p-8 rounded-3xl border border-indigo-500/10">
+                <h2 className="text-3xl font-bold text-white mb-6">About Xemora</h2>
+                <p className="text-slate-400 mb-6 leading-relaxed">
+                  Xemora is more than just an AI tool; it’s a unified ecosystem designed to bridge the gap between complex engineering and intuitive user experiences.
+                </p>
+                <p className="text-slate-400 mb-6 leading-relaxed">
+                  We believe that biometric security, multi-modal communication, and generative creativity should exist in a single, secure environment. Whether you are a developer building the next big thing or a business securing your infrastructure, Xemora provides the building blocks.
+                </p>
+                <div className="flex items-center gap-4 text-sm font-bold uppercase tracking-widest text-indigo-400">
+                  <span className="w-12 h-[1px] bg-indigo-500/50" />
+                  Engineering the Future
+                </div>
+              </div>
+            </div>
+            <div className="lg:w-1/2 grid grid-cols-2 gap-4">
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-2xl">
+                <div className="text-3xl font-bold text-white mb-2">99%</div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider font-medium">Uptime Guarantee</div>
+              </div>
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-2xl">
+                <div className="text-3xl font-bold text-white mb-2">256-bit</div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider font-medium">Encryption</div>
+              </div>
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-2xl">
+                <div className="text-3xl font-bold text-white mb-2">Instant</div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider font-medium">Identity Verification</div>
+              </div>
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-2xl">
+                <div className="text-3xl font-bold text-white mb-2">Global</div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider font-medium">CDN Distribution</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Use Cases / Social Proof */}
       <section className="py-24 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -233,10 +281,10 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-bold mb-6 text-sm uppercase tracking-[0.2em]">Platform</h4>
               <ul className="space-y-4 text-slate-500 text-sm">
-                <li><Link to="/login" className="hover:text-white transition-colors">Face Playground</Link></li>
-                <li><Link to="/login" className="hover:text-white transition-colors">Image Gen</Link></li>
-                <li><Link to="/login" className="hover:text-white transition-colors">Voice Tools</Link></li>
-                <li><Link to="/login" className="hover:text-white transition-colors">Knowledge Brain</Link></li>
+                <li><Link to="/playground" className="hover:text-white transition-colors">Face Playground</Link></li>
+                <li><Link to="/image" className="hover:text-white transition-colors">Image Gen</Link></li>
+                <li><Link to="/voice" className="hover:text-white transition-colors">Voice Tools</Link></li>
+                <li><Link to="/chat" className="hover:text-white transition-colors">Knowledge Brain</Link></li>
               </ul>
             </div>
             <div>
