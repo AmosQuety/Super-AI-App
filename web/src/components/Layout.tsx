@@ -202,34 +202,46 @@ const Layout = () => {
                 System Operational
               </div>
               
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
+              <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
                 Hello, <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">{user?.name?.split(' ')[0] || 'Creator'}</span>.
-                <br />
-                <span className="text-slate-500 text-3xl md:text-5xl font-semibold">What are we building today?</span>
               </h1>
+              <p className="text-slate-400 text-lg md:text-xl font-medium mb-8 max-w-2xl mx-auto">
+                <span className="text-white block mb-1">What are we building today?</span>
+                <span className="text-slate-500 text-sm md:text-base font-normal">Your unified workspace for biometric security, document intelligence, and creative AI.</span>
+              </p>
 
               {/* 2. QUICK ACTION CHIPS */}
-              <div className="flex flex-wrap justify-center gap-3 mt-8">
-                {quickActions.map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={() => navigate(action.href)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border ${action.bg} ${action.border} hover:bg-opacity-80 transition-all duration-200 group`}
-                  >
-                    <action.icon size={16} className={action.color} />
-                    <span className="text-sm font-medium text-slate-300 group-hover:text-white">{action.label}</span>
-                  </button>
-                ))}
+              <div className="space-y-4">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold block">Quick Start</span>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.label}
+                      onClick={() => navigate(action.href)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border ${action.bg} ${action.border} hover:bg-opacity-80 transition-all duration-200 group`}
+                    >
+                      <action.icon size={16} className={action.color} />
+                      <span className="text-sm font-medium text-slate-300 group-hover:text-white">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* 3. BENTO GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="relative group/grid">
+              {/* Connective Tissue: Grid Effect */}
+              <div className="absolute inset-0 -m-8 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.15] pointer-events-none" />
               
-              {/* LARGE CARD: Chat (COMING SOON MODE) */}
-              <div 
-                className="md:col-span-2 relative overflow-hidden bg-slate-900/30 border border-slate-800/50 rounded-3xl p-8 cursor-default"
-              >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                
+                {/* LARGE CARD: Knowledge Brain (coming soon) */}
+                <div 
+                  className="md:col-span-2 relative overflow-hidden bg-slate-900/20 border border-slate-800/40 rounded-3xl p-8 cursor-default transition-all duration-500 group/card"
+                >
+                  <div className="absolute top-6 left-8">
+                    <span className="text-[10px] font-black tracking-widest text-blue-500/40 uppercase">Intelligence</span>
+                  </div>
                 {/* Coming Soon Badge */}
                 <div className="absolute top-6 right-6 z-20">
                    <span className="px-3 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded-full border border-slate-700 tracking-wider">
@@ -237,25 +249,28 @@ const Layout = () => {
                    </span>
                 </div>
 
-                <div className="relative z-10 opacity-50 grayscale-[50%]">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-700/50">
-                    <MessageSquare className="w-6 h-6 text-slate-500" />
+                  <div className="relative z-10 opacity-40 grayscale transition-all duration-500 group-hover/card:opacity-60 group-hover/card:grayscale-0">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-800/30 flex items-center justify-center mb-4 border border-white/5">
+                      <MessageSquare className="w-6 h-6 text-slate-500" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-300 mb-2">Knowledge Brain</h3>
+                    <p className="text-slate-500 max-w-md">
+                      Chat with your documents using RAG technology. Upload PDFs, ask questions, and get cited answers instantly.
+                    </p>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-300 mb-2">Knowledge Brain</h3>
-                  <p className="text-slate-500 max-w-md">
-                    Chat with your documents using RAG technology. Upload PDFs, ask questions, and get cited answers instantly.
-                  </p>
-                </div>
                 
                 {/* Subtle, non-interactive decoration */}
                 <div className="absolute -bottom-4 -right-4 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
               </div>
 
               {/* TALL CARD: Biometrics */}
-              <div 
-                onClick={() => navigate('/playground')}
-                className="md:row-span-2 group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-8 transition-all cursor-pointer flex flex-col justify-between"
-              >
+                <div 
+                  onClick={() => navigate('/playground')}
+                  className="md:row-span-2 group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-3xl p-8 transition-all cursor-pointer flex flex-col justify-between"
+                >
+                  <div className="absolute top-6 left-8">
+                    <span className="text-[10px] font-black tracking-widest text-violet-500/40 uppercase">Security</span>
+                  </div>
                  <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
                    <ChevronRight className="text-violet-500" />
                 </div>
@@ -282,10 +297,13 @@ const Layout = () => {
               </div>
 
               {/* MEDIUM CARD: Image Gen */}
-              <div 
-                onClick={() => navigate('/image')}
-                className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-8 transition-all cursor-pointer"
-              >
+                <div 
+                  onClick={() => navigate('/image')}
+                  className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-pink-500/50 rounded-3xl p-8 transition-all cursor-pointer"
+                >
+                  <div className="absolute top-6 left-8">
+                    <span className="text-[10px] font-black tracking-widest text-pink-500/40 uppercase">Creative</span>
+                  </div>
                 <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
                    <ChevronRight className="text-pink-500" />
                 </div>
@@ -299,10 +317,13 @@ const Layout = () => {
               </div>
 
               {/* MEDIUM CARD: Voice */}
-              <div 
-                onClick={() => navigate('/voice')}
-                className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-8 transition-all cursor-pointer"
-              >
+                <div 
+                  onClick={() => navigate('/voice')}
+                  className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-3xl p-8 transition-all cursor-pointer"
+                >
+                  <div className="absolute top-6 left-8">
+                    <span className="text-[10px] font-black tracking-widest text-amber-500/40 uppercase">Creative</span>
+                  </div>
                 <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
                    <ChevronRight className="text-amber-500" />
                 </div>
@@ -315,6 +336,7 @@ const Layout = () => {
                 </p>
               </div>
 
+              </div>
             </div>
           </div>
         ) : (
