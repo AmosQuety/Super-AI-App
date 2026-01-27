@@ -80,7 +80,7 @@ const Layout = () => {
     }
   };
 
-  const isHomePage = location.pathname === "/";
+  const isHomePage = location.pathname === "/dashboard";
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-200 selection:bg-indigo-500/30">
@@ -114,7 +114,7 @@ const Layout = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-2">
-              <NavLink to="/" className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`} end>
+              <NavLink to="/dashboard" className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`} end>
                   <Home className="w-4 h-4" />
                   <span>Home</span>
               </NavLink>
@@ -157,7 +157,7 @@ const Layout = () => {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-white/10 py-4 space-y-2">
-               <NavLink to="/" className={({ isActive }) => `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive ? "bg-white/10 text-white" : "text-slate-400"}`} end>
+               <NavLink to="/dashboard" className={({ isActive }) => `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive ? "bg-white/10 text-white" : "text-slate-400"}`} end>
                   <Home className="w-5 h-5" />
                   <span className="font-medium">Home</span>
               </NavLink>

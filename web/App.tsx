@@ -15,6 +15,7 @@ import VoiceTools from "./src/components/VoiceTools";
 import "./index.css";
 import ProfilePage from "./src/pages/ProfilePage";
 import PlaygroundPage from "./src/pages/PlaygroundPage";
+import LandingPage from "./src/pages/LandingPage";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
@@ -95,7 +96,10 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Public */}
+      {/* Public Marketing Homepage */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Public Auth Pages */}
       <Route
         path="/login"
         element={
@@ -114,16 +118,15 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Protected */}
+      {/* Protected App Workspace */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<HomeContent />} />
+        <Route path="dashboard" element={<HomeContent />} />
 
         <Route
           path="chat"
