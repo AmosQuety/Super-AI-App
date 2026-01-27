@@ -77,12 +77,14 @@ export default function LoginScreen() {
         <div className="text-center mb-8">
           {/* Logo Section */}
           <div className="mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg">
-              <Mail className="w-8 h-8 text-white" />
-            </div>
+            <Link to="/" className="inline-block">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                <ScanFace className="w-8 h-8 text-white" />
+              </div>
+            </Link>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-gray-400">Sign in to your account</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Sign in to Xemora</h1>
+          <p className="text-gray-400 font-medium">Your Unified AI Ecosystem</p>
         </div>
 
         {isFaceMode ? (
@@ -170,11 +172,17 @@ export default function LoginScreen() {
             {/* Sign Up Link */}
             <p className="text-center text-gray-400 mt-6">
               Don't have an account?{' '}
-              
               <Link to="/register" className="text-purple-400 hover:text-purple-300 font-medium transition">
                 Sign Up
               </Link>
             </p>
+
+            {/* Trust Footer */}
+            <div className="mt-8 flex justify-center gap-4 text-xs text-gray-500 border-t border-slate-800 pt-6">
+              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Privacy Policy</Link>
+              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Terms of Service</Link>
+              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Security Center</Link>
+            </div>
           </>
         )}
       </div>

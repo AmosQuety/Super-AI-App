@@ -1,7 +1,7 @@
 // src/components/auth/RegisterScreen.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, User } from 'lucide-react';
+import { Eye, EyeOff, User, ScanFace } from 'lucide-react';
 import { useToast } from '../ui/toastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
@@ -152,14 +152,16 @@ export default function RegisterScreen() {
         <div className="max-w-md w-full space-y-8">
           
           <div className="text-center">
-            <div className="mx-auto bg-gradient-to-br from-purple-500 to-pink-600 p-5 rounded-3xl w-20 h-20 flex items-center justify-center mb-6 shadow-2xl shadow-purple-500/30">
-              <User size={36} className="text-white" />
-            </div>
+            <Link to="/" className="inline-block">
+              <div className="mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-3xl w-20 h-20 flex items-center justify-center mb-6 shadow-2xl shadow-indigo-500/30 hover:scale-105 transition-transform">
+                <ScanFace size={36} className="text-white" />
+              </div>
+            </Link>
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-              Create Account
+              Join Xemora
             </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400">
-              Join us and start your AI journey today!
+            <p className="text-lg text-gray-600 dark:text-gray-400 font-medium">
+              Start your Unified AI journey today
             </p>
           </div>
 
@@ -200,6 +202,13 @@ export default function RegisterScreen() {
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-4">Already have an account?</p>
               <Link to="/login" className="text-purple-500 font-semibold hover:text-purple-600">Sign In</Link>
+            </div>
+
+            {/* Trust Footer */}
+            <div className="mt-8 flex justify-center gap-4 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-700 pt-6">
+              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Privacy Policy</Link>
+              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Terms of Service</Link>
+              <Link to="#" className="hover:text-slate-400 underline decoration-slate-300 dark:decoration-slate-700">Security Center</Link>
             </div>
           </div>
         </div>
