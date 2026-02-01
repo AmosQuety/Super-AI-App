@@ -32,6 +32,11 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 *   **Crowd Scanner:** 1:N Identification to pinpoint a target face within a group photo using RetinaFace detectors.
 *   **Workspace Management:** Multi-tenant architecture allowing users to create isolated "Universes" (e.g., Marvel vs. Family) with separate facial databases.
 
+### 🎙️ Voice Intelligence Layer
+*   **Local-First Speech:** Zero-latency transcription using the Web Speech API (no cloud costs).
+*   **Command Engine:** Navigate the app and trigger actions (e.g., "Switch to Dark Mode") via voice.
+*   **Biometric Visualization:** Real-time spectral analysis of voice data (Volume & Pitch monitoring).
+
 ### 🧠 The Knowledge Brain (RAG)
 *   **Chat with Data:** Upload PDF documents and chat with them.
 *   **Vector Search:** Uses Google Gemini Embeddings + pgvector to retrieve relevant context chunks.

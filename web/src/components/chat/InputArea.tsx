@@ -110,7 +110,7 @@ const InputArea: React.FC<InputAreaProps> = ({
 
   return (
     <div 
-      className="px-4 pb-6 pt-2 bg-transparent dark:bg-transparent backdrop-blur-sm"
+      className="w-full bg-transparent"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

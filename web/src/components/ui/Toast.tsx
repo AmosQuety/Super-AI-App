@@ -1,6 +1,6 @@
 // src/components/ui/Toast.tsx
 import  {  useState, type ReactNode } from 'react';
-import { CheckCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, X, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ToastContext, type ToastType } from './toastContext';
 
@@ -25,9 +25,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
   const showSuccess = (title: string, message: string) => addToast({ type: 'success', title, message });
   const showError = (title: string, message: string) => addToast({ type: 'error', title, message });
+  const showInfo = (title: string, message: string) => addToast({ type: 'info', title, message });
 
   return (
-    <ToastContext.Provider value={{ addToast, showSuccess, showError }}>
+    <ToastContext.Provider value={{ addToast, showSuccess, showError, showInfo }}>
       {children}
       <div className="fixed top-4 right-4 z-[100] w-full max-w-sm space-y-3 pointer-events-none">
         <AnimatePresence>
@@ -41,14 +42,18 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               className={`flex items-start p-4 rounded-xl shadow-2xl border pointer-events-auto ${
                 toast.type === 'success'
                   ? 'bg-emerald-50 dark:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                  : 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+                  : toast.type === 'error'
+                  ? 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+                  : 'bg-blue-50 dark:bg-blue-900/50 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
               }`}
             >
               <div className="flex-shrink-0">
                 {toast.type === 'success' ? (
                   <CheckCircle className="w-6 h-6 text-emerald-500" />
-                ) : (
+                ) : toast.type === 'error' ? (
                   <XCircle className="w-6 h-6 text-red-500" />
+                ) : (
+                  <Info className="w-6 h-6 text-blue-500" />
                 )}
               </div>
               <div className="ml-3 flex-1">
@@ -60,7 +65,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                 className={`ml-4 p-1 rounded-full ${
                   toast.type === 'success'
                     ? 'hover:bg-emerald-100 dark:hover:bg-emerald-800'
-                    : 'hover:bg-red-100 dark:hover:bg-red-800'
+                    : toast.type === 'error'
+                    ? 'hover:bg-red-100 dark:hover:bg-red-800'
+                    : 'hover:bg-blue-100 dark:hover:bg-blue-800'
                 }`}
                 aria-label="Dismiss"
               >

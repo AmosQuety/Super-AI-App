@@ -9,23 +9,26 @@ import { MessageService } from "../../services/messageService";
 import { UserRole } from "../../auth/authorization";
 import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
-import { ImageGenerationService } from "../../services/imageGenerationService";
-import { HuggingFaceService } from '../../services/huggingface.service'; 
+
+// ✅ CHANGED: Import Pollinations instead of HuggingFace
+import { PollinationsService } from '../../services/pollinations.service'; 
+
 import prisma from "../../lib/db";
-import {JWTPayload, SecurityConfig } from "../../auth/security"; 
+import { JWTPayload, SecurityConfig } from "../../auth/security"; 
 
 // ============================================
 // SINGLETON SERVICES (Created once, reused)
 // ============================================
-// These services don't depend on prisma or request-specific data
-// They're initialized once when the module loads and reused for all requests
 const singletonServices = {
   faceRecognitionService: new FaceRecognitionService(),
   geminiAIService: new GeminiAIService(),
-  imageGenerationService: new ImageGenerationService(),
-  huggingFaceService: HuggingFaceService.getInstance(), // Add this - use getInstance() for singleton
+  
+  // ✅ CHANGED: Use Pollinations instead of HuggingFace
+  // Both imageGenerationService and huggingFaceService point to the same Pollinations instance
+  // This maintains backward compatibility with your existing code
+  imageGenerationService: PollinationsService.getInstance(), 
+  huggingFaceService: PollinationsService.getInstance(), // Same instance, different name for compatibility
 };
-
 
 export interface Upload {
   filename: string;
@@ -49,8 +52,12 @@ export interface AppContext {
   // Services
   faceRecognitionService: FaceRecognitionService;
   geminiAIService: GeminiAIService;
-  imageGenerationService: ImageGenerationService;
-  huggingFaceService: HuggingFaceService; // Add this
+  
+  // ✅ CHANGED: Type is now PollinationsService
+  // But we keep the same property names for backward compatibility
+  imageGenerationService: PollinationsService; 
+  huggingFaceService: PollinationsService;
+  
   chatService: ChatService;
   userService: UserService;
   messageService: MessageService;
@@ -63,40 +70,29 @@ export const disconnectPrisma = async () => {
   await prisma.$disconnect();
 };
 
-
 // ============================================
 // CONTEXT CREATION
 // ============================================
 export async function createContext({ req, connection }: any): Promise<AppContext> {
-  
   let token: string | undefined;
   
-  // Handle both HTTP and WebSocket connections
   if (req) {
-    // HTTP request
     token = req.headers.authorization?.replace("Bearer ", "");
+    
   } else if (connection?.context?.authToken) {
-    // WebSocket connection
     token = connection.context.authToken;
   }
   
-  // Authenticate user
   let user: JWTPayload | null = null;
   if (token) {
     try {
       user = SecurityConfig.verifyToken(token);
+      console.log('✅ User authenticated:', user.role);
     } catch (error) {
-      // Invalid token/ token expired, user remains null
       console.warn("Invalid or expired token");
-
     }
-    
-    
   }
 
-  // Create request-specific services
-  // These are created fresh for each request because they depend on prisma
-  // or might have request-specific state
   const requestServices = {
     chatService: new ChatService(prisma),
     userService: new UserService(prisma),
@@ -109,7 +105,7 @@ export async function createContext({ req, connection }: any): Promise<AppContex
     prisma,
     user,
     req,
-    res: req ?.res,
+    res: req?.res,
     ...singletonServices,
     ...requestServices,
   };

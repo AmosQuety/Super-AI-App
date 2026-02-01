@@ -1,18 +1,18 @@
 // web/src/lib/uploadLink.ts
 import { ApolloLink, Observable } from "@apollo/client";
-import type { Operation } from "@apollo/client"; // Type-only import
+import type { Operation } from "@apollo/client";
 import { print } from "graphql"; 
-import type { DocumentNode } from "graphql"; // Type-only import
+import type { DocumentNode } from "graphql";
 
 type TreeValue = File | unknown[] | Record<string, unknown> | string | number | boolean | null | undefined;
 
 export function createUploadLink({ uri, headers = {} }: { uri: string; headers?: Record<string, string> }) {
   return new ApolloLink((operation: Operation) => {
     return new Observable((observer) => {
-      // 1. Get the context (This is where AuthLink put the token!)
+      // ✅ FIX: Get the context which includes the auth token from authLink
       const context = operation.getContext();
       const fetchOptions = context.fetchOptions || {};
-      const contextHeaders = context.headers || {};
+      const contextHeaders = context.headers || {}; // This has the Bearer token!
 
       const { variables, query } = operation;
 
@@ -21,13 +21,9 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
       const files: File[] = [];
 
       const extractFiles = (tree: TreeValue, path: string[]): TreeValue => {
-        // Handle null/undefined
         if (tree === null || tree === undefined) return tree;
-        
-        // Handle primitive values
         if (typeof tree !== 'object') return tree;
 
-        // Handle File objects
         if (tree instanceof File) {
           const key = `${files.length}`;
           files.push(tree);
@@ -35,14 +31,12 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
           return null; 
         }
 
-        // Handle arrays
         if (Array.isArray(tree)) {
           return tree.map((item, index) => 
             extractFiles(item as TreeValue, [...path, `${index}`])
           );
         }
 
-        // Handle plain objects
         const newObj: Record<string, TreeValue> = {};
         Object.keys(tree as Record<string, TreeValue>).forEach((key) => {
           newObj[key] = extractFiles(
@@ -70,14 +64,22 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
         body.append(`${index}`, file, file.name);
       });
 
-      // 2. Send Request with MERGED HEADERS
+      // ✅ FIX: Merge headers properly - contextHeaders has the auth token!
+      const finalHeaders = {
+        ...headers,           // Base headers (apollo-require-preflight)
+        ...contextHeaders,    // Auth token from authLink
+      };
+
+      // ✅ DEBUG: Log to verify token is present
+      console.log('🔐 Upload request headers:', {
+        hasAuthorization: !!finalHeaders.authorization,
+        headerKeys: Object.keys(finalHeaders)
+      });
+
       fetch(uri, {
         method: "POST",
         body,
-        headers: {
-          ...headers,
-          ...contextHeaders,
-        },
+        headers: finalHeaders, // ✅ Use merged headers
         ...fetchOptions,
       })
         .then(async (result) => {

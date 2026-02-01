@@ -5,6 +5,7 @@ import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCi
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { useToast } from "./ui/toastContext";
 
+
 // --- TYPE DEFINITIONS ---
 interface AIImageStatusData {
   aiImageGenerationStatus: {
@@ -31,6 +32,7 @@ export default function ImageGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
   const { addToast } = useToast();
+ 
 
   // Check AI service status on component mount
   const { data: statusData, loading: statusLoading, error: statusError } = useQuery<AIImageStatusData>(GET_AI_IMAGE_STATUS, {

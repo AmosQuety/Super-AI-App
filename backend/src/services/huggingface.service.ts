@@ -2,47 +2,26 @@
 import { HfInference } from '@huggingface/inference';
 import { logger } from '../utils/logger';
 
-export interface ImageGenerationRequest {
-  prompt: string;
-  negative_prompt?: string;
-  width?: number;
-  height?: number;
-  num_inference_steps?: number;
-  guidance_scale?: number;
-  num_images?: number;
-}
-
-export interface ImageGenerationResponse {
-  success: boolean;
-  images?: string[]; // base64 encoded images
-  error?: string;
-  model: string;
-  timestamp: string;
-}
-
 export class HuggingFaceService {
   private static instance: HuggingFaceService;
-  private isAvailable: boolean = true;
-  private hf: HfInference;
+  private apiKeys: string[];
+  private currentKeyIndex: number = 0;
   
-  // WORKING MODEL - FLUX.1-schnell is fast, free, and Apache 2.0 licensed
+  // ✅ FIX: Use a truly free model that doesn't require paid providers
   private readonly MODEL = "black-forest-labs/FLUX.1-schnell";
+  // Alternative free models:
+  // private readonly MODEL = "stabilityai/stable-diffusion-2-1";
+  // private readonly MODEL = "prompthero/openjourney-v4";
 
   private constructor() {
-    const apiKey = process.env.HUGGING_FACE_API_KEY;
+    const keys = process.env.HUGGING_FACE_API_KEYS || process.env.HUGGING_FACE_API_KEY || "";
+    this.apiKeys = keys.split(',').map(k => k.trim()).filter(k => k.length > 0);
     
-    if (!apiKey) {
-      logger.warn('Hugging Face API key not configured. Image generation will be disabled.');
-      this.isAvailable = false;
+    if (this.apiKeys.length === 0) {
+      logger.error('❌ Hugging Face API keys not configured.');
+    } else {
+      logger.info(`✅ Loaded ${this.apiKeys.length} Hugging Face API key(s)`);
     }
-    
-    // Initialize the new Inference Client
-    this.hf = new HfInference(apiKey);
-    
-    logger.info('HuggingFace service initialized', { 
-      model: this.MODEL,
-      available: this.isAvailable 
-    });
   }
 
   public static getInstance(): HuggingFaceService {
@@ -52,184 +31,207 @@ export class HuggingFaceService {
     return HuggingFaceService.instance;
   }
 
-  async generateImages(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-    if (!this.isAvailable) {
-      return {
-        success: false,
-        error: 'Hugging Face service not configured',
-        model: this.MODEL,
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    try {
-      const {
-        prompt,
-        negative_prompt,
-        width = 1024,
-        height = 1024,
-        num_images = 1,
-      } = request;
-
-      logger.info('Generating images with Hugging Face', { 
-        model: this.MODEL,
-        promptLength: prompt.length,
-        dimensions: `${width}x${height}`,
-        numImages: num_images,
-      });
-
-      const images: string[] = [];
-
-      // Generate requested number of images
-      for (let i = 0; i < num_images; i++) {
-        try {
-          logger.info(`Starting generation for image ${i + 1}/${num_images}`);
-          
-          // Use the new textToImage method with proper parameters
-          const result = await this.hf.textToImage({
-            model: this.MODEL,
-            inputs: prompt,
-            parameters: {
-              negative_prompt,
-              width,
-              height,
-              num_inference_steps: 4, // FLUX.1-schnell works best with 1-4 steps
-            },
-          });
-
-          logger.info(`Result received for image ${i + 1}, type: ${typeof result}`);
-
-          // FIXED: Handle both Blob and already-encoded string responses
-          let base64Image: string;
-          
-          if (typeof result === 'string') {
-            // Already a base64 string or data URL
-            base64Image = result.startsWith('data:') ? result : `data:image/png;base64,${result}`;
-            logger.info('Result is already a string');
-          } else if (result && typeof result === 'object' && 'arrayBuffer' in result) {
-            // It's a Blob-like object
-            logger.info('Converting Blob to base64...');
-            const arrayBuffer = await (result as any).arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const buffer = Buffer.from(uint8Array);
-            base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
-          } else {
-            // Try to handle as ArrayBuffer or any other binary data
-            logger.info('Attempting to convert unknown type to base64...');
-            try {
-              const buffer = Buffer.from(result as any);
-              base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
-            } catch (bufferError) {
-              logger.error('Unknown result type:', typeof result, bufferError);
-              throw new Error(`Unexpected result type: ${typeof result}`);
-            }
-          }
-          
-          images.push(base64Image);
-          
-          logger.info(`Image ${i + 1}/${num_images} generated successfully, base64 length: ${base64Image.length}`);
-        } catch (imgError: any) {
-          logger.error(`Failed to generate image ${i + 1}`, { 
-            error: imgError.message,
-            stack: imgError.stack,
-          });
-          
-          // Continue with other images instead of failing completely
-          if (i === 0) {
-            // If first image fails, throw error
-            throw imgError;
-          }
-        }
-      }
-
-      if (images.length === 0) {
-        throw new Error('Failed to generate any images');
-      }
-
-      logger.info(`Successfully generated ${images.length} images`);
-
-      return {
-        success: true,
-        images,
-        model: this.MODEL,
-        timestamp: new Date().toISOString(),
-      };
-
-    } catch (error: any) {
-      logger.error('Image generation failed', { 
-        error: error.message,
-        stack: error.stack,
-      });
-      
-      return {
-        success: false,
-        error: this.getErrorMessage(error),
-        model: this.MODEL,
-        timestamp: new Date().toISOString(),
-      };
-    }
+  private rotateKey() {
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+    logger.warn(`🔄 Rotating Hugging Face Key to index ${this.currentKeyIndex}`);
   }
 
-  private getErrorMessage(error: any): string {
-    // Handle common errors with helpful messages
-    if (error.message?.includes('401')) {
-      return 'Invalid API key. Please check your HUGGING_FACE_API_KEY.';
+  async generateImages(request: any): Promise<any> {
+    const { prompt, negative_prompt, width = 1024, height = 1024 } = request;
+
+    // Track which keys we've tried
+    const attemptedKeys = new Set<number>();
+
+    for (let attempt = 0; attempt < this.apiKeys.length; attempt++) {
+      const keyIndex = this.currentKeyIndex;
+      
+      // Prevent infinite loops
+      if (attemptedKeys.has(keyIndex)) {
+        logger.error(`🔁 Already tried key ${keyIndex}, breaking loop`);
+        break;
+      }
+      attemptedKeys.add(keyIndex);
+
+      const apiKey = this.apiKeys[keyIndex];
+      const hf = new HfInference(apiKey);
+
+      try {
+        logger.info(`🎨 Attempting image generation with key ${keyIndex}/${this.apiKeys.length - 1}`);
+        
+        const result = await hf.textToImage({
+          model: this.MODEL,
+          inputs: prompt,
+          parameters: {
+            negative_prompt: negative_prompt || "blurry, distorted, low quality, watermark",
+            width: Math.min(width, 1024),
+            height: Math.min(height, 1024),
+            num_inference_steps: 20, // Reduced for faster generation
+          },
+          wait_for_model: true,
+          use_cache: false,
+        });
+
+        // Conversion logic
+        const arrayBuffer = await (result as any).arrayBuffer();
+        const base64Image = `data:image/png;base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+
+        logger.info(`✅ Image generation successful with key ${keyIndex}`);
+        return { success: true, images: [base64Image], model: this.MODEL };
+
+      } catch (error: any) {
+        const errorMsg = error.message || JSON.stringify(error);
+        
+        logger.error(`❌ Key ${keyIndex} failed:`, {
+          error: errorMsg.substring(0, 200),
+          attempt: attempt + 1,
+          totalKeys: this.apiKeys.length
+        });
+
+        // ✅ FIX: More aggressive rotation - try next key for ANY error except auth failures
+        const isAuthError = errorMsg.includes('401') || 
+                           errorMsg.includes('Invalid API key') ||
+                           errorMsg.includes('Unauthorized');
+        
+        if (isAuthError) {
+          // If it's an auth error, this key is definitely bad - skip it permanently
+          logger.error(`🔐 Authentication failed for key ${keyIndex} - key is invalid`);
+          this.rotateKey();
+          continue;
+        }
+        
+        // For any other error, rotate and try the next key
+        this.rotateKey();
+        
+        // If we haven't tried all keys yet, continue
+        if (attempt < this.apiKeys.length - 1) {
+          continue;
+        }
+        
+        // If this was the last key, return the error
+        return { 
+          success: false, 
+          error: this.getDetailedErrorMessage(error),
+          errorType: this.categorizeError(errorMsg)
+        };
+      }
     }
-    if (error.message?.includes('429')) {
-      return 'Rate limit exceeded. Please try again in a few moments.';
+
+    return { 
+      success: false, 
+      error: "All API keys failed. This could mean: 1) Keys are invalid, 2) Model requires paid tier, 3) Service is down. Try switching to a free model like 'black-forest-labs/FLUX.1-schnell'",
+      errorType: 'ALL_KEYS_EXHAUSTED'
+    };
+  }
+
+  // --- WRAPPERS ---
+  async generateImage(prompt: string): Promise<any> {
+    const result = await this.generateImages({ prompt });
+    
+    if (!result.success) {
+      return { 
+        imageUrl: '', 
+        status: 'FAILED' as const, 
+        error: result.error 
+      };
     }
-    if (error.message?.includes('503')) {
-      return 'Model is loading. Please wait 20-30 seconds and try again.';
-    }
-    if (error.message?.includes('Blob') || error.message?.includes('arrayBuffer')) {
-      return 'Image conversion error. Please try again.';
-    }
-    return error.message || 'Failed to generate images';
+    
+    return { 
+      imageUrl: result.images[0], 
+      status: 'SUCCESS' as const 
+    };
+  }
+
+  async generateMultipleImages(prompt: string, count: number): Promise<any[]> {
+    const result = await this.generateImages({ prompt, num_images: count });
+    if (!result.success) return [];
+    return result.images.map((img: string) => ({ imageUrl: img, status: 'SUCCESS' }));
   }
 
   async checkModelStatus(): Promise<{ available: boolean; message: string }> {
-    if (!this.isAvailable) {
-      return { 
-        available: false, 
-        message: 'API key not configured' 
-      };
-    }
-
-    try {
-      logger.info('Checking model status...');
+    // Quick test with minimal resources
+    for (let i = 0; i < this.apiKeys.length; i++) {
+      const hf = new HfInference(this.apiKeys[this.currentKeyIndex]);
       
-      // Try a simple generation to check if the model is available
-      const result = await this.hf.textToImage({
-        model: this.MODEL,
-        inputs: "test",
-        parameters: {
-          width: 256,
-          height: 256,
-          num_inference_steps: 1,
-        },
-      });
+      try {
+        logger.info(`🔍 Checking model status with key ${this.currentKeyIndex}`);
+        
+        await hf.textToImage({
+          model: this.MODEL,
+          inputs: "test",
+          parameters: { 
+            width: 256, 
+            height: 256, 
+            num_inference_steps: 1 
+          },
+          wait_for_model: true,
+          use_cache: true // Use cache for status checks
+        });
 
-      logger.info('Model status check successful', { resultType: typeof result });
-
-      return {
-        available: true,
-        message: 'Model is available and ready',
-      };
-    } catch (error: any) {
-      logger.warn('Model status check failed', { error: error.message });
-      
-      // Model might be loading - this is common and not necessarily an error
-      if (error.message?.includes('503') || error.message?.includes('loading')) {
-        return {
-          available: true,
-          message: 'Model is loading (this is normal for first use)',
-        };
+        logger.info(`✅ Model is available`);
+        return { available: true, message: 'Model is active and ready' };
+        
+      } catch (error: any) {
+        const errorMsg = error.message || "";
+        
+        logger.warn(`⚠️ Status check failed for key ${this.currentKeyIndex}: ${errorMsg.substring(0, 100)}`);
+        
+        if (errorMsg.includes('503') || errorMsg.includes('loading')) {
+          return { available: true, message: 'Model is loading, try again in 20 seconds' };
+        }
+        
+        // Try next key
+        this.rotateKey();
+        continue;
       }
-      
-      return { 
-        available: false, 
-        message: error.message || 'Failed to reach Hugging Face API' 
-      };
     }
+    
+    return { 
+      available: false, 
+      message: 'Service temporarily unavailable. All keys failed status check.' 
+    };
+  }
+
+  private categorizeError(errorMsg: string): string {
+    if (errorMsg.includes('401') || errorMsg.includes('Invalid API')) return 'AUTHENTICATION';
+    if (errorMsg.includes('429')) return 'RATE_LIMIT';
+    if (errorMsg.includes('503')) return 'SERVICE_UNAVAILABLE';
+    if (errorMsg.includes('balance') || errorMsg.includes('credits')) return 'INSUFFICIENT_CREDITS';
+    if (errorMsg.includes('fal-ai') || errorMsg.includes('provider')) return 'PROVIDER_ERROR';
+    return 'UNKNOWN';
+  }
+
+  private getDetailedErrorMessage(error: any): string {
+    const msg = error.message || "";
+    
+    // Authentication errors
+    if (msg.includes('401')) {
+      return 'Invalid API key. Please check your Hugging Face API keys.';
+    }
+    
+    // Credit/billing errors
+    if (msg.includes('balance is depleted') || msg.includes('Insufficient credits')) {
+      return 'Hugging Face account has insufficient credits. Consider upgrading or using a free model.';
+    }
+    
+    // Provider errors (THIS IS YOUR ISSUE)
+    if (msg.includes('fal-ai') || msg.includes('provider')) {
+      return 'Model requires paid provider (fal-ai). Switch to a free model like "black-forest-labs/FLUX.1-schnell" or "stabilityai/stable-diffusion-2-1"';
+    }
+    
+    // Rate limiting
+    if (msg.includes('429')) {
+      return 'Rate limit reached. All keys are temporarily exhausted.';
+    }
+    
+    // Service issues
+    if (msg.includes('503')) {
+      return 'Model is currently loading. Please wait 20-30 seconds and try again.';
+    }
+    
+    return msg.substring(0, 200) || 'Failed to generate images';
+  }
+
+  private getErrorMessage(error: any): string {
+    return this.getDetailedErrorMessage(error);
   }
 }

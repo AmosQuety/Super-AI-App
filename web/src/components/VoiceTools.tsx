@@ -1,5 +1,5 @@
 // src/components/VoiceTools.tsx
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Mic, 
   Square, 
@@ -10,478 +10,249 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  Pause
+  Pause,
+  Activity,
+  Zap,
+  Smile,
+  Meh
 } from "lucide-react";
-import { useToast } from "./ui/toastContext";
-
-// --- TYPE DEFINITIONS ---
-interface ISpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface ISpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-interface ISpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
-  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
-
-interface ISpeechRecognitionConstructor {
-  new(): ISpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: ISpeechRecognitionConstructor;
-    webkitSpeechRecognition?: ISpeechRecognitionConstructor;
-  }
-}
-
-const hasSpeechRecognition =
-  typeof window !== "undefined" &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-const hasSpeechSynthesis =
-  typeof window !== "undefined" && "speechSynthesis" in window;
+import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 
 interface VoiceToolsProps {
   userId?: string;
 }
 
 export default function VoiceTools({ userId }: VoiceToolsProps) {
-  // STT (Speech to Text) State
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [language, setLanguage] = useState("en-US");
-  const [interimText, setInterimText] = useState("");
-  const [finalText, setFinalText] = useState("");
+  const { 
+    isListening, 
+    transcript, 
+    interimTranscript, 
+    startListening, 
+    stopListening,
+    isSpeaking,
+    speak,
+    stopSpeaking,
+    audioMetrics,
+    sentiment
+  } = useVoiceIntelligence();
+
+  const [ttsText, setTtsText] = useState("Hello! I am an AI voice. Enter any text here and I will speak it for you.");
   const [copied, setCopied] = useState(false);
 
-  // TTS (Text to Speech) State
-  const [ttsText, setTtsText] = useState("Hello! I am an AI voice. Enter any text here and I will speak it for you.");
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voiceURI, setVoiceURI] = useState<string>("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-   const {  showError } = useToast();
+  // Combine transcripts for display
+  const fullDisplay = (transcript + " " + interimTranscript).trim();
+  const wordCount = fullDisplay ? fullDisplay.split(/\s+/).length : 0;
 
-  // Load voices for TTS
-  useEffect(() => {
-    if (!hasSpeechSynthesis) return;
-
-    const synth = window.speechSynthesis;
-    const loadVoices = () => {
-      const v = synth.getVoices();
-      setVoices(v);
-      if (!voiceURI && v.length > 0) {
-        // Try to find a good default voice (preferably English)
-        const defaultVoice = 
-          v.find(voice => voice.lang.startsWith('en-') && voice.default) ||
-          v.find(voice => voice.lang.startsWith('en-')) ||
-          v.find(voice => voice.default) ||
-          v[0];
-        setVoiceURI(defaultVoice.voiceURI);
-      }
-    };
-
-    loadVoices();
-    synth.onvoiceschanged = loadVoices;
-    
-    return () => {
-      synth.onvoiceschanged = null;
-    };
-  }, [voiceURI]);
-
-  const ensureRecognition = useCallback(() => {
-    if (!hasSpeechRecognition) return null;
-    if (recognitionRef.current) return recognitionRef.current;
-
-    const SpeechRecognitionConstructor = (window.SpeechRecognition || window.webkitSpeechRecognition) as ISpeechRecognitionConstructor;
-    const rec = new SpeechRecognitionConstructor();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = language;
-
-    rec.onresult = (event: ISpeechRecognitionEvent) => {
-      let interim = "";
-      let final = finalText;
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += (final.endsWith(" ") || final === "" ? "" : " ") + transcript.trim();
-        } else {
-          interim += transcript;
-        }
-      }
-      setInterimText(interim);
-      setFinalText(final);
-    };
-
-    rec.onerror = (e: ISpeechRecognitionErrorEvent) => {
-      console.error("SpeechRecognition error:", e);
-      setIsListening(false);
-      
-      // Show user-friendly error message
-      if (e.error === 'no-speech') {
-        console.warn('No speech detected. Please try again.');
-      } else if (e.error === 'audio-capture') {
-        console.error('No microphone found. Please check your device.');
-      } else if (e.error === 'not-allowed') {
-        console.error('Microphone permission denied. Please allow microphone access.');
-      }
-    };
-
-    rec.onend = () => {
-      setIsListening(false);
-      setInterimText(""); // Clear interim text when recording ends
-    };
-
-    recognitionRef.current = rec;
-    return rec;
-  }, [language, finalText]);
-
-  const startListening = useCallback(() => {
-    if (!hasSpeechRecognition) return;
-    const rec = ensureRecognition();
-    if (!rec) return;
-    
+  // Copy transcript
+  const handleCopyTranscript = async () => {
+    if (!fullDisplay) return;
     try {
-      rec.lang = language;
-      rec.start();
-      setIsListening(true);
-    } catch (error) {
-      console.error("Failed to start recognition:", error);
-    }
-  }, [language, ensureRecognition]);
-
-  const stopListening = useCallback(() => {
-    if (!hasSpeechRecognition || !recognitionRef.current) return;
-    try {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } catch (error) {
-      console.error("Failed to stop recognition:", error);
-    }
-  }, []);
-
-  const clearTranscript = useCallback(() => {
-    setInterimText("");
-    setFinalText("");
-    setCopied(false);
-  }, []);
-
-  // Save transcript as text file
-  const handleSaveTranscript = useCallback(() => {
-    if (!finalText.trim()) return;
-    
-    try {
-      // Create a blob with the transcript text
-      const blob = new Blob([finalText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      
-      // Create a temporary download link
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `transcript-${new Date().toISOString().slice(0, 10)}-${Date.now()}.txt`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      console.log("Transcript saved successfully for user:", userId);
-    } catch (error) {
-      console.error("Failed to save transcript:", error);
-    }
-  }, [finalText, userId]);
-
-  // Copy transcript to clipboard
-  const handleCopyTranscript = useCallback(async () => {
-    if (!finalText.trim()) return;
-    
-    try {
-      await navigator.clipboard.writeText(finalText);
+      await navigator.clipboard.writeText(fullDisplay);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy transcript:", error);
+      console.error("Failed to copy", error);
     }
-  }, [finalText]);
+  };
 
-  const speak = useCallback(() => {
-    if (!hasSpeechSynthesis || !ttsText.trim()) return;
-    
-    const utterance = new SpeechSynthesisUtterance(ttsText);
-    const selected = voices.find((v) => v.voiceURI === voiceURI);
-    if (selected) utterance.voice = selected;
-    
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setIsPaused(false);
-    };
-    
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      setIsPaused(false);
-    };
-    
-    utterance.onerror = (e) => {
-      console.error("Speech synthesis error:", e);
-      setIsSpeaking(false);
-      setIsPaused(false);
-    };
-    
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [ttsText, voices, voiceURI]);
-
-  const pauseSpeaking = useCallback(() => {
-    if (!hasSpeechSynthesis) return;
-    window.speechSynthesis.pause();
-    setIsPaused(true);
-  }, []);
-
-  const resumeSpeaking = useCallback(() => {
-    if (!hasSpeechSynthesis) return;
-    window.speechSynthesis.resume();
-    setIsPaused(false);
-  }, []);
-
-  const stopSpeaking = useCallback(() => {
-    if (!hasSpeechSynthesis) return;
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
-    setIsPaused(false);
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error: unknown) {
-          let errorMessage = "An unexpected error occurred";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === "string") {
-        errorMessage = error;
-      }
-
-      showError('Something went wrong', errorMessage); 
-          
-        }
-      }
-      if (hasSpeechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, [showError]);
-
-  const supportedNotice = useMemo(() => {
-    if (!hasSpeechRecognition && !hasSpeechSynthesis) {
-      return "This browser doesn't support the Web Speech API, which is required for both Speech Recognition and Speech Synthesis.";
-    }
-    if (!hasSpeechRecognition) {
-      return "Speech Recognition (Speech-to-Text) is not supported in this browser.";
-    }
-    if (!hasSpeechSynthesis) {
-      return "Speech Synthesis (Text-to-Speech) is not supported in this browser.";
-    }
-    return "";
-  }, []);
-
-  const wordCount = useMemo(() => {
-    return finalText.trim() ? finalText.trim().split(/\s+/).length : 0;
-  }, [finalText]);
+  // Save transcript
+  const handleSaveTranscript = () => {
+    if (!fullDisplay) return;
+    const blob = new Blob([fullDisplay], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6">
+    <div className="max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-700">
       <div className="text-center mb-12">
         <h1 className="text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent">
-          AI Voice Tools
+          Voice Intelligence Layer
         </h1>
         <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed">
-          Convert speech to text and text to speech with our advanced AI voice toolkit.
+          Interact with Xemora using secure, local-first voice technology.
         </p>
       </div>
 
-      {supportedNotice && (
-        <div className="p-6 rounded-2xl bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 mb-8 border border-yellow-200 dark:border-yellow-800/50">
-          <div className="flex items-start space-x-3">
-            <AlertTriangle className="w-6 h-6 flex-shrink-0 mt-0.5 text-yellow-500" />
-            <div>
-              <p className="font-semibold mb-1">Browser Compatibility Notice</p>
-              <p className="text-sm">{supportedNotice} For the best experience, please use a modern desktop browser like Chrome or Edge.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Speech to Text Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <Mic className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Speech to Text
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">
-                Convert your voice into text in real-time
-              </p>
-            </div>
-          </div>
+        
+        {/* --- LEFT: SPEECH TO TEXT & INTELLIGENCE --- */}
+        <div className="space-y-6">
+          
+          {/* Main Recorder Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+            
+            {/* Background Pulse Effect when listening */}
+            {isListening && (
+               <div className="absolute top-0 right-0 p-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 animate-pulse pointer-events-none" />
+            )}
 
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="stt-language" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Language
-              </label>
-              <select 
-                id="stt-language" 
-                value={language} 
-                onChange={(e) => setLanguage(e.target.value)} 
-                className="w-full p-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition-all duration-300" 
-                disabled={isListening}
-              >
-                <option value="en-US">English (US)</option>
-                <option value="en-GB">English (UK)</option>
-                <option value="fr-FR">Français (France)</option>
-                <option value="es-ES">Español (España)</option>
-                <option value="de-DE">Deutsch (Deutschland)</option>
-                <option value="sw-KE">Kiswahili (Kenya)</option>
-                <option value="ar-SA">العربية (Arabic)</option>
-                <option value="zh-CN">中文 (Chinese)</option>
-                <option value="ja-JP">日本語 (Japanese)</option>
-              </select>
+            <div className="flex items-center justify-between mb-8 relative z-10">
+              <div className="flex items-center space-x-4">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-colors duration-500 ${isListening ? 'bg-red-500 shadow-red-500/30' : 'bg-gradient-to-br from-blue-500 to-cyan-500'}`}>
+                  <Mic className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Live Transcription
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1">
+                     <span className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`} />
+                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                       {isListening ? 'Microphone Active' : 'Ready to record'}
+                     </p>
+                  </div>
+                </div>
+              </div>
+
+               {/* Biometric Visualizer (Mini) */}
+               {isListening && (
+                 <div className="flex items-end gap-1 h-8">
+                    {[...Array(5)].map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="w-1 bg-blue-500 rounded-full transition-all duration-75"
+                        style={{ 
+                          height: `${Math.max(20, Math.random() * (audioMetrics.vol * 100))}%`,
+                          opacity: 0.7 + (i * 0.05)
+                        }} 
+                      />
+                    ))}
+                 </div>
+               )}
             </div>
 
-            <div className="flex gap-3">
+            {/* Transcript Area */}
+            <div className="min-h-[18rem] p-5 border-2 border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-950/50 text-slate-900 dark:text-white relative overflow-y-auto mb-6 transition-colors focus-within:border-blue-500/50">
+               {fullDisplay ? (
+                 <p className="whitespace-pre-wrap break-words leading-relaxed text-lg">
+                   {transcript} <span className="text-blue-500 dark:text-blue-400 animate-pulse">{interimTranscript}</span>
+                 </p>
+               ) : (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
+                    <Mic className="w-8 h-8 mb-2 opacity-20" />
+                    <span className="italic">Try saying "Go to Dashboard", "Switch to Dark Mode", or "Logout"...</span>
+                 </div>
+               )}
+            </div>
+
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row gap-3">
               <button 
                 onClick={isListening ? stopListening : startListening} 
-                disabled={!hasSpeechRecognition} 
-                className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 ${
+                className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg transform active:scale-95 ${
                   isListening 
-                    ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white" 
-                    : "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                    ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/20" 
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
                 }`}
               >
                 {isListening ? (
                   <>
-                    <Square className="w-5 h-5" />
-                    Stop Recording
+                    <Square className="w-5 h-5 fill-current" />
+                    Stop Listening
                   </>
                 ) : (
                   <>
                     <Mic className="w-5 h-5" />
-                    Start Recording
+                    Start Listening
                   </>
                 )}
               </button>
 
-              <button 
-                onClick={clearTranscript} 
-                disabled={!finalText && !interimText} 
-                className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md" 
-                title="Clear transcript"
-              >
-                <RotateCcw className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="min-h-[18rem] p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white relative overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Transcript
-                  {isListening && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-                      <span className="w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse"></span>
-                      REC
-                    </span>
-                  )}
-                </label>
-                {wordCount > 0 && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {wordCount} {wordCount === 1 ? 'word' : 'words'}
-                  </span>
-                )}
+              <div className="flex gap-2">
+                 <button 
+                  onClick={handleCopyTranscript}
+                  disabled={!fullDisplay}
+                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Copy Text"
+                >
+                  {copied ? <Check className="w-6 h-6 text-green-500" /> : <Copy className="w-6 h-6" />}
+                </button>
+                <button 
+                  onClick={handleSaveTranscript}
+                  disabled={!fullDisplay}
+                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Download"
+                >
+                  <Download className="w-6 h-6" />
+                </button>
               </div>
-              <p className="whitespace-pre-wrap break-words leading-relaxed">
-                {finalText}
-                <span className="text-slate-400 dark:text-slate-500 italic">{interimText}</span>
-              </p>
-              {!finalText && !interimText && (
-                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 italic text-center">
-                  Your transcript will appear here...
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <button 
-                onClick={handleCopyTranscript} 
-                disabled={!finalText.trim()} 
-                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-5 h-5 text-green-500" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-5 h-5" />
-                    Copy
-                  </>
-                )}
-              </button>
-
-              <button 
-                onClick={handleSaveTranscript} 
-                disabled={!finalText.trim()} 
-                className="flex-1 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg transform hover:scale-105"
-              >
-                <Download className="w-5 h-5" />
-                Save as TXT
-              </button>
             </div>
           </div>
+
+          {/* Metrics & Sentiment Card */}
+          <div className="grid grid-cols-2 gap-4">
+             {/* Biometric Card */}
+             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-3 mb-4 text-violet-500">
+                   <Activity className="w-6 h-6" />
+                   <h3 className="font-bold text-slate-700 dark:text-slate-200">Voice Bio</h3>
+                </div>
+                <div className="space-y-4">
+                   <div>
+                      <div className="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Volume</span>
+                        <span>{Math.round(audioMetrics.vol * 100)}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                         <div className="h-full bg-violet-500 transition-all duration-100" style={{ width: `${Math.min(100, audioMetrics.vol * 100)}%` }} />
+                      </div>
+                   </div>
+                   <div>
+                       <div className="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Pitch (Est.)</span>
+                        <span>{Math.round(audioMetrics.pitch)} Hz</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                         <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${Math.min(100, (audioMetrics.pitch / 500) * 100)}%` }} />
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             {/* Sentiment Card */}
+             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-3 mb-4 text-pink-500">
+                   {sentiment?.label === 'POSITIVE' ? <Smile className="w-6 h-6" /> : <Meh className="w-6 h-6" />}
+                   <h3 className="font-bold text-slate-700 dark:text-slate-200">Emotion</h3>
+                </div>
+                {sentiment ? (
+                  <div>
+                    <div className="text-2xl font-black text-slate-800 dark:text-white">
+                      {sentiment.label}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      Confidence: {Math.round(sentiment.score * 100)}%
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400 italic mt-2">
+                    Speak longer phrases to detect emotion...
+                  </div>
+                )}
+             </div>
+          </div>
+
         </div>
 
-        {/* Text to Speech Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800">
+        {/* --- RIGHT: TEXT TO SPEECH --- */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 h-fit">
           <div className="flex items-center space-x-4 mb-6">
             <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
               <Volume2 className="w-7 h-7 text-white" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Text to Speech
+                Neural Speech
               </h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm">
-                Convert text into natural-sounding speech
+                Browser-native synthesis engine
               </p>
             </div>
           </div>
@@ -489,102 +260,59 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
           <div className="space-y-6">
             <div>
               <label htmlFor="tts-text" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Text to Speak
+                Input Text
               </label>
               <textarea 
                 id="tts-text" 
                 value={ttsText} 
-                onChange={(e) => setTtsText(e.target.value.slice(0, 1000))} 
-                placeholder="Enter text to convert to speech..." 
-                className="w-full h-40 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300" 
+                onChange={(e) => setTtsText(e.target.value)} 
+                className="w-full h-48 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg" 
               />
-              <div className="mt-2 flex justify-between items-center text-xs">
-                <span className="text-slate-500 dark:text-slate-400">
-                  {ttsText.trim().split(/\s+/).filter(w => w).length} words
-                </span>
-                <span className={`font-mono ${ttsText.length > 900 ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {ttsText.length} / 1000
-                </span>
+              <div className="mt-2 text-right text-xs text-slate-400">
+                {ttsText.length} characters
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="tts-voice" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Voice ({voices.length} available)
-              </label>
-              <select 
-                id="tts-voice" 
-                value={voiceURI} 
-                onChange={(e) => setVoiceURI(e.target.value)} 
-                className="w-full p-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition-all duration-300" 
-                disabled={!hasSpeechSynthesis || voices.length === 0}
-              >
-                {voices.length === 0 && <option>Loading voices…</option>}
-                {voices.map((v) => (
-                  <option key={v.voiceURI} value={v.voiceURI}>
-                    {v.name} ({v.lang})
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="flex gap-3">
               <button 
-                onClick={speak} 
-                disabled={!hasSpeechSynthesis || !ttsText.trim() || isSpeaking} 
-                className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg transform hover:scale-105"
+                onClick={() => speak(ttsText)} 
+                disabled={!ttsText.trim() || isSpeaking} 
+                className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02]"
               >
                 <Play className="w-5 h-5" />
-                Speak
+                Speak Now
               </button>
 
-              {isSpeaking && !isPaused && (
+              {isSpeaking && (
                 <button 
-                  onClick={pauseSpeaking} 
-                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-md" 
-                  title="Pause speaking"
+                  onClick={stopSpeaking} 
+                  className="p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-xl hover:bg-red-200 transition-colors shadow-md"
                 >
-                  <Pause className="w-5 h-5" />
+                  <Square className="w-5 h-5 fill-current" />
                 </button>
               )}
-
-              {isSpeaking && isPaused && (
-                <button 
-                  onClick={resumeSpeaking} 
-                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-md" 
-                  title="Resume speaking"
-                >
-                  <Play className="w-5 h-5" />
-                </button>
-              )}
-
-              <button 
-                onClick={stopSpeaking} 
-                disabled={!isSpeaking} 
-                className="p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md" 
-                title="Stop speaking"
-              >
-                <Square className="w-5 h-5" />
-              </button>
             </div>
 
+            {/* Speaking Status Visual */}
             {isSpeaking && (
-              <div className="flex items-center justify-center space-x-3 p-4 bg-purple-100 dark:bg-purple-900/30 rounded-xl border border-purple-200 dark:border-purple-800/50">
-                <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                  {isPaused ? 'Paused' : 'Speaking...'}
-                </span>
-                {!isPaused && (
-                  <div className="flex space-x-1">
-                    <div className="w-1.5 h-5 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
-                    <div className="w-1.5 h-5 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-1.5 h-5 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-1.5 h-5 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-                  </div>
-                )}
+              <div className="flex items-center justify-center space-x-1 h-8">
+                 {[...Array(8)].map((_,i) => (
+                    <div 
+                      key={i} 
+                      className="w-1.5 bg-purple-500 rounded-full animate-bounce" 
+                      style={{ 
+                        height: '20px', 
+                        animationDuration: '0.8s', 
+                        animationDelay: `${i * 0.1}s` 
+                      }} 
+                    />
+                 ))}
               </div>
             )}
+
           </div>
         </div>
+
       </div>
     </div>
   );

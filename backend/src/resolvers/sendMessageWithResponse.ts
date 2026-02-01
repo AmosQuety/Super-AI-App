@@ -1,13 +1,12 @@
 // src/resolvers/sendMessageWithResponse.ts
-import { AuthenticationError, ApolloError } from "apollo-server-express"; // Removed unused UserInputError
+import { AuthenticationError, ApolloError } from "apollo-server-express";
 import { AppContext } from "./types/context";
 import { IntelligentMatcher, createIntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
 import { pubsub } from './subscriptionResolvers';
 import { DocumentProcessor } from "../services/documentProcessor";
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
-import { checkUserRateLimit } from "../auth/UserRateLimit"; // Import it
-
+import { AIManager } from "../utils/aiManager"; // Import our new Manager
 
 // Lazy init for Matcher
 let intelligentMatcher: IntelligentMatcher | null = null;
@@ -28,22 +27,21 @@ export const sendMessageWithResponse = {
     { chatId, content, imageUrl, fileName, fileUri, fileMimeType }: any,
     context: AppContext
   ) => {
-    if (!context.user) throw new AuthenticationError("Login required");
+    // 1. Auth & Identification
+    const userId = context.user?.userId || (context.user as any)?.id;
+    if (!userId) throw new AuthenticationError("Login required");
 
-    checkUserRateLimit(context.user.userId, 'chat'); 
-    
-    // 1. Verify Chat Ownership
+    // 2. Verify Chat Ownership
     const chat = await context.prisma.chat.findUnique({ where: { id: chatId } });
-    if (!chat || chat.userId !== context.user.userId) throw new AuthenticationError("Unauthorized");
+    if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
 
     try {
       let finalPrompt = content?.trim() || '';
       let hasFileAttachment = false;
 
-      // 2. Handle Immediate File Attachment (The "Chat with File" feature)
+      // 3. Handle File Attachment
       if (fileUri && fileMimeType) {
         try {
-          // Use the extractTextFromUrl method (ensure it exists in DocumentProcessor now)
           const extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
           finalPrompt = `User Request: ${finalPrompt}\n\nAttached File Content:\n${extractedText}`;
           hasFileAttachment = true;
@@ -52,63 +50,41 @@ export const sendMessageWithResponse = {
         }
       }
 
-      // 3. RAG SEARCH (The "Long Term Memory") 🧠
-      // If no direct attachment, check the Vector Database for relevant knowledge
+      // 4. RAG SEARCH (Long Term Memory)
       if (!hasFileAttachment && finalPrompt.length > 5) {
         try {
-          console.log("🔍 Searching knowledge base for:", finalPrompt.substring(0, 50));
-          
-          // A. Generate Embedding
           const queryEmbedding = await context.geminiAIService.getEmbedding(finalPrompt);
           const vectorString = `[${queryEmbedding.join(",")}]`;
 
-          // B. Search Supabase
-          // 👇 CHANGE 1: Lower threshold to 0.3 (Very permissive)
           const relatedChunks: any[] = await context.prisma.$queryRaw`
             SELECT content, similarity 
             from match_documents(
               ${vectorString}::vector, 
               0.3,  
               5, 
-              ${context.user.userId}
+              ${userId}
             )
           `;
 
-          // 👇 CHANGE 2: Log exactly what it found
-          console.log("📊 RAG Debug Results:");
-          relatedChunks.forEach((c, i) => {
-             console.log(`   Chunk ${i} (${(c.similarity * 100).toFixed(1)}% match): ${c.content.substring(0, 50)}...`);
-          });
-
-          
           if (relatedChunks.length > 0) {
-            console.log(`✅ Found ${relatedChunks.length} relevant memory chunks.`);
-            
             const knowledgeContext = relatedChunks.map(c => c.content).join("\n---\n");
-            
-       // C. Inject Context into Prompt
-           finalPrompt = `
+            finalPrompt = `
 You are a helpful AI assistant with access to the user's personal documents.
-
 CONTEXT FROM DOCUMENTS:
 ${knowledgeContext}
-
 USER QUESTION:
 ${finalPrompt}
-
 INSTRUCTIONS:
-1. If the user's question is related to the CONTEXT above, use it to answer accurately.
-2. If the question is general (like "Hi", "Tell me a joke", or general knowledge) and NOT related to the documents, IGNORE the context and answer normally using your own knowledge.
-3. Do not mention "I found this in the documents" unless necessary. Just answer naturally.
+1. Use the context to answer accurately if relevant.
+2. If not relevant, answer normally.
 `;
-
           }
         } catch (ragError) {
-          console.error("⚠️ RAG Search failed (ignoring):", ragError);
+          console.error("⚠️ RAG Search failed:", ragError);
         }
       }
 
-      // 4. Save User Message
+      // 5. Save User Message
       const userMessage = await context.prisma.message.create({
         data: {
           chatId,
@@ -118,10 +94,11 @@ INSTRUCTIONS:
         },
       });
 
-      // 5. Generate Response
+      // 6. Generate Response (with Quota Logic)
       let aiResponse = "";
+      let usedGemini = false;
       
-      // Try Custom Matcher first (for simple "Hi", "Thanks")
+      // Step A: Try Custom Matcher first (FREE - No quota used)
       if (!hasFileAttachment) {
          try {
             const matchResult = await matcherCircuitBreaker.execute(async () => {
@@ -129,25 +106,33 @@ INSTRUCTIONS:
               return await matcher.findBestMatch(content);
             });
             if (matchResult.match && matchResult.confidence >= 0.8) {
-               // FIX: Ensure it's a string (fallback to empty string if null)
                aiResponse = matchResult.suggestedResponse || "";
             }
          } catch (e) {}
       }
 
-      // If no custom match (or custom match returned empty), ask Gemini
+      // Step B: If no custom match, check Quota and call Gemini
       if (!aiResponse) {
+         // --- STRATEGY 1: CHECK DB QUOTA ---
+         await AIManager.checkQuota(userId, 'chat');
+
          aiResponse = await context.geminiAIService.generateContent(finalPrompt);
+         usedGemini = true; // Mark that we hit the API
       }
 
-      // 6. Save AI Response
+      // 7. Save AI Response
       const aiMessage = await context.prisma.message.create({
         data: { chatId, role: "assistant", content: aiResponse },
       });
 
+      // --- STRATEGY 1: INCREMENT USAGE (Only if we used the API) ---
+      if (usedGemini) {
+        await AIManager.incrementUsage(userId, 'chat');
+      }
+
       await pubsub.publish('MESSAGE_ADDED', { messageAdded: { ...aiMessage, chatId } });
 
-      return { userMessage, aiMessage, usedCustomResponse: false };
+      return { userMessage, aiMessage, usedCustomResponse: !usedGemini };
 
     } catch (error: any) {
       console.error("Chat Error:", error);

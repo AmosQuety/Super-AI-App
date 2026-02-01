@@ -26,6 +26,10 @@ model User {
   workspaces    Workspace[]
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+
+  imageUsage    Int       @default(0)
+  chatUsage     Int       @default(0)
+  lastQuotaReset DateTime @default(now())
   
 
   @@index([email])
@@ -186,3 +190,13 @@ model ExperimentLog {
   
   createdAt   DateTime @default(now())
 }
+
+model ImageCache {
+  id          String   @id @default(cuid())
+  promptHash  String   @unique // MD5 or SHA hash of the prompt
+  imageUrl    String   // The URL of the generated image
+  createdAt   DateTime @default(now())
+
+   @@index([promptHash])
+}
+

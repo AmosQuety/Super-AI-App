@@ -63,12 +63,12 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
       
 
       {/* Center title with enhanced styling */}
-      <div className="absolute left-1/2 transform -translate-x-1/2 z-10 hidden md:block">
+      {/* <div className="absolute left-1/2 transform -translate-x-1/2 z-10 hidden md:block">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
           Super AI App
         </h1>
         <div className="h-1 w-full bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 rounded-full mt-1 opacity-60"></div>
-      </div>
+      </div> */}
 
       {/* Right side controls */}
       <div className="relative z-10 flex items-center space-x-3">
@@ -134,3 +134,5 @@ function Header({ isSidebarOpen, setIsSidebarOpen }: HeaderProps) {
 }
 
 export default Header;
+
+

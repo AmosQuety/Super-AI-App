@@ -50,6 +50,56 @@ let subscriptionServerInstance: any;
 const startServer = async (): Promise<any> => {
   try {
     const app: Application = express();
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    // 1. DYNAMIC CORS CONFIGURATION
+    const allowedOrigins = [
+      "https://prism-vision.vercel.app",
+      "https://studio.apollographql.com",
+      "https://sandbox.apollo.dev",
+    ];
+
+const corsOptions: cors.CorsOptions = {
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        
+        const isLocalhost = origin.startsWith('http://localhost') || 
+                           origin.startsWith('http://127.0.0.1') ||
+                           origin.startsWith('exp://'); // For Expo
+
+        if (isLocalhost || allowedOrigins.indexOf(origin) !== -1 || isDev) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+
+      credentials: true,
+      methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+      allowedHeaders: [
+        "Content-Type", 
+        "Authorization", 
+        "Apollo-Require-Preflight", 
+        "x-apollo-operation-name",
+        "apollographql-client-name"
+      ],
+    };
+
+     // 2. APPLY CORS IMMEDIATELY (Before Rate Limiting)
+    app.use(cors(corsOptions));
+    app.options("*", cors(corsOptions)); // Handle preflight for all routes
+
+    // 3. RATE LIMITING (Now safe because CORS headers are already set)
+    RateLimitService.initializeRedis();
+    app.use('/graphql', RateLimitService.getGraphQLLimiter());
+    app.use('/auth/*', RateLimitService.getAuthLimiter());
+    
+    // 4. LOGGING & PARSING
+    app.use(loggingMiddleware);
+    app.use(express.json());
+
+      
 
     // Validate security configuration on startup
     try {
@@ -62,30 +112,6 @@ const startServer = async (): Promise<any> => {
       }
     }
 
-    // Configure CORS
-    const corsOptions = {
-      origin: [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8081",
-        "http://10.178.83.213:5173",
-        "exp://localhost:8081",
-        "https://prism-vision.vercel.app",
-        "https://studio.apollographql.com",
-        "https://sandbox.apollo.dev",
-      ],
-      credentials: true,
-      methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "Apollo-Require-Preflight",
-        "apollographql-client-name",
-        "apollographql-client-version",
-      ],
-    };
 
     // Helper to decide if error is safe to show
     const isExposedError = (code: string) => {
@@ -364,9 +390,6 @@ const shutdown = async (signal: string) => {
     await disconnectPrisma();
     logger.info('✅ Shared Prisma client disconnected');
 
-    await prisma.$disconnect();
-    logger.info('✅ Health check Prisma client disconnected');
-    
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);
   } catch (error) {

@@ -103,7 +103,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 3. Reset Apollo cache LAST
       await client.resetStore();
 
-      console.log('✅ Login successful, token stored:', authToken);
+      console.log('Token starts with:', authToken.substring(0, 5) + '...');
+      
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw new Error(error.message || 'Login failed');

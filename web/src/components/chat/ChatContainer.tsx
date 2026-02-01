@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffe
 import Message from "./Message";
 import InputArea from "./InputArea";
 import Sidebar from "./Sidebar";
-import { Bot, RefreshCw, WifiOff, Menu, ArrowDown } from "lucide-react";
+import { Bot, RefreshCw, WifiOff, Menu, ArrowDown, Sparkles, Zap, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion"; 
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
 import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
@@ -75,6 +75,26 @@ interface Props {
   token: string;
   userInfo: { id: string; username: string };
 }
+
+// Custom hook for message skeletons
+const MessageSkeleton = () => (
+  <div className="space-y-4 w-full max-w-4xl mx-auto p-4 opacity-50">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className={`flex ${i % 2 === 0 ? 'justify-end' : 'justify-start'} w-full`}>
+        <div className={`
+          flex items-end space-x-2 max-w-[70%]
+          ${i % 2 === 0 ? 'flex-row-reverse space-x-reverse' : 'flex-row'}
+        `}>
+          <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 animate-pulse" />
+          <div className="space-y-2 w-full">
+            <div className={`h-10 rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse w-[${Math.random() * 50 + 150}px]`} />
+            {i % 2 !== 0 && <div className="h-4 w-2/3 rounded bg-gray-200 dark:bg-gray-800 animate-pulse" />}
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const useOptimisticMessages = () => {
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -160,6 +180,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   } = useQuery<ChatData>(GET_CHATS, {
     variables: { userId: currentUser.id },
     skip: !currentUser.id,
+    fetchPolicy: "cache-and-network" // Ensure freshness
   });
   
   useEffect(() => {
@@ -170,9 +191,11 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   }, [chatsError]);
 
   // 2. Get Chat History (Lazy Query)
-  // FIX 1: Removed onError from options object
   const [getChatHistory, { data: historyData, loading: historyLoading, error: historyError }] =
-    useLazyQuery<HistoryData>(GET_CHAT_HISTORY);
+    useLazyQuery<HistoryData>(GET_CHAT_HISTORY, {
+        fetchPolicy: "network-only", // Critical for ensuring no start flickering with old data
+        notifyOnNetworkStatusChange: true
+    });
 
   // Handle History Error via Effect (Replacement for onError)
   useEffect(() => {
@@ -208,6 +231,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Fetch history when conversation changes
   useEffect(() => {
     if (conversationId && userInfo.id) {
       getChatHistory({
@@ -216,10 +240,14 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     }
   }, [conversationId, userInfo.id, getChatHistory]);
 
+  // Update messages from history data
   useEffect(() => {
+    if (historyLoading) {
+        // Keeps old messages until new ones load? No, we cleared them in handleConversationSelected.
+        return; 
+    }
+
     if (historyData?.chatHistory?.messages) {
-      // FIX 2: Removed explicit ': HistoryMessage' type annotation on 'msg'
-      // This allows TypeScript to infer the correct type (which might include partials)
       const formattedMessages: MessageType[] = historyData.chatHistory.messages.map(
         (msg) => ({
           id: msg.id,
@@ -234,26 +262,15 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     } else if (historyError) {
       setAllMessages([]);
     }
-  }, [historyData, historyError, setAllMessages]);
+  }, [historyData, historyError, setAllMessages, historyLoading]);
 
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      requestAnimationFrame(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: 'smooth'
-          });
-        }
-        console.log("Scrolling to bottom", scrollToBottom);
-      });
+  // Auto-Scroll Logic (Smart Sticky Scroll) - Optimized to prevent jumps
+  useLayoutEffect(() => {
+     // Only scroll if we were already at bottom or it's a new message (loading state change)
+    if (isAtBottom && chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, []);
-
-  // REMOVED redundant scroll logic that causes flickering
-  // useEffect(() => {
-  //   scrollToBottom();
-  // }, [messages, scrollToBottom]);
+  }, [messages, isAtBottom, historyLoading, aiState]); 
 
   const handleScroll = useCallback(() => {
     if (!chatContainerRef.current) return;
@@ -267,14 +284,6 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     setShowScrollButton(!isBottom);
   }, []);
 
-  // 2. Auto-Scroll Logic (Smart Sticky Scroll)
-  useLayoutEffect(() => {
-    if (isAtBottom && chatContainerRef.current) {
-        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages, isAtBottom]); // Run when messages change
-
-  // 3. Manual "Go Down" Button Click
   const scrollToBottomManual = () => {
     if (chatContainerRef.current) {
         chatContainerRef.current.scrollTo({
@@ -311,12 +320,15 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
       attachment: attachment || undefined,
       conversationId: conversationId || undefined,
     });
+    
+    // Scroll to bottom immediately on send
+    setIsAtBottom(true);
 
     try {
       let currentConversationId = conversationId;
 
       if (!currentConversationId) {
-        toast.info("Creating new conversation...", { autoClose: 1500, theme: "dark" });
+        // toast.info("Creating new conversation...", { autoClose: 1500, theme: "dark" });
 
         const { data: chatData } = await createChat({
           variables: {
@@ -432,11 +444,13 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   }, [removeMessage]);
 
   const handleConversationSelected = useCallback((selectedId: string) => {
+    // Only update if actually changing conversation to avoid unnecessary re-renders/fetches
     if (conversationId !== selectedId) {
-      setAllMessages([]);
+      setAllMessages([]); // Clear current messages to prevent ghosting
       setConversationId(selectedId);
       setAiState("idle");
     }
+    // Always close sidebar on mobile if a selection is made
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   }, [conversationId, setAllMessages]);
 
@@ -478,23 +492,20 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     return null;
   }, [isOnline]);
 
-  if (chatsLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Loading...</div>;
+  if (chatsLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse">Loading workspace...</div>;
 
   return (
-     <div className="h-screen w-screen flex bg-gray-900 dark:bg-gray-900 text-white overflow-hidden relative">
+     <div className="h-screen w-screen flex bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden relative font-sans selection:bg-indigo-500/30">
       {renderConnectionStatus}
       
+      {/* Subtle Background Mesh */}
       <div className={`fixed inset-0 -z-10 ${
         theme === 'dark' 
-          ? 'bg-gradient-to-br from-gray-900 via-purple-900 to-slate-900' 
-          : 'bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50'
+          ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-gray-900 to-black' 
+          : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-gray-50'
       }`} />
 
-      <div className="flex flex-1 relative z-10 w-full">
-        {isSidebarOpen && (
-          <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/80 z-20 lg:hidden" />
-        )}
-
+      <div className="flex flex-1 relative z-10 w-full max-w-full">
         <Sidebar
           isOpen={isSidebarOpen}
           onConversationSelected={handleConversationSelected}
@@ -502,59 +513,114 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           chatSessions={sidebarChats} 
           userId={userInfo.id}
           activeConversationId={conversationId}
+          onCloseMobile={() => setIsSidebarOpen(false)}
         />
 
-        <main className="flex-1 flex flex-col min-w-0 h-full bg-transparent transition-all duration-300 relative">
-          <div className="lg:hidden flex items-center justify-between p-4 bg-white/10 backdrop-blur">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-white">
+        <main className="flex-1 flex flex-col min-w-0 h-full relative transition-all duration-300">
+          {/* Mobile Header */}
+          <div className="lg:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 z-20">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-700 dark:text-gray-200">
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-lg font-semibold">AI Chat</h1>
+            <span className="font-semibold text-lg">Xemora AI</span>
             <div className="w-10"></div>
           </div>
 
-          <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
-            <div className="max-w-4xl mx-auto w-full min-h-full flex flex-col justify-start">
+          <div 
+             ref={chatContainerRef} 
+             onScroll={handleScroll} 
+             className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-800"
+          >
+            <div className="max-w-5xl mx-auto w-full min-h-full flex flex-col pt-4 md:pt-8 pb-32 px-4 md:px-8">
               {historyLoading ? (
-                <div className="flex justify-center text-purple-300">Loading conversation...</div>
+                <MessageSkeleton />
               ) : messages.length === 0 ? (
-                <div className="text-center py-20">
-                  <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Bot className="w-10 h-10 text-purple-300" />
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2">Start a Conversation</h2>
-                  <p className="text-gray-400">Ask me anything!</p>
-                </div>
-              ) : (
-                
-                messages.map((message) => (
-                  <Message
-                    key={message.id}
-                    message={message}
-                    onDelete={handleDeleteMessage}
-                    onRetry={handleRetryMessage}
+                 <motion.div 
+                   initial={{ opacity: 0, scale: 0.95 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   className="flex flex-col items-center justify-center my-auto min-h-[50vh] text-center space-y-8"
+                 >
+                    <div className="relative group">
+                       <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-1000"></div>
+                       <div className="relative w-24 h-24 bg-white dark:bg-gray-900 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-800 shadow-xl">
+                          <Bot className="w-12 h-12 text-indigo-500 dark:text-indigo-400" />
+                       </div>
+                    </div>
                     
-                  />
-                ))
-              )
+                    <div className="space-y-3 max-w-md">
+                      <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+                        How can I help you today?
+                      </h2>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        I can help you analyze data, generate code, write copy, or just chat.
+                      </p>
+                    </div>
 
-              }
-              
-              {aiState !== "idle" && (
-                <div className="flex justify-start py-4">
-                  <div className="bg-white/10 p-3 rounded-2xl flex items-center gap-2 text-blue-200 text-sm">
-                     <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce"/>
-                        <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce delay-75"/>
-                        <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce delay-150"/>
-                     </div>
-                     {aiState === "thinking" ? "Thinking..." : "Typing..."}
-                  </div>
+                    {/* Suggestions Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
+                      {[
+                        { icon: Sparkles, text: "Generate a react landing page", color: "text-amber-500" },
+                        { icon: Zap, text: "Explain quantum computing", color: "text-blue-500" },
+                        { icon: MessageSquare, text: "Write a professional email", color: "text-green-500" },
+                        { icon: Bot, text: "Refactor this code snippet", color: "text-purple-500" }
+                      ].map((item, idx) => (
+                        <button 
+                          key={idx}
+                          onClick={() => handleSendMessage(item.text)}
+                          className="flex items-center space-x-3 p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left shadow-sm hover:shadow-md group"
+                        >
+                          <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 ${item.color} group-hover:scale-110 transition-transform`}>
+                            <item.icon className="w-5 h-5" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                 </motion.div>
+              ) : (
+                <div className="space-y-6">
+                  <AnimatePresence initial={false}>
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Message
+                          message={message}
+                          onDelete={handleDeleteMessage}
+                          onRetry={handleRetryMessage}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
+              )}
+              
+              {/* Thinking Indicator */}
+              {aiState !== "idle" && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-start py-4"
+                >
+                  <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-2xl shadow-sm text-sm text-gray-600 dark:text-gray-300">
+                     {aiState === "thinking" ? (
+                       <div className="flex space-x-1">
+                          <span className="animate-bounce delay-0">●</span>
+                          <span className="animate-bounce delay-150">●</span>
+                          <span className="animate-bounce delay-300">●</span>
+                       </div>
+                     ) : <Zap className="w-4 h-4 animate-pulse text-indigo-500" />}
+                     <span className="font-medium">
+                       {aiState === "thinking" ? "Thinking..." : "Generating response..."}
+                     </span>
+                  </div>
+                </motion.div>
               )}
             </div>
           </div>
-
 
           <AnimatePresence>
             {showScrollButton && (
@@ -563,22 +629,27 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     onClick={scrollToBottomManual}
-                    className="absolute bottom-24 right-8 p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg z-50 transition-colors"
+                    className="absolute bottom-32 right-8 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-full shadow-xl hover:shadow-2xl z-30 transition-all hover:-translate-y-1"
                 >
                     <ArrowDown size={20} />
-                    {/* Optional: Add badge for new messages count if you track it */}
                 </motion.button>
             )}
           </AnimatePresence>
 
-          <div className="p-4 md:p-6">
-            <div className="max-w-4xl mx-auto">
-              <InputArea
-                onSendMessage={handleSendMessage}
-                disabled={historyLoading || aiState !== "idle"}
-                isOnline={isOnline}
-              />
-            </div>
+          {/* Floating Input Area Wrapper */}
+          <div className="fixed bottom-0 left-0 w-full lg:pl-80 z-20 pointer-events-none">
+             {/* Gradient fade overlay for smooth content disappear behind input */}
+             <div className="h-24 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-black dark:via-black/80 dark:to-transparent pointer-events-none" />
+             
+             <div className="bg-white dark:bg-black p-4 md:p-6 pb-6 pointer-events-auto">
+                <div className="max-w-4xl mx-auto shadow-2xl rounded-2xl ring-1 ring-gray-900/5 dark:ring-white/10">
+                  <InputArea
+                    onSendMessage={handleSendMessage}
+                    disabled={historyLoading || aiState !== "idle"}
+                    isOnline={isOnline}
+                  />
+                </div>
+             </div>
           </div>
         </main>
       </div>
