@@ -12,9 +12,12 @@ import {
   User,
   Home,
   ScanFace,
-  ChevronRight
+  ChevronRight,
+  Sun,
+  Moon
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth"; 
+import { useTheme } from "../contexts/useTheme";
 import { VoiceIntelligenceProvider } from "../contexts/VoiceIntelligenceContext"; // Import Provider
 
 // --- CONFIGURATION ---
@@ -60,6 +63,7 @@ const Layout = () => {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -85,13 +89,13 @@ const Layout = () => {
 
   return (
     <VoiceIntelligenceProvider>
-      <div className="min-h-screen bg-[#0B0F19] text-slate-200 selection:bg-indigo-500/30">
+      <div className="min-h-screen bg-theme-primary text-theme-primary transition-colors duration-300 selection:bg-indigo-500/30">
         
         {/* --- NAVBAR --- */}
         <nav 
           className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
             scrolled 
-              ? 'bg-[#0B0F19]/90 backdrop-blur-xl shadow-lg border-b border-white/5' 
+              ? 'bg-theme-secondary/90 backdrop-blur-xl shadow-lg border-b border-theme-light' 
               : 'bg-transparent border-b border-transparent'
           }`}
         >
@@ -107,7 +111,7 @@ const Layout = () => {
                     </div>
                   </div>
                   <div className="hidden sm:block">
-                    <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-theme-primary to-theme-secondary bg-clip-text text-transparent">
                       {PRODUCT_NAME}
                     </h1>
                   </div>
@@ -116,14 +120,14 @@ const Layout = () => {
 
               {/* Desktop Navigation */}
               <div className="hidden lg:flex items-center space-x-2">
-                <NavLink to="/dashboard" className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`} end>
+                <NavLink to="/dashboard" className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-theme-tertiary text-theme-primary" : "text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary"}`} end>
                     <Home className="w-4 h-4" />
                     <span>Home</span>
                 </NavLink>
                 {navigation.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <NavLink key={item.name} to={item.href} className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                    <NavLink key={item.name} to={item.href} className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-theme-tertiary text-theme-primary" : "text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary"}`}>
                       <Icon className="w-4 h-4" />
                       <span>{item.name}</span>
                     </NavLink>
@@ -131,26 +135,35 @@ const Layout = () => {
                 })}
               </div>
 
-              {/* User Menu */}
+              {/* User Menu & Theme Toggle */}
               <div className="flex items-center space-x-2 lg:space-x-3">
+                {/* Theme Toggle */}
+                <button 
+                  onClick={toggleTheme}
+                  className="p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-theme-tertiary transition-colors border border-theme-light"
+                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+
                 {user && (
                   <div className="hidden md:flex items-center space-x-3">
                     <button onClick={() => navigate("/profile")}>
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-white/10">
-                              <User className="w-4 h-4 text-white" />
+                      <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-theme-secondary border border-theme-light hover:bg-theme-tertiary transition-colors cursor-pointer">
+                          <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center ring-2 ring-violet-500/20">
+                              <User className="w-4 h-4 text-theme-primary" />
                           </div>
-                          <span className="text-sm font-medium text-slate-300">
+                          <span className="text-sm font-medium text-theme-secondary">
                               {user.name || user.email}
                           </span>
                       </div>
                     </button>
-                    <button onClick={handleSignOut} className="p-2.5 rounded-xl bg-white/5 text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition-colors border border-white/10">
+                    <button onClick={handleSignOut} className="p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-red-500/20 hover:text-red-400 transition-colors border border-theme-light">
                         <LogOut className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2.5 rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 transition-colors border border-white/10">
+                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-theme-tertiary transition-colors border border-theme-light">
                   {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                 </button>
               </div>
@@ -166,15 +179,15 @@ const Layout = () => {
                 {navigation.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <NavLink key={item.name} to={item.href} className={({ isActive }) => `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive ? "bg-white/10 text-white" : "text-slate-400"}`}>
+                    <NavLink key={item.name} to={item.href} className={({ isActive }) => `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive ? "bg-theme-tertiary text-theme-primary" : "text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary"}`}>
                       <Icon className="w-5 h-5" />
                       <span className="font-medium">{item.name}</span>
                     </NavLink>
                   );
                 })}
                 {user && (
-                  <div className="border-t border-white/10 pt-4 mt-2 px-2">
-                      <button onClick={() => navigate("/profile")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 text-left mb-2 text-slate-300">
+                  <div className="border-t border-theme-light pt-4 mt-2 px-2">
+                      <button onClick={() => navigate("/profile")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-theme-secondary text-left mb-2 text-theme-secondary">
                           <User className="w-5 h-5" />
                           <span className="font-medium">{user.name || user.email}</span>
                       </button>
@@ -196,7 +209,7 @@ const Layout = () => {
               
               {/* 1. HERO SECTION */}
               <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700/50 text-xs font-medium text-slate-400 mb-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-theme-secondary border border-theme-light text-xs font-medium text-theme-tertiary mb-6">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -204,17 +217,17 @@ const Layout = () => {
                   System Operational
                 </div>
                 
-                <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
+                <h1 className="text-5xl md:text-7xl font-bold text-theme-primary mb-4 tracking-tight">
                   Hello, <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">{user?.name?.split(' ')[0] || 'Creator'}</span>.
                 </h1>
-                <p className="text-slate-400 text-lg md:text-xl font-medium mb-8 max-w-2xl mx-auto">
-                  <span className="text-white block mb-1">What are we building today?</span>
-                  <span className="text-slate-500 text-sm md:text-base font-normal">Your unified workspace for biometric security, document intelligence, and creative AI.</span>
+                <p className="text-theme-secondary text-lg md:text-xl font-medium mb-8 max-w-2xl mx-auto">
+                  <span className="text-theme-primary block mb-1">What are we building today?</span>
+                  <span className="text-theme-tertiary text-sm md:text-base font-normal">Your unified workspace for biometric security, document intelligence, and creative AI.</span>
                 </p>
 
                 {/* 2. QUICK ACTION CHIPS */}
                 <div className="space-y-4">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold block">Quick Start</span>
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-theme-tertiary font-bold block">Quick Start</span>
                   <div className="flex flex-wrap justify-center gap-3">
                     {quickActions.map((action) => (
                       <button
@@ -239,24 +252,24 @@ const Layout = () => {
                   
                   {/* LARGE CARD: Knowledge Brain (coming soon) */}
                   <div 
-                    className="md:col-span-2 relative overflow-hidden bg-slate-900/20 border border-slate-800/40 rounded-3xl p-8 cursor-default transition-all duration-500 group/card"
+                    className="md:col-span-2 relative overflow-hidden bg-theme-secondary border border-theme-light rounded-3xl p-8 cursor-default transition-all duration-500 group/card"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-blue-500/40 uppercase">Intelligence</span>
                     </div>
                   {/* Coming Soon Badge */}
                   <div className="absolute top-6 right-6 z-20">
-                    <span className="px-3 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded-full border border-slate-700 tracking-wider">
+                    <span className="px-3 py-1 bg-theme-tertiary text-theme-tertiary text-xs font-bold rounded-full border border-theme-light tracking-wider">
                       COMING SOON
                     </span>
                   </div>
 
                     <div className="relative z-10 opacity-40 grayscale transition-all duration-500 group-hover/card:opacity-60 group-hover/card:grayscale-0">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-800/30 flex items-center justify-center mb-4 border border-white/5">
-                        <MessageSquare className="w-6 h-6 text-slate-500" />
+                      <div className="w-12 h-12 rounded-2xl bg-theme-tertiary flex items-center justify-center mb-4 border border-theme-light">
+                        <MessageSquare className="w-6 h-6 text-theme-tertiary" />
                       </div>
-                      <h3 className="text-2xl font-bold text-slate-300 mb-2">Knowledge Brain</h3>
-                      <p className="text-slate-500 max-w-md">
+                      <h3 className="text-2xl font-bold text-theme-primary mb-2">Knowledge Brain</h3>
+                      <p className="text-theme-secondary max-w-md">
                         Chat with your documents using RAG technology. Upload PDFs, ask questions, and get cited answers instantly.
                       </p>
                     </div>
@@ -268,7 +281,7 @@ const Layout = () => {
                 {/* TALL CARD: Biometrics */}
                   <div 
                     onClick={() => navigate('/playground')}
-                    className="md:row-span-2 group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-3xl p-8 transition-all cursor-pointer flex flex-col justify-between"
+                    className="md:row-span-2 group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-violet-500/50 rounded-3xl p-8 transition-all cursor-pointer flex flex-col justify-between"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-violet-500/40 uppercase">Security</span>
@@ -280,19 +293,19 @@ const Layout = () => {
                     <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
                       <ScanFace className="w-6 h-6 text-violet-400" />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Biometric Lab</h3>
-                    <p className="text-slate-400">
+                    <h3 className="text-2xl font-bold text-theme-primary mb-2">Biometric Lab</h3>
+                    <p className="text-theme-secondary">
                       Access advanced computer vision tools:
                     </p>
-                    <ul className="mt-4 space-y-2 text-sm text-slate-500">
+                    <ul className="mt-4 space-y-2 text-sm text-theme-tertiary">
                       <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Magic Mirror Analysis</li>
                       <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> 1:N Identification</li>
                       <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Liveness Detection</li>
                     </ul>
                   </div>
-                  <div className="mt-8 relative h-32 w-full bg-slate-950 rounded-xl border border-slate-800 overflow-hidden group-hover:border-violet-500/30 transition-colors">
+                  <div className="mt-8 relative h-32 w-full bg-theme-tertiary rounded-xl border border-theme-light overflow-hidden group-hover:border-violet-500/30 transition-colors">
                       <div className="absolute inset-0 flex items-center justify-center">
-                          <ScanFace className="w-12 h-12 text-slate-700 group-hover:text-violet-500/50 transition-colors" />
+                          <ScanFace className="w-12 h-12 text-theme-tertiary group-hover:text-violet-500/50 transition-colors" />
                       </div>
                       <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-violet-500/50 animate-scan" />
                   </div>
@@ -301,7 +314,7 @@ const Layout = () => {
                 {/* MEDIUM CARD: Image Gen */}
                   <div 
                     onClick={() => navigate('/image')}
-                    className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-pink-500/50 rounded-3xl p-8 transition-all cursor-pointer"
+                    className="group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-pink-500/50 rounded-3xl p-8 transition-all cursor-pointer"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-pink-500/40 uppercase">Creative</span>
@@ -312,8 +325,8 @@ const Layout = () => {
                   <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center mb-4">
                     <ImageIcon className="w-6 h-6 text-pink-400" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Imagine Anything</h3>
-                  <p className="text-slate-400 text-sm">
+                  <h3 className="text-xl font-bold text-theme-primary mb-2">Imagine Anything</h3>
+                  <p className="text-theme-secondary text-sm">
                     Generate stunning visuals with Flux & Stable Diffusion models.
                   </p>
                 </div>
@@ -321,7 +334,7 @@ const Layout = () => {
                 {/* MEDIUM CARD: Voice */}
                   <div 
                     onClick={() => navigate('/voice')}
-                    className="group relative overflow-hidden bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-3xl p-8 transition-all cursor-pointer"
+                    className="group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-amber-500/50 rounded-3xl p-8 transition-all cursor-pointer"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-amber-500/40 uppercase">Creative</span>
@@ -332,8 +345,8 @@ const Layout = () => {
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
                     <Mic className="w-6 h-6 text-amber-400" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Voice Command</h3>
-                  <p className="text-slate-400 text-sm">
+                  <h3 className="text-xl font-bold text-theme-primary mb-2">Voice Command</h3>
+                  <p className="text-theme-secondary text-sm">
                     Speak naturally to the AI. Hands-free interaction.
                   </p>
                 </div>

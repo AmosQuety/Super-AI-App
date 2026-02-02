@@ -6,6 +6,7 @@ import { SentimentService, type SentimentResult } from "../services/voice/Sentim
 import { useToast } from "../components/ui/toastContext";
 import { useTheme } from "./useTheme";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 // Types
 interface VoiceIntelligenceContextType {
@@ -50,6 +51,7 @@ export const VoiceIntelligenceProvider: React.FC<{ children: ReactNode }> = ({ c
 
   const { showSuccess, showInfo } = useToast();
   const { setTheme } = useTheme();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
 
   // Initialize Services
@@ -99,8 +101,10 @@ export const VoiceIntelligenceProvider: React.FC<{ children: ReactNode }> = ({ c
         showSuccess("Voice Navigation", `Navigating to ${match.payload}`);
       } else if (match.action === "ACTION") {
         if (match.payload === "LOGOUT") {
-           // Handle logout via auth hook if available here, or dispatch event
-           showInfo("Action", "Logout requested via voice.");
+           signOut().then(() => {
+             navigate('/login');
+             showInfo("Action", "Logged out successfully.");
+           });
         } else if (match.payload === "THEME_DARK") {
            setTheme("dark");
            showInfo("Theme", "Switched to Dark Mode");
@@ -110,8 +114,8 @@ export const VoiceIntelligenceProvider: React.FC<{ children: ReactNode }> = ({ c
         }
       }
       
-      // Clear transcript after command execution to avoid re-triggering?
-      // Or keep it for context. Let's keep it but maybe debounced.
+      // Clear transcript after command execution to avoid re-triggering and redundant toasts
+      setTranscript("");
     }
 
     // Analyze Sentiment on "sentences" (simple heuristic: length > 10 chars)

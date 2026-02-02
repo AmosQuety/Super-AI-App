@@ -12,16 +12,16 @@
 
   /* LIGHT MODE THEME (default) */
   /* Background Colors */
-  --bg-primary: #F8F9FA;             /* Soft off-white */
-  --bg-secondary: #FFFFFF;           /* Clean white */
-  --bg-tertiary: #F1F5F9;            /* Light slate gray */
-  --bg-input: #FFFFFF;               /* Input background */
-  --bg-overlay: rgba(248, 249, 250, 0.9); /* Overlay background */
+  --bg-primary: #FFFFFF;             /* Pure white for max clarity */
+  --bg-secondary: #F8FAFC;           /* Slate-50 background */
+  --bg-tertiary: #F1F5F9;            /* Slate-100 background */
+  --bg-input: #F8FAFC;               /* Clean background for inputs */
+  --bg-overlay: rgba(255, 255, 255, 0.9); /* Overlay background */
   
   /* Text Colors */
-  --text-primary: #1E293B;           /* Dark slate */
-  --text-secondary: #64748B;         /* Slate gray */
-  --text-tertiary: #475569;          /* Darker slate gray */
+  --text-primary: #0F172A;           /* Slate-900 for high contrast */
+  --text-secondary: #475569;         /* Slate-600 */
+  --text-tertiary: #64748B;          /* Slate-500 */
   --text-white: #FFFFFF;             /* Pure white */
   
   /* Border Colors */
