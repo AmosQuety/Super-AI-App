@@ -629,7 +629,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     onClick={scrollToBottomManual}
-                    className="absolute bottom-32 right-8 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-full shadow-xl hover:shadow-2xl z-30 transition-all hover:-translate-y-1"
+                    className="absolute bottom-32 left-1/2 -translate-x-1/2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-full shadow-xl hover:shadow-2xl z-30 transition-all hover:-translate-y-1"
                 >
                     <ArrowDown size={20} />
                 </motion.button>

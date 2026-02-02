@@ -116,7 +116,7 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
       >
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Header Area */}
-          <div className="p-5 space-y-4 pt-6">
+          <div className="p-5 space-y-4 pt-6 lg:pt-24">
             <div className="flex items-center justify-between lg:justify-end">
                {/* Mobile Close Button */}
                <button 
