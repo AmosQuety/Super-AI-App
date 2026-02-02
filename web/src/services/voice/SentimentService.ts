@@ -1,4 +1,5 @@
 // src/services/voice/SentimentService.ts
+import { logger } from '../../utils/logger';
 
 export interface SentimentResult {
     label: 'POSITIVE' | 'NEGATIVE';
@@ -25,10 +26,10 @@ export interface SentimentResult {
         const { status, error } = event.data;
         if (status === 'ready') {
             this.isReady = true;
-            console.log("Sentiment Service Ready");
+            logger.info("Sentiment Service Ready");
         }
         if (status === 'error') {
-            console.error("Sentiment Worker Error:", error);
+            logger.error("Sentiment Worker Error:", error);
         }
       };
       

@@ -1,5 +1,6 @@
 // src/lib/ErrorMonitor.ts
 import * as Sentry from '@sentry/react';
+import { logger } from '../utils/logger';
 
 // Define a safer interface than 'any'
 interface ErrorContext {
@@ -39,7 +40,7 @@ class ErrorMonitor {
         environment: env.VITE_APP_ENV || 'development',
       });
       this.isInitialized = true;
-      console.log('✅ Error Monitoring Initialized');
+      logger.info('✅ Error Monitoring Initialized');
     }
   }
 

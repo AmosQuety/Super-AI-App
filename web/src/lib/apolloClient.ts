@@ -24,12 +24,14 @@ import {
 } from "@apollo/client/errors";
 import ErrorMonitor from "./ErrorMonitor";
 import { createUploadLink } from "./uploadLink";
+import { logger } from "../utils/logger";
 
 // Extend Vite's ImportMeta type
 declare global {
   interface ImportMetaEnv {
     VITE_GRAPHQL_URL?: string;
     MODE: string;
+    DEV: boolean;
   }
 
   interface ImportMeta {
@@ -47,7 +49,7 @@ const GRAPHQL_URL = "https://super-ai-app.onrender.com/graphql";
 // ✅ DEFINE PUBLIC ROUTES - These should NEVER redirect to login
 const PUBLIC_ROUTES = ['/', '/login', '/register'];
 
-console.log('🔧 Apollo Client Configuration:', {
+logger.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,
   environment: import.meta.env.MODE,
 });
@@ -87,12 +89,12 @@ let activeRequests = 0;
 
 const incrementRequest = () => {
   activeRequests++;
-  console.log(`📡 Active GraphQL requests: ${activeRequests}`);
+  logger.log(`📡 Active GraphQL requests: ${activeRequests}`);
 };
 
 const decrementRequest = () => {
   activeRequests = Math.max(0, activeRequests - 1);
-  console.log(`📡 Active GraphQL requests: ${activeRequests}`);
+  logger.log(`📡 Active GraphQL requests: ${activeRequests}`);
 };
 
 // Auth link - Get token from localStorage
@@ -101,7 +103,7 @@ const authLink = setContext(async (_, { headers }) => {
   const token = localStorage.getItem('authToken');
 
   // Debug log to ensure token exists when query fires
-  if (!token) console.warn('⚠️ No auth token found in localStorage');
+  if (!token) logger.warn('⚠️ No auth token found in localStorage');
 
   return {
     headers: {
@@ -123,7 +125,7 @@ const retryLink = new RetryLink({
     max: 3,
     retryIf: (error, operation: Operation) => {
       // Explicitly mark operation parameter to avoid unused warning
-      console.log('Retry attempt for operation:', operation.operationName);
+      logger.log('Retry attempt for operation:', operation.operationName);
       return !!error && (
         error.toString().includes('NetworkError') ||
         error.toString().includes('Failed to fetch')
@@ -138,7 +140,7 @@ const retryLink = new RetryLink({
 const errorLink = new ErrorLink(({ error, operation }) => {
   decrementRequest();
 
-  console.log("❌ GraphQL Operation:", operation.operationName);
+  logger.log("❌ GraphQL Operation:", operation.operationName);
 
   // 1. Capture Network Errors
   if (error && 'networkError' in error && error.networkError) {
@@ -168,7 +170,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
       // ✅ FIXED: Only redirect to login if on a PROTECTED route
       if (extensions?.code === "UNAUTHENTICATED") {
-        console.warn("User authentication failed");
+        logger.warn("User authentication failed");
 
         if (typeof window !== "undefined") {
           const currentPath = window.location.pathname;
@@ -177,10 +179,10 @@ const errorLink = new ErrorLink(({ error, operation }) => {
           const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
           
           if (!isPublicRoute && !localStorage.getItem("authToken")) {
-            console.log(`🔒 Redirecting from protected route ${currentPath} to login`);
+            logger.log(`🔒 Redirecting from protected route ${currentPath} to login`);
             window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
           } else if (isPublicRoute) {
-            console.log(`✅ On public route ${currentPath}, not redirecting`);
+            logger.log(`✅ On public route ${currentPath}, not redirecting`);
           }
         }
       }
@@ -235,9 +237,10 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 const trackingLink = new ApolloLink((operation, forward) => {
   incrementRequest();
 
-  console.log('🚀 GraphQL Operation:', {
+  logger.log('🚀 GraphQL Operation:', {
     name: operation.operationName,
-    variables: operation.variables,
+    // Only log variables in development to avoid leaking PII/secrets in production
+    variables: import.meta.env.DEV ? operation.variables : '[HIDDEN IN PROD]',
   });
 
   const observable = forward(operation);
@@ -278,6 +281,6 @@ const client = new ApolloClient({
   },
 });
 
-console.log('✅ Apollo Client initialized');
+logger.log('✅ Apollo Client initialized');
 
 export default client;
