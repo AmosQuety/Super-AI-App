@@ -1,28 +1,21 @@
 // src/components/VoiceTools.tsx
-import React, { useState, useEffect } from "react";
+import  { useState } from "react";
 import { 
   Mic, 
   Square, 
   Play, 
   Volume2, 
   Download, 
-  RotateCcw, 
-  AlertTriangle,
   Copy,
   Check,
-  Pause,
   Activity,
-  Zap,
   Smile,
   Meh
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 
-interface VoiceToolsProps {
-  userId?: string;
-}
 
-export default function VoiceTools({ userId }: VoiceToolsProps) {
+export default function VoiceTools( ) {
   const { 
     isListening, 
     transcript, 
@@ -49,6 +42,7 @@ export default function VoiceTools({ userId }: VoiceToolsProps) {
     try {
       await navigator.clipboard.writeText(fullDisplay);
       setCopied(true);
+      console.log("word count:", wordCount);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Failed to copy", error);
