@@ -22,7 +22,7 @@ export interface SentimentResult {
       });
   
       this.worker.onmessage = (event) => {
-        const { status, output, error } = event.data;
+        const { status, error } = event.data;
         if (status === 'ready') {
             this.isReady = true;
             console.log("Sentiment Service Ready");
