@@ -9,7 +9,6 @@ import Layout from "./src/components/Layout";
 import LoginScreen from "./src/components/auth/Login";
 import RegisterScreen from "./src/components/auth/Register";
 import ChatContainer from "./src/components/chat/ChatContainer";
-import VoiceScreen from "./src/pages/VoiceScreen";
 import ImageGenerator from "./src/components/ImageGenerator";
 import VoiceTools from "./src/components/VoiceTools";
 import "./index.css";
@@ -142,9 +141,8 @@ const AppRoutes = () => {
         />
 
         <Route path="playground" element={<PlaygroundPage />} />
-        <Route path="voice-screen" element={<VoiceScreen />} />
         <Route path="image" element={<ImageGenerator />} />
-        <Route path="voice" element={<VoiceTools userId={defaultUser.id} />} />
+        <Route path="voice" element={<VoiceTools/>} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="document-uploader" element={<DocumentUploader />} />
       </Route>
