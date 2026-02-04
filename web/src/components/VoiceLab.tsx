@@ -8,12 +8,49 @@ import {
   Loader2, 
   Trash2, 
   CheckCircle2, 
-  Zap
+  Zap,
+  AlertCircle
 } from 'lucide-react';
+
 import { KokoroTTS } from 'kokoro-js';
 import { Client } from '@gradio/client';
 
+// Helper to encode Float32Array to WAV
+function encodeWAV(samples: Float32Array, sampleRate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
 export default function VoiceLab() {
+
   // TTS State
   const [ttsText, setTtsText] = useState("Kokoro is a 82M parameter TTS model that runs entirely in your browser.");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -27,6 +64,9 @@ export default function VoiceLab() {
   const [cloningStatus, setCloningStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
+  const [hfToken, setHfToken] = useState<string>(''); // For private spaces
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -55,11 +95,22 @@ export default function VoiceLab() {
     setTtsProgress(0);
 
     try {
-      const audio = await ttsModel.generate(ttsText, {
-        voice: "af_heart", // default voice
+      const result = await ttsModel.generate(ttsText, {
+        voice: "af_heart", 
       });
       
-      const url = URL.createObjectURL(audio.blob);
+      console.log("Generated Audio Data:", result);
+
+      let blob: Blob;
+      if (result.toBlob) {
+        blob = await result.toBlob();
+      } else if (result.audio && result.sampling_rate) {
+        blob = encodeWAV(result.audio, result.sampling_rate);
+      } else {
+        throw new Error("Unknown audio format returned from Kokoro");
+      }
+
+      const url = URL.createObjectURL(blob);
       const audioTag = new Audio(url);
       audioTag.play();
     } catch (err) {
@@ -68,6 +119,7 @@ export default function VoiceLab() {
       setIsGenerating(false);
     }
   };
+
 
   // -- Recording Logic --
   const startRecording = async () => {
@@ -113,12 +165,13 @@ export default function VoiceLab() {
   const handleCloneVoice = async () => {
     if (!audioBlob) return;
     setCloningStatus('uploading');
-    setSpaceStatus('Waking up Space...');
+    setSpaceStatus('Connecting...');
 
     try {
-      // Connect to a hypothetical XTTS v2 Space
-      // This is a template: replace with actual Space ID e.g., "coqui/xtts" 
-      const client = await Client.connect("lucataco/xtts-v2"); 
+      // Connect with optional token
+      const client = await Client.connect("lucataco/xtts-v2", {
+        token: hfToken as any
+      }); 
       
       setCloningStatus('processing');
       setSpaceStatus('Synthesizing...');
@@ -129,18 +182,23 @@ export default function VoiceLab() {
         audio_file_path: audioBlob,
       });
 
-      // Handle Gradio response (this depends on the specific Space API)
       if (result.data && (result.data as any)[0]) {
           setClonedAudioUrl((result.data as any)[0].url);
           setCloningStatus('done');
+      } else {
+          setCloningStatus('error');
+          setSpaceStatus('Unexpected response format');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Cloning Error:", err);
       setCloningStatus('error');
+      setSpaceStatus(err.message.includes('401') ? 'Auth Required (HF Token)' : 'Cloning Failed');
+      if (err.message.includes('401')) setShowTokenInput(true);
     } finally {
-      setSpaceStatus('Ready');
+      // Keep status visible
     }
   };
+
 
   return (
     <div className="space-y-8 p-6 bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
@@ -234,9 +292,31 @@ export default function VoiceLab() {
               Clone & Generate
             </button>
 
-            {/* Status Bar */}
-            {cloningStatus !== 'idle' && (
+            {cloningStatus === 'error' && (
+              <div className="mt-4 flex flex-col gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold uppercase">
+                  <AlertCircle className="w-4 h-4" />
+                  {spaceStatus}
+                </div>
+                {showTokenInput && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-500">This Space is private. Please enter a <a href="https://huggingface.co/settings/tokens" target="_blank" className="underline">Hugging Face Token</a>:</p>
+                    <input 
+                      type="password" 
+                      value={hfToken} 
+                      onChange={(e) => setHfToken(e.target.value)}
+                      placeholder="hf_..."
+                      className="w-full p-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {cloningStatus !== 'idle' && cloningStatus !== 'error' && (
               <div className="mt-4 flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+
+
                 <div className="flex-1">
                   <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400 mb-1">
                     <span>{spaceStatus}</span>
