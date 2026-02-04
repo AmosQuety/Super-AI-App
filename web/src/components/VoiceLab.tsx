@@ -12,50 +12,19 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-import { KokoroTTS } from 'kokoro-js';
+
 import { Client } from '@gradio/client';
 
-// Helper to encode Float32Array to WAV
-function encodeWAV(samples: Float32Array, sampleRate: number): Blob {
-  const buffer = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buffer);
-
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, samples.length * 2, true);
-
-  let offset = 44;
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-
-  return new Blob([buffer], { type: "audio/wav" });
-}
-
 export default function VoiceLab() {
-
   // TTS State
-  const [ttsText, setTtsText] = useState("Kokoro is a 82M parameter TTS model that runs entirely in your browser.");
+  const [ttsText, setTtsText] = useState("Kokoro is a 82M parameter TTS model that runs entirely in your browser. This version is optimized with Web Workers for a smooth UI.");
   const [isGenerating, setIsGenerating] = useState(false);
   const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsModel, setTtsModel] = useState<any>(null);
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
+
+  // Worker Ref
+  const workerRef = useRef<Worker | null>(null);
 
   // Cloning State
   const [isRecording, setIsRecording] = useState(false);
@@ -67,58 +36,62 @@ export default function VoiceLab() {
   const [hfToken, setHfToken] = useState<string>(''); // For private spaces
   const [showTokenInput, setShowTokenInput] = useState(false);
 
-
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Initialize Kokoro
+  // Initialize Worker
   useEffect(() => {
-    async function initKokoro() {
-      try {
-        const tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
-          dtype: "q8", // 8-bit quantization for low resource
-          device: "wasm", // Fallback to wasm for 4GB RAM machines
-        });
-        setTtsModel(tts);
-      } catch (err) {
-        console.error("Failed to load Kokoro:", err);
+    // Create worker using Vite-compatible syntax
+    const worker = new Worker(new URL('../services/voice/tts.worker.ts', import.meta.url), {
+        type: 'module'
+    });
+    workerRef.current = worker;
+
+    worker.onmessage = (event) => {
+      const { type, status, message, progress, audio, error } = event.data;
+
+      switch (type) {
+        case 'status':
+          setTtsStatus(status);
+          setStatusMessage(message);
+          if (status === 'ready') setTtsProgress(100);
+          break;
+        case 'progress':
+          setTtsProgress(Math.round(progress * 100));
+          setStatusMessage(`Downloading: ${Math.round(progress * 100)}%`);
+          break;
+        case 'done':
+          setIsGenerating(false);
+          setTtsStatus('ready');
+          setStatusMessage('Generation Complete');
+          const blob = new Blob([audio], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          const audioTag = new Audio(url);
+          audioTag.play();
+          break;
+        case 'error':
+          setIsGenerating(false);
+          setTtsStatus('error');
+          setStatusMessage(`Error: ${error || message}`);
+          break;
       }
-    }
-    initKokoro();
+    };
+
+    // Load model
+    worker.postMessage({ type: 'load' });
+
+    return () => {
+      worker.terminate();
+    };
   }, []);
 
   // -- TTS Logic --
   const handleGenerateTTS = async () => {
-    if (!ttsModel || !ttsText.trim()) return;
+    if (!workerRef.current || !ttsText.trim() || ttsStatus !== 'ready') return;
     setIsGenerating(true);
-    console.log(ttsProgress, "Generating TTS...");
-    setTtsProgress(0);
-
-    try {
-      const result = await ttsModel.generate(ttsText, {
-        voice: "af_heart", 
-      });
-      
-      console.log("Generated Audio Data:", result);
-
-      let blob: Blob;
-      if (result.toBlob) {
-        blob = await result.toBlob();
-      } else if (result.audio && result.sampling_rate) {
-        blob = encodeWAV(result.audio, result.sampling_rate);
-      } else {
-        throw new Error("Unknown audio format returned from Kokoro");
-      }
-
-      const url = URL.createObjectURL(blob);
-      const audioTag = new Audio(url);
-      audioTag.play();
-    } catch (err) {
-      console.error("TTS Generation Error:", err);
-    } finally {
-      setIsGenerating(false);
-    }
+    workerRef.current.postMessage({ type: 'generate', text: ttsText });
   };
+
 
 
   // -- Recording Logic --
@@ -212,12 +185,13 @@ export default function VoiceLab() {
             Local TTS with Kokoro-82M & Cloud Voice Cloning
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
-          <div className={`w-2 h-2 rounded-full ${ttsModel ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
+          <div className={`w-2 h-2 rounded-full ${ttsStatus === 'ready' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
           <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-            {ttsModel ? 'Kokoro Engine Ready' : 'Loading Engine...'}
+            {statusMessage}
           </span>
         </div>
+
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -235,13 +209,30 @@ export default function VoiceLab() {
           />
           <button
             onClick={handleGenerateTTS}
-            disabled={isGenerating || !ttsModel}
+            disabled={isGenerating || ttsStatus !== 'ready'}
             className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20"
           >
             {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            Generate Local Audio
+            {isGenerating ? 'Synthesizing...' : 'Generate Local Audio'}
           </button>
+
+          {/* Progress Bar for Loading/Generating */}
+          {(ttsStatus === 'loading' || isGenerating) && (
+            <div className="mt-4">
+              <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                <span>{statusMessage}</span>
+                <span>{ttsProgress}%</span>
+              </div>
+              <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-purple-500 transition-all duration-300" 
+                  style={{ width: `${ttsProgress}%` }} 
+                />
+              </div>
+            </div>
+          )}
         </div>
+
 
         {/* Cloning Lab */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
