@@ -8,7 +8,6 @@ import {
   Loader2, 
   Trash2, 
   CheckCircle2, 
-  AlertCircle,
   Zap
 } from 'lucide-react';
 import { KokoroTTS } from 'kokoro-js';
@@ -52,7 +51,9 @@ export default function VoiceLab() {
   const handleGenerateTTS = async () => {
     if (!ttsModel || !ttsText.trim()) return;
     setIsGenerating(true);
+    console.log(ttsProgress, "Generating TTS...");
     setTtsProgress(0);
+
     try {
       const audio = await ttsModel.generate(ttsText, {
         voice: "af_heart", // default voice
