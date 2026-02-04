@@ -13,6 +13,9 @@ import {
   Meh
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
+import VoiceLab from "./VoiceLab";
+import { FlaskConical } from "lucide-react";
+
 
 
 export default function VoiceTools( ) {
@@ -31,6 +34,8 @@ export default function VoiceTools( ) {
 
   const [ttsText, setTtsText] = useState("Hello! I am an AI voice. Enter any text here and I will speak it for you.");
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'intelligence' | 'lab'>('intelligence');
+
 
   // Combine transcripts for display
   const fullDisplay = (transcript + " " + interimTranscript).trim();
@@ -74,7 +79,38 @@ export default function VoiceTools( ) {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="flex justify-center mb-8">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+          <button
+            onClick={() => setActiveTab('intelligence')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
+              activeTab === 'intelligence' 
+                ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Activity className="w-5 h-5" />
+            Intelligence Layer
+          </button>
+          <button
+            onClick={() => setActiveTab('lab')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
+              activeTab === 'lab' 
+                ? 'bg-white dark:bg-slate-900 text-purple-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <FlaskConical className="w-5 h-5" />
+            Cloning Lab
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'lab' ? (
+        <VoiceLab />
+      ) : (
+        <div className="grid lg:grid-cols-2 gap-8">
+
         
         {/* --- LEFT: SPEECH TO TEXT & INTELLIGENCE --- */}
         <div className="space-y-6">
@@ -307,7 +343,9 @@ export default function VoiceTools( ) {
           </div>
         </div>
 
-      </div>
+        </div>
+      )}
     </div>
+
   );
 }
