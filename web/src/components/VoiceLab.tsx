@@ -9,8 +9,11 @@ import {
   Trash2, 
   CheckCircle2, 
   Zap,
-  AlertCircle
+  AlertCircle,
+  BrainCircuit,
+  Sparkles
 } from 'lucide-react';
+
 
 
 import { Client } from '@gradio/client';
@@ -22,9 +25,13 @@ export default function VoiceLab() {
   const [ttsProgress, setTtsProgress] = useState(0);
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
+  const [synapses, setSynapses] = useState(0); // For mini-game
 
-  // Worker Ref
+  // Worker & Audio Queue Ref
   const workerRef = useRef<Worker | null>(null);
+  const audioQueueRef = useRef<HTMLAudioElement[]>([]);
+  const isPlayingRef = useRef(false);
+
 
   // Cloning State
   const [isRecording, setIsRecording] = useState(false);
@@ -50,6 +57,7 @@ export default function VoiceLab() {
     worker.onmessage = (event) => {
       const { type, status, message, progress, audio, error } = event.data;
 
+
       switch (type) {
         case 'status':
           setTtsStatus(status);
@@ -57,17 +65,20 @@ export default function VoiceLab() {
           if (status === 'ready') setTtsProgress(100);
           break;
         case 'progress':
-          setTtsProgress(Math.round(progress * 100));
-          setStatusMessage(`Downloading: ${Math.round(progress * 100)}%`);
+          // Normalize progress (handle both 0-1 and 0-100)
+          const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
+          setTtsProgress(normP);
+          setStatusMessage(`Downloading: ${normP}%`);
           break;
-        case 'done':
-          setIsGenerating(false);
-          setTtsStatus('ready');
-          setStatusMessage('Generation Complete');
+        case 'chunk':
           const blob = new Blob([audio], { type: 'audio/wav' });
           const url = URL.createObjectURL(blob);
           const audioTag = new Audio(url);
-          audioTag.play();
+          
+          audioQueueRef.current.push(audioTag);
+          if (!isPlayingRef.current) {
+            playNextInQueue();
+          }
           break;
         case 'error':
           setIsGenerating(false);
@@ -77,6 +88,19 @@ export default function VoiceLab() {
       }
     };
 
+    const playNextInQueue = () => {
+        if (audioQueueRef.current.length === 0) {
+            isPlayingRef.current = false;
+            return;
+        }
+        isPlayingRef.current = true;
+        const nextAudio = audioQueueRef.current.shift();
+        if (nextAudio) {
+            nextAudio.onended = () => playNextInQueue();
+            nextAudio.play().catch(e => console.error("Audio playback blocked:", e));
+        }
+    };
+
     // Load model
     worker.postMessage({ type: 'load' });
 
@@ -84,6 +108,39 @@ export default function VoiceLab() {
       worker.terminate();
     };
   }, []);
+
+  // Neural Synapse Game Component (Inline for simplicity)
+  const SynapseGame = () => (
+    <div className="relative h-48 bg-slate-900/50 rounded-2xl border border-slate-700 overflow-hidden group cursor-crosshair">
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+         <BrainCircuit className="w-12 h-12 text-blue-400 mb-2 animate-pulse" />
+         <p className="text-xs text-blue-300 font-bold uppercase tracking-widest">Neural Synapse Linker</p>
+         <p className="text-[10px] text-slate-500 mt-1">Hover over floating energy to "optimize" the thinking brain</p>
+         <div className="mt-3 flex items-center gap-2">
+            <span className="text-xl font-black text-white">{synapses}</span>
+            <span className="text-[10px] text-slate-400">Links Established</span>
+         </div>
+      </div>
+      
+      {/* Moving Synapses */}
+      {[...Array(6)].map((_, i) => (
+        <div 
+          key={i}
+          onMouseEnter={() => setSynapses(s => s + 1)}
+          className="absolute w-4 h-4 bg-teal-400/20 hover:bg-teal-400 rounded-full blur-sm hover:blur-none transition-all cursor-pointer animate-float"
+          style={{ 
+            top: `${20 + Math.random() * 60}%`, 
+            left: `${10 + Math.random() * 80}%`,
+            animationDelay: `${i * 0.5}s`,
+            animationDuration: `${3 + Math.random() * 2}s`
+          }}
+        >
+          <Sparkles className="w-full h-full text-white/50 scale-50" />
+        </div>
+      ))}
+    </div>
+  );
+
 
   // -- TTS Logic --
   const handleGenerateTTS = async () => {
@@ -218,20 +275,27 @@ export default function VoiceLab() {
 
           {/* Progress Bar for Loading/Generating */}
           {(ttsStatus === 'loading' || isGenerating) && (
-            <div className="mt-4">
-              <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                <span>{statusMessage}</span>
-                <span>{ttsProgress}%</span>
-              </div>
-              <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div className="mt-4 space-y-4">
+              <div className="h-0.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-purple-500 transition-all duration-300" 
                   style={{ width: `${ttsProgress}%` }} 
                 />
               </div>
+              
+              {isGenerating && <SynapseGame />}
+              
+              <div className="flex justify-between items-center text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1 h-1 bg-purple-500 rounded-full animate-ping" />
+                   {statusMessage}
+                </div>
+                <span>{ttsProgress}% Total Progress</span>
+              </div>
             </div>
           )}
         </div>
+
 
 
         {/* Cloning Lab */}

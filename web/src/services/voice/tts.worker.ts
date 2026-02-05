@@ -72,27 +72,50 @@ self.onmessage = async (event: MessageEvent) => {
     }
 
     try {
-      ctx.postMessage({ type: 'status', status: 'generating', message: 'Synthesizing speech...' });
+      ctx.postMessage({ type: 'status', status: 'generating', message: 'Analyzing text structure...' });
       
-      const result = await tts.generate(text, {
-        voice: voice || "af_heart",
-      });
+      // Split text into sentences for "streaming" effect
+      const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+      
+      for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i].trim();
+        if (!sentence) continue;
 
-      let audioBlob: Blob;
-      if (result.toBlob) {
-        audioBlob = await result.toBlob();
-      } else if (result.audio && result.sampling_rate) {
-        audioBlob = encodeWAV(result.audio, result.sampling_rate);
-      } else {
-        throw new Error("Invalid audio format returned");
+        ctx.postMessage({ 
+          type: 'status', 
+          status: 'generating', 
+          message: `Synthesizing sentence ${i+1}/${sentences.length}...`,
+          chunkIndex: i,
+          totalChunks: sentences.length
+        });
+
+        const result = await tts.generate(sentence, {
+          voice: voice || "af_heart",
+        });
+
+        let audioBlob: Blob;
+        if (result.toBlob) {
+          audioBlob = await result.toBlob();
+        } else if (result.audio && result.sampling_rate) {
+          audioBlob = encodeWAV(result.audio, result.sampling_rate);
+        } else {
+          throw new Error("Invalid audio format returned");
+        }
+
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        ctx.postMessage({ 
+          type: 'chunk', 
+          audio: arrayBuffer, 
+          index: i, 
+          isLast: i === sentences.length - 1 
+        }, [arrayBuffer]);
       }
 
-      // Convert Blob to ArrayBuffer to send back more efficiently
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      ctx.postMessage({ type: 'done', audio: arrayBuffer }, [arrayBuffer]);
+      ctx.postMessage({ type: 'status', status: 'ready', message: 'Playback complete' });
     } catch (err: any) {
       ctx.postMessage({ type: 'error', message: err.message });
     }
   }
 };
+
 
