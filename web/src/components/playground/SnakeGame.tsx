@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import  { useEffect, useRef, useState } from 'react';
 
 interface Point {
   x: number;
@@ -132,7 +132,7 @@ export default function SnakeGame() {
       ctx.fillStyle = '#8b5cf6'; // violet
       ctx.shadowBlur = 15;
       ctx.shadowColor = '#8b5cf6';
-      snakeRef.current.forEach((segment, i) => {
+      snakeRef.current.forEach((segment) => {
         const size = gridSize - 2;
         ctx.fillRect(segment.x * gridSize + 1, segment.y * gridSize + 1, size, size);
       });
