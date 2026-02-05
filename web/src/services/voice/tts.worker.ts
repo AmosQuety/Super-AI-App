@@ -1,5 +1,9 @@
+/// <reference lib="webworker" />
 // src/services/voice/tts.worker.ts
 import { KokoroTTS } from 'kokoro-js';
+
+const ctx: DedicatedWorkerGlobalScope = self as any;
+
 
 let tts: any = null;
 
@@ -41,7 +45,7 @@ self.onmessage = async (event: MessageEvent) => {
 
   if (type === 'load') {
     try {
-      self.postMessage({ type: 'status', status: 'loading', message: 'Downloading model...' });
+      ctx.postMessage({ type: 'status', status: 'loading', message: 'Downloading model...' });
       
       tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
         dtype: "q8",
@@ -49,25 +53,26 @@ self.onmessage = async (event: MessageEvent) => {
         // @ts-ignore - progress_callback is common in transformers.js wrappers
         progress_callback: (p: any) => {
             if (p.status === 'progress') {
-                self.postMessage({ type: 'progress', progress: p.progress, file: p.file });
+                ctx.postMessage({ type: 'progress', progress: p.progress, file: p.file });
             }
         }
       });
 
-      self.postMessage({ type: 'status', status: 'ready', message: 'Engine Ready' });
+
+      ctx.postMessage({ type: 'status', status: 'ready', message: 'Engine Ready' });
     } catch (err: any) {
-      self.postMessage({ type: 'error', message: err.message });
+      ctx.postMessage({ type: 'error', message: err.message });
     }
   }
 
   if (type === 'generate') {
     if (!tts) {
-      self.postMessage({ type: 'error', message: 'Model not loaded' });
+      ctx.postMessage({ type: 'error', message: 'Model not loaded' });
       return;
     }
 
     try {
-      self.postMessage({ type: 'status', status: 'generating', message: 'Synthesizing speech...' });
+      ctx.postMessage({ type: 'status', status: 'generating', message: 'Synthesizing speech...' });
       
       const result = await tts.generate(text, {
         voice: voice || "af_heart",
@@ -84,9 +89,10 @@ self.onmessage = async (event: MessageEvent) => {
 
       // Convert Blob to ArrayBuffer to send back more efficiently
       const arrayBuffer = await audioBlob.arrayBuffer();
-      self.postMessage({ type: 'done', audio: arrayBuffer }, [arrayBuffer]);
+      ctx.postMessage({ type: 'done', audio: arrayBuffer }, [arrayBuffer]);
     } catch (err: any) {
-      self.postMessage({ type: 'error', message: err.message });
+      ctx.postMessage({ type: 'error', message: err.message });
     }
   }
 };
+

@@ -17,7 +17,7 @@ import { Client } from '@gradio/client';
 
 export default function VoiceLab() {
   // TTS State
-  const [ttsText, setTtsText] = useState("Kokoro is a 82M parameter TTS model that runs entirely in your browser. This version is optimized with Web Workers for a smooth UI.");
+  const [ttsText, setTtsText] = useState("Welcome to Xemora. This voice is being generated instantly, right here in your browser, with zero latency. Pretty cool, right?");
   const [isGenerating, setIsGenerating] = useState(false);
   const [ttsProgress, setTtsProgress] = useState(0);
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'error'>('idle');
