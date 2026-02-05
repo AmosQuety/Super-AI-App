@@ -10,31 +10,108 @@ import {
   Check,
   Activity,
   Smile,
-  Meh
+  Meh,
+  Loader2,
+  CheckCircle2,
+  FlaskConical
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import VoiceLab from "./VoiceLab";
-import { FlaskConical } from "lucide-react";
+import SnakeGame from "./playground/SnakeGame";
+import { useEffect, useRef } from "react";
 
-
-
-export default function VoiceTools( ) {
+export default function VoiceTools() {
   const { 
     isListening, 
     transcript, 
     interimTranscript, 
     startListening, 
     stopListening,
-    isSpeaking,
-    speak,
-    stopSpeaking,
     audioMetrics,
     sentiment
   } = useVoiceIntelligence();
 
-  const [ttsText, setTtsText] = useState("Hello! I am an AI voice. Enter any text here and I will speak it for you.");
+  const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution.");
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'intelligence' | 'lab'>('intelligence');
+
+  const [ttsProgress, setTtsProgress] = useState(0);
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'done' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
+  const [finalAudioUrl, setFinalAudioUrl] = useState<string | null>(null);
+
+
+  const workerRef = useRef<Worker | null>(null);
+  const audioChunksBuffer = useRef<ArrayBuffer[]>([]);
+
+  // Initialize Local TTS Worker
+  useEffect(() => {
+    const worker = new Worker(new URL('../services/voice/tts.worker.ts', import.meta.url), {
+        type: 'module'
+    });
+    workerRef.current = worker;
+
+    worker.onmessage = (event) => {
+      const { type, status, message, progress, audio, error } = event.data;
+
+      switch (type) {
+        case 'status':
+          if (status === 'ready') {
+             if (audioChunksBuffer.current.length > 0) {
+                finalizeAudio();
+             } else {
+                setTtsStatus('ready');
+                setStatusMessage(message);
+                setTtsProgress(100);
+             }
+          } else {
+             setTtsStatus(status as any);
+             setStatusMessage(message);
+          }
+          break;
+        case 'progress':
+          const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
+          setTtsProgress(normP);
+          setStatusMessage(`Downloading: ${normP}%`);
+          break;
+        case 'chunk':
+          audioChunksBuffer.current.push(audio);
+          break;
+        case 'error':
+          setTtsStatus('error');
+          setStatusMessage(`Error: ${error || message}`);
+          break;
+      }
+    };
+
+    const finalizeAudio = () => {
+        setTtsStatus('done');
+        setStatusMessage('Synthesis Complete');
+        const blob = new Blob(audioChunksBuffer.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        setFinalAudioUrl(url);
+        audioChunksBuffer.current = [];
+    };
+
+    worker.postMessage({ type: 'load' });
+    return () => worker.terminate();
+  }, []);
+
+
+  const handleGenerateLocalTTS = () => {
+    if (!workerRef.current || !ttsText.trim()) return;
+    setFinalAudioUrl(null);
+    setTtsStatus('generating');
+    audioChunksBuffer.current = [];
+    workerRef.current.postMessage({ type: 'generate', text: ttsText });
+  };
+
+
+  const handleResetTTS = () => {
+    setFinalAudioUrl(null);
+    setTtsStatus('ready');
+  };
+
 
 
   // Combine transcripts for display
@@ -272,7 +349,7 @@ export default function VoiceTools( ) {
         </div>
 
         {/* --- RIGHT: TEXT TO SPEECH --- */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 h-fit">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 h-fit min-h-[500px] flex flex-col">
           <div className="flex items-center space-x-4 mb-6">
             <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
               <Volume2 className="w-7 h-7 text-white" />
@@ -282,66 +359,117 @@ export default function VoiceTools( ) {
                 Neural Speech
               </h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm">
-                Browser-native synthesis engine
+                Local-first synthesis engine
               </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="tts-text" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Input Text
-              </label>
-              <textarea 
-                id="tts-text" 
-                value={ttsText} 
-                onChange={(e) => setTtsText(e.target.value)} 
-                className="w-full h-48 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg" 
-              />
-              <div className="mt-2 text-right text-xs text-slate-400">
-                {ttsText.length} characters
-              </div>
-            </div>
+          <div className="flex-1 flex flex-col">
+            {/* STATE A: IDLE */}
+            {ttsStatus !== 'generating' && ttsStatus !== 'done' && (
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                <div>
+                  <label htmlFor="tts-text" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    Cerebral Input
+                  </label>
+                  <textarea 
+                    id="tts-text" 
+                    value={ttsText} 
+                    onChange={(e) => setTtsText(e.target.value)} 
+                    className="w-full h-48 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg" 
+                  />
+                </div>
 
-            <div className="flex gap-3">
-              <button 
-                onClick={() => speak(ttsText)} 
-                disabled={!ttsText.trim() || isSpeaking} 
-                className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02]"
-              >
-                <Play className="w-5 h-5" />
-                Speak Now
-              </button>
-
-              {isSpeaking && (
                 <button 
-                  onClick={stopSpeaking} 
-                  className="p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-xl hover:bg-red-200 transition-colors shadow-md"
+                  onClick={handleGenerateLocalTTS} 
+                  disabled={!ttsText.trim() || ttsStatus === 'loading'} 
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02]"
                 >
-                  <Square className="w-5 h-5 fill-current" />
+                  <Play className="w-5 h-5" />
+                  Initialize Synthesis
                 </button>
-              )}
-            </div>
-
-            {/* Speaking Status Visual */}
-            {isSpeaking && (
-              <div className="flex items-center justify-center space-x-1 h-8">
-                 {[...Array(8)].map((_,i) => (
-                    <div 
-                      key={i} 
-                      className="w-1.5 bg-purple-500 rounded-full animate-bounce" 
-                      style={{ 
-                        height: '20px', 
-                        animationDuration: '0.8s', 
-                        animationDelay: `${i * 0.1}s` 
-                      }} 
-                    />
-                 ))}
               </div>
             )}
 
+            {/* STATE B: LOADING / GENERATING */}
+            {ttsStatus === 'generating' && (
+              <div className="space-y-6 flex-1 flex flex-col animate-in zoom-in-95 duration-500">
+                <div className="flex flex-col items-center">
+                   <div className="relative">
+                      <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full" />
+                      <Loader2 className="w-10 h-10 animate-spin text-purple-500 relative z-10" />
+                   </div>
+                   <h3 className="text-lg font-bold mt-4 text-slate-900 dark:text-white">Synthesizing Neural Pathway...</h3>
+                   <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">{statusMessage}</p>
+                </div>
+
+                <div className="space-y-2">
+                   <div className="flex justify-between text-[10px] text-slate-500 font-black uppercase tracking-widest px-1">
+                      <span>Progress</span>
+                      <span>{ttsProgress}%</span>
+                   </div>
+                   <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" 
+                        style={{ width: `${ttsProgress}%` }} 
+                      />
+                   </div>
+                </div>
+
+                {/* Snake Game Wrapper */}
+                <div className="flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px]">
+                   <div className="absolute top-0 inset-x-0 h-8 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between px-3 z-20">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
+                         Active Game Wait Session
+                      </span>
+                      <span className="text-[9px] text-slate-600 font-medium">Latency Distraction Layer v1.0</span>
+                   </div>
+                   <div className="h-full flex items-center justify-center pt-8">
+                      <SnakeGame />
+                   </div>
+                </div>
+                
+                <p className="text-center text-[10px] text-slate-500 font-medium uppercase tracking-widest">
+                  Game controls: Use keyboard arrow keys
+                </p>
+              </div>
+            )}
+
+            {/* STATE C: FINISHED */}
+            {ttsStatus === 'done' && (
+              <div className="space-y-8 flex-1 flex flex-col justify-center animate-in scale-in-95 duration-700">
+                <div className="bg-green-50/50 dark:bg-green-900/10 border-2 border-dashed border-green-200 dark:border-green-800/50 rounded-3xl p-10 flex flex-col items-center text-center">
+                   <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-green-500/20">
+                      <CheckCircle2 className="w-10 h-10 text-white" />
+                   </div>
+                   <h3 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tighter">DATA LINK ESTABLISHED</h3>
+                   <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto mb-8">
+                      Local neural synthesis complete. Your sample is ready for immediate synchronization.
+                   </p>
+                   
+                   {finalAudioUrl && (
+                    <div className="w-full bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg">
+                       <audio controls src={finalAudioUrl} className="w-full h-12" autoPlay />
+                    </div>
+                   )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleResetTTS} 
+                    className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <Mic className="w-5 h-5" />
+                    Synthesize New Thought
+                  </button>
+                  <p className="text-center text-[10px] text-slate-500 uppercase font-bold tracking-widest">Local Engine Ready</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
 
         </div>
       )}

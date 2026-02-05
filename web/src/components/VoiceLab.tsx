@@ -9,31 +9,24 @@ import {
   Trash2, 
   CheckCircle2, 
   Zap,
-  AlertCircle,
-  BrainCircuit,
-  Sparkles
+  AlertCircle
 } from 'lucide-react';
-
-
-
+import SnakeGame from './playground/SnakeGame';
 import { Client } from '@gradio/client';
 
 export default function VoiceLab() {
   // TTS State
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
-//  "Welcome to Xemora. This voice is being generated instantly, right here in your browser, with zero latency. Pretty cool, right?"
-    
-  const [isGenerating, setIsGenerating] = useState(false);
+  
   const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'error'>('idle');
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'done' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
-  const [synapses, setSynapses] = useState(0); // For mini-game
+  const [finalAudioUrl, setFinalAudioUrl] = useState<string | null>(null);
 
-  // Worker & Audio Queue Ref
+
+  // Worker & Buffer Ref
   const workerRef = useRef<Worker | null>(null);
-  const audioQueueRef = useRef<HTMLAudioElement[]>([]);
-  const isPlayingRef = useRef(false);
-
+  const audioChunksBuffer = useRef<ArrayBuffer[]>([]);
 
   // Cloning State
   const [isRecording, setIsRecording] = useState(false);
@@ -42,7 +35,7 @@ export default function VoiceLab() {
   const [cloningStatus, setCloningStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
-  const [hfToken, setHfToken] = useState<string>(''); // For private spaces
+  const [hfToken, setHfToken] = useState<string>(''); 
   const [showTokenInput, setShowTokenInput] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -50,7 +43,6 @@ export default function VoiceLab() {
 
   // Initialize Worker
   useEffect(() => {
-    // Create worker using Vite-compatible syntax
     const worker = new Worker(new URL('../services/voice/tts.worker.ts', import.meta.url), {
         type: 'module'
     });
@@ -59,51 +51,46 @@ export default function VoiceLab() {
     worker.onmessage = (event) => {
       const { type, status, message, progress, audio, error } = event.data;
 
-
       switch (type) {
         case 'status':
-          setTtsStatus(status);
-          setStatusMessage(message);
-          if (status === 'ready') setTtsProgress(100);
+          if (status === 'ready') {
+             if (audioChunksBuffer.current.length > 0) {
+                finalizeAudio();
+             } else {
+                setTtsStatus('ready');
+                setStatusMessage(message);
+                setTtsProgress(100);
+             }
+          } else {
+             setTtsStatus(status as any);
+             setStatusMessage(message);
+          }
           break;
         case 'progress':
-          // Normalize progress (handle both 0-1 and 0-100)
           const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
           setTtsProgress(normP);
           setStatusMessage(`Downloading: ${normP}%`);
           break;
         case 'chunk':
-          const blob = new Blob([audio], { type: 'audio/wav' });
-          const url = URL.createObjectURL(blob);
-          const audioTag = new Audio(url);
-          
-          audioQueueRef.current.push(audioTag);
-          if (!isPlayingRef.current) {
-            playNextInQueue();
-          }
+          audioChunksBuffer.current.push(audio);
           break;
         case 'error':
-          setIsGenerating(false);
           setTtsStatus('error');
           setStatusMessage(`Error: ${error || message}`);
           break;
       }
     };
 
-    const playNextInQueue = () => {
-        if (audioQueueRef.current.length === 0) {
-            isPlayingRef.current = false;
-            return;
-        }
-        isPlayingRef.current = true;
-        const nextAudio = audioQueueRef.current.shift();
-        if (nextAudio) {
-            nextAudio.onended = () => playNextInQueue();
-            nextAudio.play().catch(e => console.error("Audio playback blocked:", e));
-        }
+    const finalizeAudio = () => {
+        setTtsStatus('done');
+        setStatusMessage('Synthesis Complete');
+        
+        const blob = new Blob(audioChunksBuffer.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        setFinalAudioUrl(url);
+        audioChunksBuffer.current = [];
     };
 
-    // Load model
     worker.postMessage({ type: 'load' });
 
     return () => {
@@ -111,46 +98,21 @@ export default function VoiceLab() {
     };
   }, []);
 
-  // Neural Synapse Game Component (Inline for simplicity)
-  const SynapseGame = () => (
-    <div className="relative h-48 bg-slate-900/50 rounded-2xl border border-slate-700 overflow-hidden group cursor-crosshair">
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-         <BrainCircuit className="w-12 h-12 text-blue-400 mb-2 animate-pulse" />
-         <p className="text-xs text-blue-300 font-bold uppercase tracking-widest">Neural Synapse Linker</p>
-         <p className="text-[10px] text-slate-500 mt-1">Hover over floating energy to "optimize" the thinking brain</p>
-         <div className="mt-3 flex items-center gap-2">
-            <span className="text-xl font-black text-white">{synapses}</span>
-            <span className="text-[10px] text-slate-400">Links Established</span>
-         </div>
-      </div>
-      
-      {/* Moving Synapses */}
-      {[...Array(6)].map((_, i) => (
-        <div 
-          key={i}
-          onMouseEnter={() => setSynapses(s => s + 1)}
-          className="absolute w-4 h-4 bg-teal-400/20 hover:bg-teal-400 rounded-full blur-sm hover:blur-none transition-all cursor-pointer animate-float"
-          style={{ 
-            top: `${20 + Math.random() * 60}%`, 
-            left: `${10 + Math.random() * 80}%`,
-            animationDelay: `${i * 0.5}s`,
-            animationDuration: `${3 + Math.random() * 2}s`
-          }}
-        >
-          <Sparkles className="w-full h-full text-white/50 scale-50" />
-        </div>
-      ))}
-    </div>
-  );
-
 
   // -- TTS Logic --
   const handleGenerateTTS = async () => {
-    if (!workerRef.current || !ttsText.trim() || ttsStatus !== 'ready') return;
-    setIsGenerating(true);
+    if (!workerRef.current || !ttsText.trim()) return;
+    setFinalAudioUrl(null);
+    setTtsStatus('generating');
+    audioChunksBuffer.current = [];
     workerRef.current.postMessage({ type: 'generate', text: ttsText });
   };
 
+
+  const handleResetTTS = () => {
+    setFinalAudioUrl(null);
+    setTtsStatus('ready');
+  };
 
 
   // -- Recording Logic --
@@ -193,14 +155,12 @@ export default function VoiceLab() {
     }
   };
 
-  // -- Cloning Logic (HF Space Placeholder) --
   const handleCloneVoice = async () => {
     if (!audioBlob) return;
     setCloningStatus('uploading');
     setSpaceStatus('Connecting...');
 
     try {
-      // Connect with optional token
       const client = await Client.connect("lucataco/xtts-v2", {
         token: hfToken as any
       }); 
@@ -226,8 +186,6 @@ export default function VoiceLab() {
       setCloningStatus('error');
       setSpaceStatus(err.message.includes('401') ? 'Auth Required (HF Token)' : 'Cloning Failed');
       if (err.message.includes('401')) setShowTokenInput(true);
-    } finally {
-      // Keep status visible
     }
   };
 
@@ -245,12 +203,11 @@ export default function VoiceLab() {
           </p>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
-          <div className={`w-2 h-2 rounded-full ${ttsStatus === 'ready' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+          <div className={`w-2 h-2 rounded-full ${ttsStatus === 'ready' || ttsStatus === 'done' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
           <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
             {statusMessage}
           </span>
         </div>
-
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -260,45 +217,78 @@ export default function VoiceLab() {
             <Volume2 className="w-5 h-5 text-purple-500" />
             Browser Synthesis
           </h3>
-          <textarea
-            value={ttsText}
-            onChange={(e) => setTtsText(e.target.value)}
-            className="w-full h-32 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border-2 border-slate-100 dark:border-slate-700 focus:border-purple-500 focus:ring-0 resize-none mb-4 transition-all"
-            placeholder="Type text to speak..."
-          />
-          <button
-            onClick={handleGenerateTTS}
-            disabled={isGenerating || ttsStatus !== 'ready'}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20"
-          >
-            {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {isGenerating ? 'Synthesizing...' : 'Generate Local Audio'}
-          </button>
 
-          {/* Progress Bar for Loading/Generating */}
-          {(ttsStatus === 'loading' || isGenerating) && (
-            <div className="mt-4 space-y-4">
-              <div className="h-0.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          {ttsStatus !== 'generating' && ttsStatus !== 'done' ? (
+            <>
+              <textarea
+                value={ttsText}
+                onChange={(e) => setTtsText(e.target.value)}
+                className="w-full h-32 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border-2 border-slate-100 dark:border-slate-700 focus:border-purple-500 focus:ring-0 resize-none mb-4 transition-all"
+                placeholder="Type text to speak..."
+              />
+              <button
+                onClick={handleGenerateTTS}
+                disabled={ttsStatus !== 'ready'}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20"
+              >
+                <Play className="w-5 h-5" />
+                Generate Local Audio
+              </button>
+            </>
+          ) : ttsStatus === 'generating' ? (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center">
+                 <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-2" />
+                 <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Generating Consciousness...</p>
+                 <p className="text-xs text-slate-500">Wait time: ~5-15s based on text length</p>
+              </div>
+
+              <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-purple-500 transition-all duration-300" 
                   style={{ width: `${ttsProgress}%` }} 
                 />
               </div>
-              
-              {isGenerating && <SynapseGame />}
-              
-              <div className="flex justify-between items-center text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
-                <div className="flex items-center gap-1.5">
-                   <div className="w-1 h-1 bg-purple-500 rounded-full animate-ping" />
-                   {statusMessage}
-                </div>
-                <span>{ttsProgress}% Total Progress</span>
+
+              <div className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
+                 <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center text-[10px] text-slate-500 font-bold tracking-widest uppercase">
+                    <span>Neural Processing Distraction</span>
+                    <span className="flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                       Active Game Session
+                    </span>
+                 </div>
+                 <SnakeGame />
               </div>
+
+              <p className="text-center text-[10px] text-slate-500 uppercase tracking-widest font-medium">Use arrow keys to play while you wait</p>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in zoom-in-95 duration-500">
+               <div className="p-8 bg-green-50 dark:bg-green-900/10 border-2 border-dashed border-green-200 dark:border-green-800/50 rounded-3xl flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-green-500/20">
+                     <CheckCircle2 className="w-8 h-8 text-white" />
+                  </div>
+                  <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Cerebral Link Established</h4>
+                  <p className="text-sm text-slate-500 mb-6">Your neural speech sample is ready for playback</p>
+                  
+                  {finalAudioUrl && (
+                    <div className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                       <audio controls src={finalAudioUrl} className="w-full h-10" autoPlay />
+                    </div>
+                  )}
+               </div>
+
+               <button
+                onClick={handleResetTTS}
+                className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
+              >
+                <Mic className="w-5 h-5" />
+                Generate New Session
+              </button>
             </div>
           )}
         </div>
-
-
 
         {/* Cloning Lab */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
@@ -372,8 +362,6 @@ export default function VoiceLab() {
 
             {cloningStatus !== 'idle' && cloningStatus !== 'error' && (
               <div className="mt-4 flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-
-
                 <div className="flex-1">
                   <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400 mb-1">
                     <span>{spaceStatus}</span>
