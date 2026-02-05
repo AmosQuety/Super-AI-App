@@ -20,7 +20,9 @@ import { Client } from '@gradio/client';
 
 export default function VoiceLab() {
   // TTS State
-  const [ttsText, setTtsText] = useState("Welcome to Xemora. This voice is being generated instantly, right here in your browser, with zero latency. Pretty cool, right?");
+  const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
+//  "Welcome to Xemora. This voice is being generated instantly, right here in your browser, with zero latency. Pretty cool, right?"
+    
   const [isGenerating, setIsGenerating] = useState(false);
   const [ttsProgress, setTtsProgress] = useState(0);
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'error'>('idle');
