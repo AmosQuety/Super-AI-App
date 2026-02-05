@@ -74,9 +74,11 @@ self.onmessage = async (event: MessageEvent) => {
     try {
       ctx.postMessage({ type: 'status', status: 'generating', message: 'Analyzing text structure...' });
       
-      // Split text into sentences for "streaming" effect
       const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
-      
+      const allSamples: Float32Array[] = [];
+      let totalLength = 0;
+      let samplingRate = 24000; // Default for Kokoro
+
       for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i].trim();
         if (!sentence) continue;
@@ -84,38 +86,44 @@ self.onmessage = async (event: MessageEvent) => {
         ctx.postMessage({ 
           type: 'status', 
           status: 'generating', 
-          message: `Synthesizing sentence ${i+1}/${sentences.length}...`,
-          chunkIndex: i,
-          totalChunks: sentences.length
+          message: `Synthesizing part ${i+1}/${sentences.length}...`,
         });
 
         const result = await tts.generate(sentence, {
           voice: voice || "af_heart",
         });
 
-        let audioBlob: Blob;
-        if (result.toBlob) {
-          audioBlob = await result.toBlob();
-        } else if (result.audio && result.sampling_rate) {
-          audioBlob = encodeWAV(result.audio, result.sampling_rate);
-        } else {
-          throw new Error("Invalid audio format returned");
+        if (result.audio) {
+          allSamples.push(result.audio);
+          totalLength += result.audio.length;
+          if (result.sampling_rate) samplingRate = result.sampling_rate;
         }
-
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        ctx.postMessage({ 
-          type: 'chunk', 
-          audio: arrayBuffer, 
-          index: i, 
-          isLast: i === sentences.length - 1 
-        }, [arrayBuffer]);
       }
 
-      ctx.postMessage({ type: 'status', status: 'ready', message: 'Playback complete' });
+      // Concatenate all samples into one continuous buffer
+      const mergedSamples = new Float32Array(totalLength);
+      let offset = 0;
+      for (const samples of allSamples) {
+        mergedSamples.set(samples, offset);
+        offset += samples.length;
+      }
+
+      // Encode single WAV
+      const audioBlob = encodeWAV(mergedSamples, samplingRate);
+      const arrayBuffer = await audioBlob.arrayBuffer();
+
+      ctx.postMessage({ 
+        type: 'chunk', 
+        audio: arrayBuffer, 
+        isFinal: true 
+      }, [arrayBuffer]);
+
+      ctx.postMessage({ type: 'status', status: 'ready', message: 'Synchronization complete' });
     } catch (err: any) {
       ctx.postMessage({ type: 'error', message: err.message });
     }
   }
+
 };
 
 

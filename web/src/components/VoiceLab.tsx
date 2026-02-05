@@ -53,18 +53,9 @@ export default function VoiceLab() {
 
       switch (type) {
         case 'status':
-          if (status === 'ready') {
-             if (audioChunksBuffer.current.length > 0) {
-                finalizeAudio();
-             } else {
-                setTtsStatus('ready');
-                setStatusMessage(message);
-                setTtsProgress(100);
-             }
-          } else {
-             setTtsStatus(status as any);
-             setStatusMessage(message);
-          }
+          setTtsStatus(status as any);
+          setStatusMessage(message);
+          if (status === 'ready') setTtsProgress(100);
           break;
         case 'progress':
           const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
@@ -72,7 +63,12 @@ export default function VoiceLab() {
           setStatusMessage(`Downloading: ${normP}%`);
           break;
         case 'chunk':
-          audioChunksBuffer.current.push(audio);
+          // Single final chunk containing merged WAV
+          const blob = new Blob([audio], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          setFinalAudioUrl(url);
+          setTtsStatus('done');
+          setStatusMessage('Synchronization Complete');
           break;
         case 'error':
           setTtsStatus('error');
@@ -81,22 +77,13 @@ export default function VoiceLab() {
       }
     };
 
-    const finalizeAudio = () => {
-        setTtsStatus('done');
-        setStatusMessage('Synthesis Complete');
-        
-        const blob = new Blob(audioChunksBuffer.current, { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        setFinalAudioUrl(url);
-        audioChunksBuffer.current = [];
-    };
-
     worker.postMessage({ type: 'load' });
 
     return () => {
       worker.terminate();
     };
   }, []);
+
 
 
   // -- TTS Logic --
@@ -215,8 +202,9 @@ export default function VoiceLab() {
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Volume2 className="w-5 h-5 text-purple-500" />
-            Browser Synthesis
+            Neural AI Synthesis v2
           </h3>
+
 
           {ttsStatus !== 'generating' && ttsStatus !== 'done' ? (
             <>
@@ -251,13 +239,14 @@ export default function VoiceLab() {
               </div>
 
               <div className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
-                 <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center text-[10px] text-slate-500 font-bold tracking-widest uppercase">
-                    <span>Neural Processing Distraction</span>
+                  <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center text-[10px] text-slate-500 font-bold tracking-widest uppercase">
+                    <span>AI Latency Synchronization</span>
                     <span className="flex items-center gap-2">
                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                       Active Game Session
+                       Active Wait Protection
                     </span>
-                 </div>
+                  </div>
+
                  <SnakeGame />
               </div>
 

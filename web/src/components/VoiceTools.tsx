@@ -56,18 +56,9 @@ export default function VoiceTools() {
 
       switch (type) {
         case 'status':
-          if (status === 'ready') {
-             if (audioChunksBuffer.current.length > 0) {
-                finalizeAudio();
-             } else {
-                setTtsStatus('ready');
-                setStatusMessage(message);
-                setTtsProgress(100);
-             }
-          } else {
-             setTtsStatus(status as any);
-             setStatusMessage(message);
-          }
+          setTtsStatus(status as any);
+          setStatusMessage(message);
+          if (status === 'ready') setTtsProgress(100);
           break;
         case 'progress':
           const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
@@ -75,27 +66,24 @@ export default function VoiceTools() {
           setStatusMessage(`Downloading: ${normP}%`);
           break;
         case 'chunk':
-          audioChunksBuffer.current.push(audio);
+          const blob = new Blob([audio], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          setFinalAudioUrl(url);
+          setTtsStatus('done');
+          setStatusMessage('Synchronization Complete');
           break;
         case 'error':
           setTtsStatus('error');
           setStatusMessage(`Error: ${error || message}`);
           break;
-      }
-    };
 
-    const finalizeAudio = () => {
-        setTtsStatus('done');
-        setStatusMessage('Synthesis Complete');
-        const blob = new Blob(audioChunksBuffer.current, { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        setFinalAudioUrl(url);
-        audioChunksBuffer.current = [];
+      }
     };
 
     worker.postMessage({ type: 'load' });
     return () => worker.terminate();
   }, []);
+
 
 
   const handleGenerateLocalTTS = () => {
@@ -356,8 +344,9 @@ export default function VoiceTools() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Neural Speech
+                Advanced Neural Voice
               </h2>
+
               <p className="text-slate-500 dark:text-slate-400 text-sm">
                 Local-first synthesis engine
               </p>
