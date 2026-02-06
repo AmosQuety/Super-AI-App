@@ -1,9 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Mic, 
   Square, 
-  Play, 
-  Volume2, 
   Upload, 
   Loader2, 
   Trash2, 
@@ -22,19 +20,9 @@ import { Client } from '@gradio/client';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 
 export default function VoiceLab() {
-  // TTS State
+  // TTS State (for synthesis input)
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
   
-  const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'done' | 'error'>('idle');
-  const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
-  const [finalAudioUrl, setFinalAudioUrl] = useState<string | null>(null);
-
-
-  // Worker & Buffer Ref
-  const workerRef = useRef<Worker | null>(null);
-  const audioChunksBuffer = useRef<ArrayBuffer[]>([]);
-
   // Workflow Phases: 1. Consent, 2. Enrollment, 3. Generation
   const [phase, setPhase] = useState<'consent' | 'enrollment' | 'generation'>('consent');
   const [hasConsent, setHasConsent] = useState(false);
@@ -62,67 +50,6 @@ export default function VoiceLab() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  // Initialize Worker
-  useEffect(() => {
-    const worker = new Worker(new URL('../services/voice/tts.worker.ts', import.meta.url), {
-        type: 'module'
-    });
-    workerRef.current = worker;
-
-    worker.onmessage = (event) => {
-      const { type, status, message, progress, audio, error } = event.data;
-
-      switch (type) {
-        case 'status':
-          setTtsStatus(status as any);
-          setStatusMessage(message);
-          if (status === 'ready') setTtsProgress(100);
-          break;
-        case 'progress':
-          const normP = progress <= 1 ? Math.round(progress * 100) : Math.round(progress);
-          setTtsProgress(normP);
-          setStatusMessage(`Downloading: ${normP}%`);
-          break;
-        case 'chunk':
-          // Single final chunk containing merged WAV
-          const blob = new Blob([audio], { type: 'audio/wav' });
-          const url = URL.createObjectURL(blob);
-          setFinalAudioUrl(url);
-          setTtsStatus('done');
-          setStatusMessage('Synchronization Complete');
-          break;
-        case 'error':
-          setTtsStatus('error');
-          setStatusMessage(`Error: ${error || message}`);
-          break;
-      }
-    };
-
-    worker.postMessage({ type: 'load' });
-
-    return () => {
-      worker.terminate();
-    };
-  }, []);
-
-
-
-  // -- TTS Logic --
-  const handleGenerateTTS = async () => {
-    if (!workerRef.current || !ttsText.trim()) return;
-    setFinalAudioUrl(null);
-    setTtsStatus('generating');
-    audioChunksBuffer.current = [];
-    workerRef.current.postMessage({ type: 'generate', text: ttsText });
-  };
-
-
-  const handleResetTTS = () => {
-    setFinalAudioUrl(null);
-    setTtsStatus('ready');
-  };
-
 
   // -- Recording Logic --
   const startRecording = async () => {
