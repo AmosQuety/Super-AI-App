@@ -10,7 +10,7 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 ---
 
 ## 🚀 Live Demo
-
+*  **Video Demo:** [https://youtu.be/E5pNRct9X4Q](https://youtu.be/E5pNRct9X4Q)
 *   **Frontend:** [https://prism-vision.vercel.app](https://prism-vision.vercel.app)
 *   **Backend API:** [https://super-ai-backend.onrender.com/graphql](https://super-ai-app.onrender.com/graphql)
 *   **AI Engine:** [https://amosquety-biometric-brain.hf.space](https://amosquety-biometric-brain.hf.space)
@@ -157,3 +157,4 @@ This project is open-source and available under the **MIT License**.
 **Nabasa Amos**
 *   Full Stack Software Engineer & AI Enthusiast
 *   [GitHub](https://github.com/AmosQuety)
+
