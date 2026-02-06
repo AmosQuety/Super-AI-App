@@ -36,7 +36,9 @@ export default function VoiceLab() {
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
   const [hfToken, setHfToken] = useState<string>(''); 
+  const [hfSpaceId, setHfSpaceId] = useState<string>('lucataco/xtts-v2');
   const [showTokenInput, setShowTokenInput] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -148,8 +150,9 @@ export default function VoiceLab() {
     setSpaceStatus('Connecting...');
 
     try {
-      const client = await Client.connect("lucataco/xtts-v2", {
-        token: hfToken as any
+      // Connect to Gradio Space
+      const client = await Client.connect(hfSpaceId, {
+        token: (hfToken as any) || undefined
       }); 
       
       setCloningStatus('processing');
@@ -171,8 +174,17 @@ export default function VoiceLab() {
     } catch (err: any) {
       console.error("Cloning Error:", err);
       setCloningStatus('error');
-      setSpaceStatus(err.message.includes('401') ? 'Auth Required (HF Token)' : 'Cloning Failed');
-      if (err.message.includes('401')) setShowTokenInput(true);
+      
+      const errorMessage = err.message || "";
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        setSpaceStatus('Auth Required (HF Token)');
+        setShowTokenInput(true);
+      } else if (errorMessage.includes('metadata') || errorMessage.includes('Space') || errorMessage.includes('not found')) {
+        setSpaceStatus('Space Unavailable or Private');
+        setShowTokenInput(true); // Often metadata fails because of auth
+      } else {
+        setSpaceStatus(`Error: ${errorMessage.substring(0, 30)}${errorMessage.length > 30 ? '...' : ''}`);
+      }
     }
   };
 
@@ -281,10 +293,46 @@ export default function VoiceLab() {
 
         {/* Cloning Lab */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Mic className="w-5 h-5 text-red-500" />
-            Voice Cloning Lab
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <Mic className="w-5 h-5 text-red-500" />
+              Voice Cloning Lab
+            </h3>
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 text-slate-400 hover:text-blue-500 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              title="Space Settings"
+            >
+              <Zap className={`w-4 h-4 ${showSettings ? 'text-blue-500' : ''}`} />
+            </button>
+          </div>
+
+          {showSettings && (
+            <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 animate-in slide-in-from-top-2 duration-300">
+               <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Target Space ID</label>
+                    <input 
+                      type="text" 
+                      value={hfSpaceId} 
+                      onChange={(e) => setHfSpaceId(e.target.value)}
+                      placeholder="e.g. lucataco/xtts-v2"
+                      className="w-full p-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">HF Access Token (Optional)</label>
+                    <input 
+                      type="password" 
+                      value={hfToken} 
+                      onChange={(e) => setHfToken(e.target.value)}
+                      placeholder="hf_..."
+                      className="w-full p-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+               </div>
+            </div>
+          )}
           
           <div className="space-y-4">
             {/* Record / Upload UI */}
@@ -334,9 +382,9 @@ export default function VoiceLab() {
                   <AlertCircle className="w-4 h-4" />
                   {spaceStatus}
                 </div>
-                {showTokenInput && (
+                {showTokenInput && !showSettings && (
                   <div className="space-y-2">
-                    <p className="text-[10px] text-slate-500">This Space is private. Please enter a <a href="https://huggingface.co/settings/tokens" target="_blank" className="underline">Hugging Face Token</a>:</p>
+                    <p className="text-[10px] text-slate-500">Authentication failed. This space may be private. Enter a <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" className="underline text-blue-500">Hugging Face Token</a>:</p>
                     <input 
                       type="password" 
                       value={hfToken} 
