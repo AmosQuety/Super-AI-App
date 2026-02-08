@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import { Mic, Square, RefreshCw, UploadCloud, Volume2 } from "lucide-react";
 
 interface VoiceCaptureProps {

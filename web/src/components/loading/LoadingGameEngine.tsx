@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Settings, X, Volume2, VolumeX, Trophy, Play, RotateCcw } from 'lucide-react';
+import  { useState, useEffect, useCallback } from 'react';
+import { Settings, X, Volume2, VolumeX, Trophy } from 'lucide-react';
 import EmojiCatcher from './games/EmojiCatcher';
 import PopTheBubbles from './games/PopTheBubbles';
 import TapDodge from './games/TapDodge';

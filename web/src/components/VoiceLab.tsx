@@ -15,9 +15,10 @@ import {
   ChevronUp,
   Music4
 } from 'lucide-react';
-import LoadingGameEngine from './loading/LoadingGameEngine';
+// import LoadingGameEngine from './loading/LoadingGameEngine';
 import { Client } from '@gradio/client';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
+import SnakeGame from './playground/SnakeGame';
 
 export default function VoiceLab() {
   // TTS State (for synthesis input)

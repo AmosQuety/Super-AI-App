@@ -130,7 +130,11 @@ export const REGISTER_USER_FACE = gql`
     }
   }
 `;
-
-
-
-
+export const REGISTER_VOICE = gql`
+  mutation RegisterVoice($audio: Upload!) {
+    registerVoice(referenceAudio: $audio) {
+      success
+      message
+    }
+  }
+`;
