@@ -247,6 +247,10 @@ export const authResolvers = {
       // Return the value directly from the database object
       return !!parent.hasFaceRegistered;
     },
+
+    hasVoiceRegistered: (parent: any) => {
+      return !!parent.hasVoiceRegistered;
+    },
   },
 };
 

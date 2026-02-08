@@ -5,6 +5,7 @@ import { GET_ME, UPDATE_PROFILE, CHANGE_PASSWORD } from "../graphql/users";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../components/ui/toastContext";
 import FaceSettings from "../components/settings/FaceSettings";
+import VoiceSettings from "../components/settings/VoiceSettings";
 import { User,  Lock, Save, Loader2, LogOut } from "lucide-react";
 
 // Minimal type definition - only what's needed to fix errors
@@ -191,6 +192,9 @@ export default function ProfilePage() {
                     </h2>
                     {/* HERE IS YOUR NEW COMPONENT */}
                     <FaceSettings />
+                    <div className="mt-8">
+                       <VoiceSettings />
+                    </div>
                 </section>
             </div>
 

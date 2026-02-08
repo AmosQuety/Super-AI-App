@@ -41,10 +41,7 @@ declare global {
 
 // phone IP address
 // const GRAPHQL_URL = "http://172.16.0.78:4001/graphql";
-// const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
-
-
-const GRAPHQL_URL = "https://super-ai-app.onrender.com/graphql";
+const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
 
 // ✅ DEFINE PUBLIC ROUTES - These should NEVER redirect to login
 const PUBLIC_ROUTES = ['/', '/login', '/register'];

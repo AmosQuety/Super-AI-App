@@ -21,6 +21,7 @@ export const typeDefs = gql`
     createdAt: DateTime!
     updatedAt: DateTime!
     hasFaceRegistered: Boolean
+    hasVoiceRegistered: Boolean
   }
 
   type Chat {
@@ -115,6 +116,12 @@ export const typeDefs = gql`
     maxPromptLength: Int!
     defaultDimensions: String!
   }
+
+  type VoiceCloneResponse {
+    success: Boolean!
+    audioUrl: String
+    error: String
+  }
   # ===== END NEW TYPES =====
 
   type Query {
@@ -179,6 +186,10 @@ export const typeDefs = gql`
     deleteWorkspace(id: ID!): Boolean!
 
     uploadDocument(file: Upload!): GenericResponse!
+    
+    registerVoice(referenceAudio: Upload!): GenericResponse!
+    
+    cloneVoice(text: String!, referenceAudio: Upload): VoiceCloneResponse!
     
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
   }

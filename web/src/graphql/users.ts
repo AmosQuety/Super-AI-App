@@ -13,6 +13,7 @@ export const GET_ME = gql`
       isActive
       createdAt
       hasFaceRegistered
+      hasVoiceRegistered
     }
   }
 `;

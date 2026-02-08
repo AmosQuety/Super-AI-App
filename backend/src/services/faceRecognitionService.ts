@@ -216,12 +216,26 @@ export class FaceRecognitionService {
           headers: { ...formData.getHeaders() },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 120000 // <--- Give it 2 minutes (Group photos are heavy!)
+          timeout: 300000 // <--- Increase to 5 minutes for CPU safety
         }
       );
 
       return response.data;
     } catch (error: any) {
+      // DEBUG LOGS
+      console.error("❌ Python API Error:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+
+      // Surfacing the detailed error from Python if available
+      const pythonError = error.response?.data?.error || error.response?.data?.message;
+      
+      if (pythonError) {
+        throw new Error(`Find Face Error: ${pythonError}`);
+      }
+
       // Check for timeout
       if (error.code === 'ECONNABORTED') {
          throw new Error("Processing took too long. Try a smaller group photo.");

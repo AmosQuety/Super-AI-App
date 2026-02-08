@@ -11,6 +11,8 @@ import { AppContext } from "./types/context";
 import { imageGenerationResolvers } from "./imageGenerationResolvers";
 import { workspaceResolvers } from "./workspaceResolvers";
 
+import { voiceCloningResolvers } from "./mutations/voiceCloning";
+
 export const resolvers: IResolvers = {
   ...scalarResolvers,
   ...authResolvers,
@@ -27,7 +29,8 @@ export const resolvers: IResolvers = {
     ...mutationResolvers,
     ...sendMessageWithResponse,
     ...imageGenerationResolvers.Mutation,
-     ...workspaceResolvers.Mutation
+     ...workspaceResolvers.Mutation,
+     ...voiceCloningResolvers.Mutation
   },
   
   User: { 

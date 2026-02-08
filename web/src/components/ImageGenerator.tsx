@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { useToast } from "./ui/toastContext";
+import LoadingGameEngine from "./loading/LoadingGameEngine";
 
 
 // --- TYPE DEFINITIONS ---
@@ -267,16 +268,15 @@ export default function ImageGenerator() {
 
       {/* Results Section */}
       {loading ? (
-        <div className="flex justify-center items-center py-16">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400 text-lg">
-              Creating your masterpiece...
+        <div className="w-full max-w-4xl mx-auto py-12">
+            <div className="text-center mb-6">
+                <h4 className="text-xl font-bold text-slate-800 dark:text-white">Neural Pathway Folding...</h4>
+                <p className="text-xs text-slate-500 italic mt-1 mb-4">The AI is processing your request</p>
+            </div>
+            <LoadingGameEngine />
+            <p className="text-slate-505 dark:text-slate-500 text-sm mt-6 text-center">
+                This may take 10-30 seconds depending on server load
             </p>
-            <p className="text-slate-500 dark:text-slate-500 text-sm mt-2">
-              This may take 10-30 seconds depending on server load
-            </p>
-          </div>
         </div>
       ) : images.length > 0 ? (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800">

@@ -15,7 +15,7 @@ import {
   ChevronUp,
   Music4
 } from 'lucide-react';
-import SnakeGame from './playground/SnakeGame';
+import LoadingGameEngine from './loading/LoadingGameEngine';
 import { Client } from '@gradio/client';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 
