@@ -4,7 +4,7 @@ import {
   ImageIcon, 
   Mic, 
   MessageSquare, 
-  Sparkles, 
+
   ShieldCheck, 
   Zap, 
   ArrowRight,
@@ -56,12 +56,12 @@ const features = [
 const testimonials = [
   {
     quote: "Xemora has completely transformed how our developers integrate AI security. The biometric lab is second to none.",
-    author: "Elena Vance",
+    author: "Mugume Innocent",
     role: "Lead Engineer at TechStream"
   },
   {
     quote: "The generative art tools are incredibly intuitive. It's like having a digital artist at my fingertips.",
-    author: "Marcus Thorne",
+    author: "Mark Twiine",
     role: "Creative Director"
   }
 ];
@@ -83,7 +83,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-3 group transition-transform hover:scale-[1.02]">
             <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-6 h-6 text-white" />
+              
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               Xemora
@@ -272,7 +272,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-3 mb-6">
-                <Sparkles className="w-8 h-8 text-indigo-500" />
+                
                 <span className="text-2xl font-bold text-white tracking-tight">Xemora</span>
               </div>
               <p className="text-slate-500 max-w-sm mb-8 leading-relaxed">
