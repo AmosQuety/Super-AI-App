@@ -1,5 +1,7 @@
-// src/utils/logger.ts - ENHANCED
 import winston from 'winston';
+import { AsyncLocalStorage } from 'async_hooks';
+
+export const asyncContext = new AsyncLocalStorage<Map<string, string>>();
 
 const logFormat = winston.format.combine(
   winston.format.timestamp(),

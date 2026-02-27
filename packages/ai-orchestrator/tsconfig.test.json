@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "paths": {
+      "@core/*": ["./core/*"],
+      "@infrastructure/*": ["./infrastructure/*"],
+      "@shared/*": ["./shared/*"]
+    }
+  },
+  "include": [
+    "core/**/*",
+    "infrastructure/**/*",
+    "shared/**/*",
+    "tests/**/*",
+    "index.ts"
+  ]
+}

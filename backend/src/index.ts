@@ -31,6 +31,7 @@ import {
   securityLoggingMiddleware,
   performanceMiddleware 
 } from './middleware/logging';
+import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
 
 console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
@@ -135,6 +136,9 @@ const corsOptions: cors.CorsOptions = {
 
     // JSON body parser
     app.use(express.json());
+
+    // 5. AI ORCHESTRATOR BOOTSTRAP
+    await initAIOrchestrator();
 
     // Debug middleware to log upload requests
     app.use('/graphql', (req: Request, _res: Response, next: NextFunction) => {
@@ -389,6 +393,8 @@ const shutdown = async (signal: string) => {
 
     await disconnectPrisma();
     logger.info('✅ Shared Prisma client disconnected');
+
+    await shutdownAIOrchestrator();
 
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);

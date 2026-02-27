@@ -13,6 +13,7 @@
     "prisma:push": "prisma db push"
   },
   "dependencies": {
+    "@super-ai/ai-orchestrator": "file:../packages/ai-orchestrator",
     "@google/generative-ai": "^0.24.1",
     "@graphql-tools/schema": "^10.0.25",
     "@huggingface/inference": "^4.13.4",

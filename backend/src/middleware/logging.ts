@@ -1,6 +1,6 @@
-// src/middleware/logging.ts
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../utils/logger';
+import { logger, asyncContext } from '../utils/logger';
+import crypto from 'crypto';
 
 /**
  * Comprehensive logging middleware for Express
@@ -88,7 +88,13 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
     });
   });
 
-  next();
+  const requestId = crypto.randomUUID();
+  const store = new Map<string, string>();
+  store.set('requestId', requestId);
+
+  asyncContext.run(store, () => {
+    next();
+  });
 };
 
 /**

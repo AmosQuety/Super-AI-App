@@ -2,7 +2,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { FaceRecognitionService } from "../../services/faceRecognitionService";
-import { GeminiAIService } from "../../services/geminiAIService";
+import { OrchestratorAIService } from "../../services/ai/OrchestratorAIService";
 import { ChatService } from "../../services/chatService";
 import { UserService } from "../../services/userService";
 import { MessageService } from "../../services/messageService";
@@ -21,7 +21,9 @@ import { JWTPayload, SecurityConfig } from "../../auth/security";
 // ============================================
 const singletonServices = {
   faceRecognitionService: new FaceRecognitionService(),
-  geminiAIService: new GeminiAIService(),
+  // ✅ REPLACED: OrchestratorAIService delegates to ChatOrchestrator internally.
+  // The property name is preserved so all resolvers continue to work unchanged.
+  geminiAIService: new OrchestratorAIService(),
   
   // ✅ CHANGED: Use Pollinations instead of HuggingFace
   // Both imageGenerationService and huggingFaceService point to the same Pollinations instance
@@ -51,7 +53,9 @@ export interface AppContext {
  
   // Services
   faceRecognitionService: FaceRecognitionService;
-  geminiAIService: GeminiAIService;
+  // ✅ REPLACED: Type updated to OrchestratorAIService.
+  // Interface shape (generateContent, getEmbedding) is identical to the old GeminiAIService.
+  geminiAIService: OrchestratorAIService;
   
   // ✅ CHANGED: Type is now PollinationsService
   // But we keep the same property names for backward compatibility
