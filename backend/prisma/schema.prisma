@@ -201,3 +201,12 @@ model ImageCache {
    @@index([promptHash])
 }
 
+model VoiceEmbedding {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                 String   @map("user_id") @unique
+  gptCondLatentPath      String   @map("gpt_cond_latent_path")
+  speakerEmbeddingPath   String   @map("speaker_embedding_path")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("voice_embeddings")
+}
