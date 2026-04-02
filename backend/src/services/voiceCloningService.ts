@@ -50,7 +50,7 @@ export class VoiceCloningService {
         formData,
         {
           headers: { ...formData.getHeaders() },
-          timeout: 120000,
+          timeout: 300000,
         }
       );
 
@@ -100,7 +100,7 @@ export class VoiceCloningService {
         {
           headers: { ...formData.getHeaders() },
           responseType: 'arraybuffer',
-          timeout: 120000,
+          timeout: 300000,
         }
       );
 
