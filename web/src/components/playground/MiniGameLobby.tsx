@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import SnakeGame from './SnakeGame';
 import PongGame from './PongGame';
 import { Gamepad2 } from 'lucide-react';
