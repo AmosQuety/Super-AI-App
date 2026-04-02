@@ -120,6 +120,16 @@ export const typeDefs = gql`
   type VoiceCloneResponse {
     success: Boolean!
     audioUrl: String
+    jobId: String
+    status: String
+    error: String
+  }
+
+  type VoiceJobStatus {
+    status: String!  # PROCESSING | COMPLETED | FAILED
+    success: Boolean
+    message: String
+    audioUrl: String
     error: String
   }
   # ===== END NEW TYPES =====
@@ -143,6 +153,8 @@ export const typeDefs = gql`
     aiImageGenerationStatus: AIImageGenerationStatus!
 
     myWorkspaces: [Workspace!]!
+
+    getVoiceJobStatus(jobId: String!): VoiceJobStatus!
   }
 
   type Mutation {
@@ -187,7 +199,7 @@ export const typeDefs = gql`
 
     uploadDocument(file: Upload!): GenericResponse!
     
-    registerVoice(referenceAudio: Upload!): GenericResponse!
+    registerVoice(referenceAudio: Upload!): VoiceCloneResponse!
     
     cloneVoice(text: String!, referenceAudio: Upload): VoiceCloneResponse!
     

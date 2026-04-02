@@ -3,12 +3,13 @@ import FormData from 'form-data';
 import { Readable } from 'stream';
 import { logger } from '../utils/logger';
 import { Upload } from '../resolvers/types/upload';
+import { redisClient } from '../lib/redis';
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
+const POLL_INTERVAL_MS = 4000;    // Check every 4 seconds
+const POLL_TIMEOUT_MS  = 360000;  // Give up after 6 minutes
 
-/** Drain a Readable stream fully into a Buffer before sending anywhere.
- *  This prevents the fs-capacitor temp stream from being GC'd / closed
- *  mid-transfer, which causes Python to see a premature EOF. */
+/** Drain a Readable stream fully into a Buffer before sending anywhere. */
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -20,19 +21,34 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
   });
 }
 
+/** Poll the Python /audio/status/:jobId endpoint until it resolves or times out. */
+async function pollJobStatus(jobId: string): Promise<any> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise(res => setTimeout(res, POLL_INTERVAL_MS));
+    try {
+      const { data } = await axios.get(`${PYTHON_SERVICE_URL}/audio/status/${jobId}`, { timeout: 10000 });
+      if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+        return data;
+      }
+      logger.info(`⏳ [${jobId}] Still ${data.status}...`);
+    } catch (pollErr: any) {
+      logger.warn(`⚠️ [${jobId}] Poll error: ${pollErr.message}`);
+    }
+  }
+  throw new Error('Voice synthesis timed out. Please try again with shorter text.');
+}
+
 export class VoiceCloningService {
   /**
-   * Register a voice by extracting and storing embeddings in the Python server.
-   * We buffer the upload fully before forwarding so the fs-capacitor stream
-   * cannot be garbage-collected while Python is still reading.
+   * Register a voice — enqueue on Python, return jobId immediately,
+   * then poll until the job completes or fails.
    */
   async registerVoice(userId: string, referenceAudio: Promise<Upload>) {
     try {
       const { createReadStream, filename, mimetype } = await referenceAudio;
-
-      // Fully drain upload into memory — prevents premature EOF on Python side
       const audioBuffer = await streamToBuffer(createReadStream());
-      logger.info(`🎙️ Registering voice for user ${userId} — audio buffer: ${audioBuffer.byteLength} bytes, file: ${filename}, mime: ${mimetype}`);
+      logger.info(`🎙️ Registering voice for user ${userId} — ${audioBuffer.byteLength} bytes`);
 
       if (audioBuffer.byteLength === 0) {
         return { success: false, error: 'Received empty audio file' };
@@ -42,48 +58,67 @@ export class VoiceCloningService {
       formData.append('user_id', userId);
       formData.append('reference_audio', audioBuffer, { filename, contentType: mimetype });
 
-      logger.info(`🎙️ [AXIOS] OUTGOING POST to ${PYTHON_SERVICE_URL}/audio/register`);
-      logger.info(`🎙️ [AXIOS] Headers Boundary: ${formData.getBoundary()}`);
+      // Build the webhook URL and pass it to Python
+      const WEBHOOK_BASE_URL = process.env.NODE_ENV === 'production' 
+          ? 'https://your-production-url.com' 
+          : `http://localhost:${process.env.PORT || 4001}`;
+      
+      formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
 
-      const response = await axios.post(
+      // Enqueue — returns instantly with a jobId
+      const { data: queued } = await axios.post(
         `${PYTHON_SERVICE_URL}/audio/register`,
         formData,
-        {
-          headers: { ...formData.getHeaders() },
-          timeout: 300000,
-        }
+        { headers: { ...formData.getHeaders() }, timeout: 30000 }
       );
 
-      return response.data;
+      if (!queued.jobId) {
+        return { success: false, error: queued.error || 'Failed to queue registration' };
+      }
 
+      logger.info(`🎙️ Register queued — job ${queued.jobId}. Waiting via Webhook or Polling.`);
+
+      // Poll until done (We still poll on GraphQL, but Python will hit webhook when done)
+      // Ideally, GraphQL Subscriptions replaces this poll entirely in the React frontend!
+      const result = await pollJobStatus(queued.jobId);
+      if (result.status === 'FAILED') {
+        return { success: false, error: result.error || 'Voice registration failed' };
+      }
+
+      return { success: true, message: result.message || 'Voice registered successfully', jobId: queued.jobId };
     } catch (error: any) {
-      logger.error('❌ Voice Registration Failed', { 
+      logger.error('❌ Voice Registration Failed', {
         message: error.message,
         status: error.response?.status,
         responseData: error.response?.data,
-        responseHeaders: error.response?.headers,
         stack: error.stack
       });
       return {
         success: false,
-        error: error.response?.data?.error || error.response?.data?.details || error.message || 'Failed to register voice'
+        error: error.response?.data?.error || error.message || 'Failed to register voice'
       };
     }
   }
 
   /**
-   * Clone a voice using XTTS v2 on the Python server.
+   * Clone a voice — enqueue on Python and return jobId immediately.
+   * The caller should poll getVoiceJobStatus to get the result.
    */
   async cloneVoice(text: string, referenceAudio?: Promise<Upload>, userId?: string) {
     try {
       const formData = new FormData();
       formData.append('text', text);
 
+      const WEBHOOK_BASE_URL = process.env.NODE_ENV === 'production' 
+          ? 'https://your-production-url.com' 
+          : `http://localhost:${process.env.PORT || 4001}`;
+          
+      // Python will append the Job ID when it hits this URL
+      formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
+
       if (referenceAudio) {
         const { createReadStream, filename, mimetype } = await referenceAudio;
-        // Buffer here too for consistency
         const audioBuffer = await streamToBuffer(createReadStream());
-        logger.info(`🎙️ Clone: audio buffer ${audioBuffer.byteLength} bytes, file: ${filename}`);
         formData.append('reference_audio', audioBuffer, { filename, contentType: mimetype });
       } else if (userId) {
         formData.append('user_id', userId);
@@ -91,37 +126,59 @@ export class VoiceCloningService {
         throw new Error('Either referenceAudio or userId must be provided');
       }
 
-      logger.info(`🎙️ Requesting voice clone from AI Engine: ${text.substring(0, 30)}...`);
-      logger.info(`🎙️ [AXIOS] OUTGOING POST to ${PYTHON_SERVICE_URL}/audio/clone`);
+      logger.info(`🎙️ Requesting voice clone job from AI Engine`);
 
-      const response = await axios.post(
+      // Enqueue — returns instantly
+      const { data: queued } = await axios.post(
         `${PYTHON_SERVICE_URL}/audio/clone`,
         formData,
-        {
-          headers: { ...formData.getHeaders() },
-          responseType: 'arraybuffer',
-          timeout: 300000,
-        }
+        { headers: { ...formData.getHeaders() }, timeout: 30000 }
       );
 
-      return {
-        success: true,
-        data: Buffer.from(response.data),
-        contentType: 'audio/wav'
-      };
+      if (!queued.jobId) {
+        return { success: false, error: queued.error || 'Failed to queue voice clone' };
+      }
+
+      logger.info(`🎙️ Clone queued — job ${queued.jobId}. Python Webhook will receive updates.`);
+      return { success: true, jobId: queued.jobId, status: 'PROCESSING' };
 
     } catch (error: any) {
-      logger.error('❌ Voice Cloning Failed', { 
+      logger.error('❌ Voice Clone Enqueue Failed', {
         message: error.message,
         status: error.response?.status,
-        responseData: error.response?.data ? (Buffer.isBuffer(error.response.data) ? error.response.data.toString('utf-8') : error.response.data) : null,
-        responseHeaders: error.response?.headers,
+        responseData: error.response?.data,
         stack: error.stack
       });
       return {
         success: false,
-        error: error.response?.data?.error || error.response?.data?.details || error.message || 'Failed to clone voice'
+        error: error.response?.data?.error || error.message || 'Failed to start voice synthesis'
       };
+    }
+  }
+
+  /** Poll a job by ID — called by the getVoiceJobStatus resolver. */
+  async getJobStatus(jobId: string) {
+    try {
+      // 1. FAST PATH: Check if the Webhook has already populated Redis
+      if (redisClient) {
+        const cached = await redisClient.get(`JOB_STATUS_${jobId}`);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+      }
+
+      // 2. SLOW PATH: Fallback to directly asking Python (if webhook missed or still processing)
+      const { data } = await axios.get(
+        `${PYTHON_SERVICE_URL}/audio/status/${jobId}`,
+        { timeout: 10000 }
+      );
+      return data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return { status: 'FAILED', success: false, error: 'Job not found or has expired.' };
+      }
+      logger.error('❌ getJobStatus error', { message: error.message });
+      return { status: 'FAILED', success: false, error: 'Could not retrieve job status.' };
     }
   }
 }

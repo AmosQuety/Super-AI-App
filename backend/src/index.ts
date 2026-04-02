@@ -37,7 +37,7 @@ console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
 // Constants for configuration
 const UPLOAD_CONFIG = {
-  maxFileSize: 10000000, // 10MB
+  maxFileSize: 3145728, // 3MB Limit to protect AI memory (approx 15-30 seconds audio)
   maxFiles: 10,
 };
 
@@ -96,8 +96,13 @@ const corsOptions: cors.CorsOptions = {
     app.use('/graphql', RateLimitService.getGraphQLLimiter());
     app.use('/auth/*', RateLimitService.getAuthLimiter());
     
-    // 4. LOGGING & PARSING
+    // 4. LOGGING & PARSING & WEBHOOKS
     app.use(loggingMiddleware);
+    
+    // Attach Webhooks early before generic GraphQL body parsing
+    const { webhookRouter } = require('./services/webhooks');
+    app.use('/api/webhooks', webhookRouter);
+
     app.use(express.json());
 
       

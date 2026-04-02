@@ -7,7 +7,7 @@ import {
 import { useMutation } from '@apollo/client/react';
 import { REGISTER_VOICE, CLONE_VOICE } from '../graphql/voice';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
-import SnakeGame from './playground/SnakeGame';
+import LoadingGameEngine from './loading/LoadingGameEngine';
 
 interface RegisterVoiceData {
   registerVoice: { success: boolean; message: string };
@@ -81,6 +81,10 @@ export default function VoiceLab() {
       mediaRecorder.onstop = () => {
         const actualMime = mediaRecorder.mimeType || 'audio/webm';
         const blob = new Blob(audioChunksRef.current, { type: actualMime });
+        if (blob.size > 3 * 1024 * 1024) {
+            alert("Recording is too large! Please keep your audio under 3MB (approx 15 seconds) to ensure optimal AI cloning speed.");
+            return;
+        }
         const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: actualMime });
         setAudioBlob(file);
         setAudioUrl(URL.createObjectURL(file));
@@ -103,7 +107,11 @@ export default function VoiceLab() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // File already satisfies the Upload scalar — store directly
+      if (file.size > 3 * 1024 * 1024) {
+          alert("Audio file is too large! Please upload a file smaller than 3MB (approx 15 seconds) to prevent AI memory crashes.");
+          e.target.value = ''; // Reset input
+          return;
+      }
       setAudioBlob(file);
       setAudioUrl(URL.createObjectURL(file));
     }
@@ -136,7 +144,13 @@ export default function VoiceLab() {
     } catch (err: any) {
       console.error("Registration Error:", err);
       setCloningStatus('error');
-      setSpaceStatus(err.message);
+      
+      const errorMessage = err.graphQLErrors?.[0]?.message 
+        || err.networkError?.result?.errors?.[0]?.message 
+        || err.message 
+        || 'Connection to server failed.';
+        
+      setSpaceStatus(errorMessage);
     }
   };
 
@@ -167,7 +181,13 @@ export default function VoiceLab() {
     } catch (err: any) {
       console.error("Local Clone Error:", err);
       setCloningStatus('error');
-      setSpaceStatus(err.message);
+      
+      const errorMessage = err.graphQLErrors?.[0]?.message 
+        || err.networkError?.result?.errors?.[0]?.message 
+        || err.message 
+        || 'Connection to AI server failed. Please try again.';
+        
+      setSpaceStatus(errorMessage);
     }
   };
 
@@ -209,7 +229,7 @@ export default function VoiceLab() {
           <button
             onClick={() => setPhase('enrollment')}
             disabled={!hasConsent}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20"
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0"
           >
             <UserCheck className="w-5 h-5" />
             Begin Enrollment
@@ -236,9 +256,9 @@ export default function VoiceLab() {
             <div className="flex flex-col items-center justify-center border-3 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl p-12 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
               <button
                 onClick={isRecording ? stopRecording : startRecording}
-                className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 animate-pulse scale-110 shadow-xl shadow-red-500/50' : 'bg-slate-100 dark:bg-slate-800 group-hover:bg-red-50 dark:group-hover:bg-red-900/20 shadow-md'}`}
+                className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${isRecording ? 'bg-red-500 animate-pulse scale-110 shadow-[0_0_40px_rgba(239,68,68,0.6)]' : 'bg-slate-100 dark:bg-slate-800 group-hover:bg-red-50 dark:group-hover:bg-red-900/40 hover:scale-105 shadow-md group-hover:shadow-[0_0_20px_rgba(239,68,68,0.3)]'}`}
               >
-                {isRecording ? <Square className="w-8 h-8 text-white" /> : <Mic className="w-8 h-8 text-slate-600 dark:text-slate-400 group-hover:text-red-500" />}
+                {isRecording ? <Square className="w-8 h-8 text-white" /> : <Mic className="w-8 h-8 text-slate-600 dark:text-slate-400 group-hover:text-red-500 transition-colors" />}
               </button>
               
               <div className="mt-8 text-center">
@@ -273,10 +293,10 @@ export default function VoiceLab() {
                   )}
 
                   {!isRecording && (
-                    <label className="cursor-pointer bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-6 py-2 rounded-xl text-sm font-bold hover:border-red-500 transition-all flex items-center gap-2 mx-auto w-fit">
+                    <label className="cursor-pointer bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-6 py-2 rounded-xl text-sm font-bold hover:border-red-500 dark:hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300 flex items-center gap-2 mx-auto w-fit hover:-translate-y-0.5">
                       <Upload className="w-4 h-4 text-red-500" />
                       Upload .wav
-                      <input type="file" accept="audio/wav" className="hidden" onChange={handleFileUpload} />
+                      <input type="file" accept="audio/wav,audio/mp3" className="hidden" onChange={handleFileUpload} />
                     </label>
                   )}
               </div>
@@ -305,7 +325,7 @@ export default function VoiceLab() {
                 <button
                   onClick={handleRegisterVoice}
                   disabled={cloningStatus === 'uploading'}
-                  className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/20"
+                  className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0"
                 >
                   {cloningStatus === 'uploading' ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserCheck className="w-5 h-5" />}
                   Confirm & Finalize
@@ -416,10 +436,13 @@ export default function VoiceLab() {
           <button
             onClick={handleCloneVoice}
             disabled={!audioBlob || !ttsText.trim() || cloningStatus === 'uploading' || cloningStatus === 'processing'}
-            className="w-full py-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20 text-lg"
+            className="w-full py-4 bg-orange-600 hover:bg-orange-600/90 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:shadow-[0_0_35px_rgba(234,88,12,0.6)] hover:-translate-y-1 active:translate-y-0 text-lg group relative overflow-hidden"
           >
-            {cloningStatus === 'uploading' || cloningStatus === 'processing' ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6" />}
-            Generate Speech
+            <div className="absolute inset-0 bg-white/20 w-0 group-hover:w-full transition-all duration-500 ease-out z-0"></div>
+            <span className="relative z-10 flex items-center gap-2">
+                {cloningStatus === 'uploading' || cloningStatus === 'processing' ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6 group-hover:scale-110 transition-transform" />}
+                Generate Speech
+            </span>
           </button>
         </div>
 
@@ -471,7 +494,7 @@ export default function VoiceLab() {
                    </div>
                    
                    <div className="flex-1 bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px]">
-                      <SnakeGame />
+                      <LoadingGameEngine />
                    </div>
                 </div>
               )}

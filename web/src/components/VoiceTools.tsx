@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import VoiceLab from "./VoiceLab";
-import SnakeGame from "./playground/SnakeGame";
+import LoadingGameEngine from "./loading/LoadingGameEngine";
 import { useEffect, useRef } from "react";
 
 export default function VoiceTools() {
@@ -405,22 +405,13 @@ export default function VoiceTools() {
                    </div>
                 </div>
 
-                {/* Snake Game Wrapper */}
+                {/* Loading Game Wrapper */}
                 <div className="flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px]">
-                   <div className="absolute top-0 inset-x-0 h-8 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between px-3 z-20">
-                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-2">
-                         <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
-                         Active Game Wait Session
-                      </span>
-                      <span className="text-[9px] text-slate-600 font-medium">Latency Distraction Layer v1.0</span>
-                   </div>
-                   <div className="h-full flex items-center justify-center pt-8">
-                      <SnakeGame />
-                   </div>
+                   <LoadingGameEngine />
                 </div>
                 
                 <p className="text-center text-[10px] text-slate-500 font-medium uppercase tracking-widest">
-                  Game controls: Use keyboard arrow keys
+                  Game controls: Use keyboard, tap, or click
                 </p>
               </div>
             )}

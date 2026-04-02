@@ -5,20 +5,22 @@ import { AuthProvider } from "./src/contexts/AuthContext";
 import { ThemeProvider } from "./src/contexts/ThemeProvider";
 import { useAuth } from "./src/hooks/useAuth";
 import { ToastProvider } from "./src/components/ui/Toast";
+import "./index.css";
 import Layout from "./src/components/Layout";
 import LoginScreen from "./src/components/auth/Login";
 import RegisterScreen from "./src/components/auth/Register";
-import ChatContainer from "./src/components/chat/ChatContainer";
-import ImageGenerator from "./src/components/ImageGenerator";
-import VoiceTools from "./src/components/VoiceTools";
-import "./index.css";
-import ProfilePage from "./src/pages/ProfilePage";
-import PlaygroundPage from "./src/pages/PlaygroundPage";
 import LandingPage from "./src/pages/LandingPage";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
-import DocumentUploader from "./src/components/chat/DocumentUploader";
+import { lazy, Suspense } from "react";
+
+const ChatContainer = lazy(() => import("./src/components/chat/ChatContainer"));
+const ImageGenerator = lazy(() => import("./src/components/ImageGenerator"));
+const VoiceTools = lazy(() => import("./src/components/VoiceTools"));
+const ProfilePage = lazy(() => import("./src/pages/ProfilePage"));
+const PlaygroundPage = lazy(() => import("./src/pages/PlaygroundPage"));
+const DocumentUploader = lazy(() => import("./src/components/chat/DocumentUploader"));
 
 // ==============================
 // 🔹 PRODUCT CONFIG (single source of truth)
@@ -97,59 +99,61 @@ const AppRoutes = () => {
   };
 
   return (
-    <Routes>
-      {/* Landing Page - Accessible to everyone, no redirects */}
-      <Route path="/" element={<LandingPage />} />
+    <Suspense fallback={<LoadingSpinner />}>
+      <Routes>
+        {/* Landing Page - Accessible to everyone, no redirects */}
+        <Route path="/" element={<LandingPage />} />
 
-      {/* Auth Pages - Only redirect if ALREADY authenticated */}
-      <Route
-        path="/login"
-        element={
-          <AuthOnlyRoute>
-            <LoginScreen />
-          </AuthOnlyRoute>
-        }
-      />
-
-      <Route
-        path="/register"
-        element={
-          <AuthOnlyRoute>
-            <RegisterScreen />
-          </AuthOnlyRoute>
-        }
-      />
-
-      {/* Protected App Workspace */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<HomeContent />} />
-
+        {/* Auth Pages - Only redirect if ALREADY authenticated */}
         <Route
-          path="chat"
+          path="/login"
           element={
-            <ChatContainer
-              token={authToken || ""}
-              userInfo={defaultUser}
-            />
+            <AuthOnlyRoute>
+              <LoginScreen />
+            </AuthOnlyRoute>
           }
         />
 
-        <Route path="playground" element={<PlaygroundPage />} />
-        <Route path="image" element={<ImageGenerator />} />
-        <Route path="voice" element={<VoiceTools/>} />
-        <Route path="profile" element={<ProfilePage />} />
-        <Route path="document-uploader" element={<DocumentUploader />} />
-      </Route>
+        <Route
+          path="/register"
+          element={
+            <AuthOnlyRoute>
+              <RegisterScreen />
+            </AuthOnlyRoute>
+          }
+        />
 
-      {/* Catch-all: redirect to landing page */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Protected App Workspace */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<HomeContent />} />
+
+          <Route
+            path="chat"
+            element={
+              <ChatContainer
+                token={authToken || ""}
+                userInfo={defaultUser}
+              />
+            }
+          />
+
+          <Route path="playground" element={<PlaygroundPage />} />
+          <Route path="image" element={<ImageGenerator />} />
+          <Route path="voice" element={<VoiceTools/>} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="document-uploader" element={<DocumentUploader />} />
+        </Route>
+
+        {/* Catch-all: redirect to landing page */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 };
 

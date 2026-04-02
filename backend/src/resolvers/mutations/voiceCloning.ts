@@ -24,25 +24,28 @@ export const voiceCloningResolvers = {
         if (!result.success) {
           return {
             success: false,
-            message: result.error || "Voice registration failed"
+            error: result.error || "Voice registration failed"
           };
         }
 
-        // Update user record to reflect registration
-        await context.prisma.user.update({
-          where: { id: userId },
-          data: { hasVoiceRegistered: true }
-        });
+        // Update user record to reflect registration (if it was polled successfully)
+        if (result.jobId && result.message?.includes('successfully')) {
+          await context.prisma.user.update({
+             where: { id: userId },
+             data: { hasVoiceRegistered: true }
+          });
+        }
 
         return {
           success: true,
-          message: result.message || "Voice registered successfully"
+          jobId: result.jobId,
+          status: "COMPLETED",
         };
       } catch (error: any) {
         logger.error("❌ registerVoice Error:", error);
         return {
           success: false,
-          message: error.message
+          error: error.message
         };
       }
     },
@@ -56,49 +59,18 @@ export const voiceCloningResolvers = {
 
         const result = await voiceCloningService.cloneVoice(text, referenceAudio, userId);
 
-        if (!result.success || !result.data) {
+        if (!result.success || !result.jobId) {
           return {
             success: false,
-            error: result.error || "Voice cloning failed"
+            error: result.error || "Voice cloning failed to initialize"
           };
         }
 
-        // Upload generated audio to Supabase Storage
-        const fileName = `voice-clones/${userId}/${Date.now()}.wav`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("biometric_faces")
-          .upload(fileName, result.data, {
-            contentType: "audio/wav",
-            upsert: true
-          });
-
-        if (uploadError) {
-          logger.error("❌ Failed to upload voice clone to Supabase", uploadError);
-          return {
-            success: false,
-            error: "Failed to store generated audio"
-          };
-        }
-
-        // Get Public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from("biometric_faces")
-          .getPublicUrl(fileName);
-
-        // Optional: Save AudioJob record in DB
-        await context.prisma.audioJob.create({
-          data: {
-            userId: userId,
-            type: "VOICE_CLONE",
-            inputText: text,
-            outputUrl: publicUrl,
-            status: "COMPLETED"
-          }
-        });
-
+        // Return immediately with Job ID so the frontend can start polling
         return {
           success: true,
-          audioUrl: publicUrl
+          jobId: result.jobId,
+          status: result.status,
         };
 
       } catch (error: any) {

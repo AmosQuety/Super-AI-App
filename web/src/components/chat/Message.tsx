@@ -139,6 +139,21 @@ const Message: React.FC<MessageProps> = ({
     }
   };
 
+  // REFACTOR: Render basic Markdown bold and italics securely
+  const renderFormattedText = (text: string) => {
+    // Split by **text** or *text* capturing the delimiters
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-bold">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={index} className="italic">{part.slice(1, -1)}</em>;
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   return (
     <div 
     className={`flex w-full mb-4 sm:mb-6 group ${isUserMessage ? "justify-end" : "justify-start"}`}
@@ -215,7 +230,7 @@ const Message: React.FC<MessageProps> = ({
         ) : (
           <>
             <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
-              {message.text}
+              {renderFormattedText(message.text)}
             </p>
             
             {/* Error message with retry option */}

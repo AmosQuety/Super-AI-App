@@ -1,6 +1,7 @@
 import prisma from "../lib/db";
 import { GraphQLError } from "graphql";
 import crypto from "crypto";
+import { redisClient } from "../lib/redis";
 
 // Configuration
 const DAILY_IMAGE_LIMIT = 10;
@@ -68,12 +69,39 @@ export class AIManager {
    */
   static async getCachedImage(prompt: string): Promise<string | null> {
     const hash = crypto.createHash('md5').update(prompt.toLowerCase().trim()).digest('hex');
+    const redisKey = `img_cache_${hash}`;
+
+    // 1. Check Fast Redis Cache First
+    if (redisClient) {
+      try {
+        const cachedUrl = await redisClient.get(redisKey);
+        if (cachedUrl) return cachedUrl;
+      } catch (err) {
+        console.error("Redis Cache Read Error:", err);
+      }
+    }
+
+    // 2. Fallback to Prisma SQLite Database
     const cached = await prisma.imageCache.findUnique({ where: { promptHash: hash } });
+    
+    // 3. Keep Redis warm if found in Prisma
+    if (cached && redisClient) {
+        redisClient.setex(redisKey, 86400 * 7, cached.imageUrl).catch(() => {}); // 7 day eviction fallback
+    }
+
     return cached ? cached.imageUrl : null;
   }
 
   static async cacheImage(prompt: string, imageUrl: string) {
     const hash = crypto.createHash('md5').update(prompt.toLowerCase().trim()).digest('hex');
+    const redisKey = `img_cache_${hash}`;
+
+    // 1. Cache to Fast Redis (7 day TTL)
+    if (redisClient) {
+      redisClient.setex(redisKey, 86400 * 7, imageUrl).catch((err: any) => console.error("Redis Cache Write Error:", err));
+    }
+
+    // 2. Persist safely in Prisma
     await prisma.imageCache.upsert({
       where: { promptHash: hash },
       update: {},
