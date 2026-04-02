@@ -5,7 +5,7 @@
  * Filters out sensitive data and reduces noise in production.
  */
 
-const isDev = import.meta.env.DEV;
+
 
 export const logger = {
   log: (...args: any[]) => {
