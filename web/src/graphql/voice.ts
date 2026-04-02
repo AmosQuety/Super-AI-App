@@ -44,3 +44,22 @@ export const SAVE_TRANSCRIPT = gql`
     }
   }
 `;
+
+export const REGISTER_VOICE = gql`
+  mutation RegisterVoice($referenceAudio: Upload!) {
+    registerVoice(referenceAudio: $referenceAudio) {
+      success
+      message
+    }
+  }
+`;
+
+export const CLONE_VOICE = gql`
+  mutation CloneVoice($text: String!, $referenceAudio: Upload) {
+    cloneVoice(text: $text, referenceAudio: $referenceAudio) {
+      success
+      audioUrl
+      error
+    }
+  }
+`;

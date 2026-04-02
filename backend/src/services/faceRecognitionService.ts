@@ -57,11 +57,17 @@ export class FaceRecognitionService {
 
       return { success: true, ...response.data };
     } catch (error: any) {
-      logger.error("Face Registration Failed", { error: error.response?.data || error.message });
+      logger.error("❌ Face Registration Failed", { 
+        message: error.message,
+        status: error.response?.status,
+        responseData: error.response?.data,
+        responseHeaders: error.response?.headers,
+        stack: error.stack
+      });
       // Return a structured error so the resolver can handle it
       return { 
         success: false, 
-        message: error.response?.data?.message || "Failed to register face" 
+        message: error.response?.data?.message || error.response?.data?.error || "Failed to register face" 
       };
     }
   }
@@ -118,7 +124,12 @@ export class FaceRecognitionService {
          return { success: false, error: "Service warming up, please try again." };
       }
       
-      logger.error("Face Verification Error", { error: error.message });
+      logger.error("❌ Face Verification Error", { 
+        message: error.message,
+        status: error.response?.status,
+        responseData: error.response?.data,
+        stack: error.stack
+      });
       throw new Error("Could not connect to biometric engine.");
     }
   }
@@ -147,9 +158,12 @@ export class FaceRecognitionService {
 
     } catch (error: any) {
       //  Log the real error for you (The Developer)
-      logger.error("Face Analysis Internal Error", { 
+      logger.error("❌ Face Analysis Internal Error", { 
         message: error.message,
-        code: error.code 
+        code: error.code,
+        status: error.response?.status,
+        responseData: error.response?.data,
+        stack: error.stack
       });
 
       //  Return a clean error for the USER
@@ -223,10 +237,11 @@ export class FaceRecognitionService {
       return response.data;
     } catch (error: any) {
       // DEBUG LOGS
-      console.error("❌ Python API Error:", {
+      logger.error("❌ Python API FindFace Error", {
         status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
+        responseData: error.response?.data,
+        message: error.message,
+        stack: error.stack
       });
 
       // Surfacing the detailed error from Python if available

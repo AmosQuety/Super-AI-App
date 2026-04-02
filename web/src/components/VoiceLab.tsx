@@ -1,24 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { 
-  Mic, 
-  Square, 
-  Upload, 
-  Loader2, 
-  Trash2, 
-  CheckCircle2, 
-  Zap,
-  AlertCircle,
-  ShieldCheck,
-  UserCheck,
-  Settings,
-  ChevronDown,
-  ChevronUp,
-  Music4
+  Zap, AlertCircle, ShieldCheck, UserCheck, Settings, 
+  ChevronDown, ChevronUp, Music4, RefreshCw,
+  Mic, Square, Upload, CheckCircle2, Trash2, Loader2 
 } from 'lucide-react';
-// import LoadingGameEngine from './loading/LoadingGameEngine';
-import { Client } from '@gradio/client';
+import { useMutation } from '@apollo/client/react';
+import { REGISTER_VOICE, CLONE_VOICE } from '../graphql/voice';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 import SnakeGame from './playground/SnakeGame';
+
+interface RegisterVoiceData {
+  registerVoice: { success: boolean; message: string };
+}
+
+interface CloneVoiceData {
+  cloneVoice: { success: boolean; audioUrl: string; error?: string };
+}
+
 
 export default function VoiceLab() {
   // TTS State (for synthesis input)
@@ -28,10 +26,14 @@ export default function VoiceLab() {
   const [phase, setPhase] = useState<'consent' | 'enrollment' | 'generation'>('consent');
   const [hasConsent, setHasConsent] = useState(false);
   
-  // Audio Metrics from context
-  const { audioMetrics } = useVoiceIntelligence();
+  // Audio Metrics & Transcript from context
+  const { audioMetrics, transcript } = useVoiceIntelligence();
 
-  // MegaTTS3 Parameters
+  // Mutations
+  const [registerVoice] = useMutation<RegisterVoiceData>(REGISTER_VOICE);
+  const [cloneVoiceMutation] = useMutation<CloneVoiceData>(CLONE_VOICE);
+
+  // Advanced Parameters (for UI sliders)
   const [inferTimestep, setInferTimestep] = useState(32);
   const [pW, setPW] = useState(1.4);
   const [tW, setTW] = useState(3);
@@ -40,14 +42,14 @@ export default function VoiceLab() {
   // Existing states
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioBlob, setAudioBlob] = useState<File | null>(null);
   const [cloningStatus, setCloningStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
-  const [hfToken, setHfToken] = useState<string>(''); 
-  const [hfSpaceId, setHfSpaceId] = useState<string>('mrfakename/MegaTTS3-Voice-Cloning');
-  const [showTokenInput, setShowTokenInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [hfSpaceId, setHfSpaceId] = useState('xemora/MegaTTS3');
+  const [hfToken, setHfToken] = useState('');
+  const [showTokenInput] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -56,7 +58,19 @@ export default function VoiceLab() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      // Pick the best supported MIME type — browsers always encode WebM regardless
+      // of what you pass, so we detect and use the real type to keep ext + content-type consistent
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+      const ext = mimeType.startsWith('audio/webm') ? 'webm' : 'mp4';
+
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -65,9 +79,11 @@ export default function VoiceLab() {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
+        const actualMime = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(audioChunksRef.current, { type: actualMime });
+        const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: actualMime });
+        setAudioBlob(file);
+        setAudioUrl(URL.createObjectURL(file));
       };
 
       mediaRecorder.start();
@@ -87,54 +103,71 @@ export default function VoiceLab() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // File already satisfies the Upload scalar — store directly
       setAudioBlob(file);
       setAudioUrl(URL.createObjectURL(file));
     }
   };
 
-  const handleCloneVoice = async () => {
-    if (!audioBlob || !ttsText.trim()) return;
+  const handleSyncTranscript = () => {
+    if (transcript.trim()) {
+      setTtsText(transcript);
+    }
+  };
+
+  const handleRegisterVoice = async () => {
+    if (!audioBlob) return;
     setCloningStatus('uploading');
-    setSpaceStatus('Connecting to MegaTTS3...');
+    setSpaceStatus('Syncing Biometrics with Backend...');
 
     try {
-      const client = await Client.connect(hfSpaceId, {
-        token: (hfToken as any) || undefined
-      }); 
-      
-      setCloningStatus('processing');
-      setSpaceStatus('Synthesizing Neural Speech...');
-
-      // MegaTTS3 Endpoint: /generate_speech
-      const result = await client.predict("/generate_speech", {
-        inp_audio: audioBlob,
-        inp_text: ttsText,
-        infer_timestep: inferTimestep,
-        p_w: pW,
-        t_w: tW,
+      const { data } = await registerVoice({
+        variables: { referenceAudio: audioBlob }
       });
 
-      if (result.data && (result.data as any)[0]) {
-          setClonedAudioUrl((result.data as any)[0].url);
-          setCloningStatus('done');
+      if (data?.registerVoice?.success) {
+        setPhase('generation');
+        setCloningStatus('idle');
+        setSpaceStatus('Ready');
       } else {
-          setCloningStatus('error');
-          setSpaceStatus('Unexpected response format');
+        setCloningStatus('error');
+        setSpaceStatus(data?.registerVoice?.message || 'Registration failed');
       }
     } catch (err: any) {
-      console.error("MegaTTS3 Error:", err);
+      console.error("Registration Error:", err);
       setCloningStatus('error');
-      
-      const errorMessage = err.message || "";
-      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        setSpaceStatus('Auth Required (HF Token)');
-        setShowTokenInput(true);
-      } else if (errorMessage.includes('metadata') || errorMessage.includes('Space') || errorMessage.includes('not found')) {
-        setSpaceStatus('Space Unavailable or Private');
-        setShowTokenInput(true); 
+      setSpaceStatus(err.message);
+    }
+  };
+
+  const handleCloneVoice = async () => {
+    if (!ttsText.trim()) return;
+    setCloningStatus('processing');
+    setSpaceStatus('Synthesizing Neural Speech...');
+
+    try {
+      // Use the local GraphQL backend
+      const { data } = await cloneVoiceMutation({
+        variables: { 
+          text: ttsText,
+          // If they just recorded but didn't "register", we could pass the blob
+          // But usually we use the registered voice for the logged-in user.
+          referenceAudio: phase === 'enrollment' ? audioBlob : undefined 
+        }
+      });
+
+      if (data?.cloneVoice?.success && data.cloneVoice.audioUrl) {
+          setClonedAudioUrl(data.cloneVoice.audioUrl);
+          setCloningStatus('done');
+          setSpaceStatus('Done');
       } else {
-        setSpaceStatus(`Error: ${errorMessage.substring(0, 30)}${errorMessage.length > 30 ? '...' : ''}`);
+          setCloningStatus('error');
+          setSpaceStatus(data?.cloneVoice?.error || 'Synthesis failed');
       }
+    } catch (err: any) {
+      console.error("Local Clone Error:", err);
+      setCloningStatus('error');
+      setSpaceStatus(err.message);
     }
   };
 
@@ -215,20 +248,27 @@ export default function VoiceLab() {
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium">Capture a 10s sample for best results</p>
                   
                   {isRecording && (
-                    <div className="flex items-center gap-2 mb-6 justify-center">
-                       <div className="flex items-end gap-1 h-6">
-                          {[...Array(8)].map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="w-1 bg-red-500 rounded-full transition-all duration-75"
-                              style={{ 
-                                height: `${Math.max(20, Math.random() * (audioMetrics.vol * 150))}%`,
-                                opacity: 0.7 + (i * 0.04)
-                              }} 
-                            />
-                          ))}
-                       </div>
-                       <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Noise Level</span>
+                    <div className="space-y-4 mb-6">
+                      <div className="flex items-center gap-2 justify-center">
+                         <div className="flex items-end gap-1 h-6">
+                            {[...Array(8)].map((_, i) => (
+                              <div 
+                                key={i} 
+                                className="w-1 bg-red-500 rounded-full transition-all duration-75"
+                                style={{ 
+                                  height: `${Math.max(20, Math.random() * (audioMetrics.vol * 150))}%`,
+                                  opacity: 0.7 + (i * 0.04)
+                                }} 
+                              />
+                            ))}
+                         </div>
+                         <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Noise Level</span>
+                      </div>
+                      {transcript && (
+                        <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 animate-in fade-in duration-300">
+                          <p className="text-xs text-slate-500 italic">"{transcript}..."</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -263,9 +303,11 @@ export default function VoiceLab() {
                 </div>
 
                 <button
-                  onClick={() => setPhase('generation')}
+                  onClick={handleRegisterVoice}
+                  disabled={cloningStatus === 'uploading'}
                   className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/20"
                 >
+                  {cloningStatus === 'uploading' ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserCheck className="w-5 h-5" />}
                   Confirm & Finalize
                 </button>
             </div>
@@ -300,17 +342,25 @@ export default function VoiceLab() {
 
         {/* Synthesis Input */}
         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              Text to Generate
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                Text to Generate
+              </h3>
+              <button 
+                onClick={handleSyncTranscript}
+                disabled={!transcript.trim()}
+                className="text-[10px] font-bold text-orange-500 hover:text-orange-600 disabled:opacity-30 flex items-center gap-1 uppercase tracking-widest transition-all"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Sync with Transcript
+              </button>
+            </div>
             <textarea
               value={ttsText}
               onChange={(e) => setTtsText(e.target.value)}
               className="w-full h-40 p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 focus:border-orange-500 focus:ring-0 resize-none transition-all text-lg font-medium leading-relaxed"
               placeholder="Enter the text you want to synthesize..."
             />
-          </div>
 
           {/* Advanced Options */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
