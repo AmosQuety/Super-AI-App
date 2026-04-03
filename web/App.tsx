@@ -40,8 +40,8 @@ const LoadingSpinner = () => (
     <div className="text-center">
       <div className="w-16 h-16 mx-auto mb-4 relative">
         <div className="absolute inset-0 bg-gradient-to-tr from-blue-500 via-purple-500 to-pink-500 rounded-full animate-ping opacity-75"></div>
-        <div className="relative w-16 h-16 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
-          <div className="w-12 h-12 bg-slate-950 rounded-lg"></div>
+        <div className="relative w-16 h-16 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-6 hover:rotate-0 transition-transform">
+          <span className="text-3xl font-black text-slate-950/80 select-none">X</span>
         </div>
       </div>
       <div className="text-lg font-medium text-white">

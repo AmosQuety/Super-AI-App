@@ -113,7 +113,7 @@ const Layout = () => {
                   <div className="relative w-10 h-10 lg:w-12 lg:h-12">
                     <div className="absolute inset-0 bg-gradient-to-tr from-blue-500 via-purple-500 to-pink-500 rounded-2xl opacity-75 blur-sm group-hover:blur-md transition-all duration-300"></div>
                     <div className="relative w-full h-full bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                      
+                      <span className="text-2xl font-black text-slate-950/80 select-none tracking-tighter">X</span>
                     </div>
                   </div>
                   <div className="hidden sm:block">
