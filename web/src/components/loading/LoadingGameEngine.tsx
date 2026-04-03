@@ -87,7 +87,7 @@ export default function LoadingGameEngine() {
       </div>
 
       {/* Game Content */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
         {renderGame()}
       </div>
 

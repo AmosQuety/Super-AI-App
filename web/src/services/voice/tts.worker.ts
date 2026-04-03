@@ -1,11 +1,7 @@
 /// <reference lib="webworker" />
 // src/services/voice/tts.worker.ts
-import { KokoroTTS } from 'kokoro-js';
-
-const ctx: DedicatedWorkerGlobalScope = self as any;
-
-
 let tts: any = null;
+const ctx: DedicatedWorkerGlobalScope = self as any;
 
 // Helper to encode Float32Array to WAV (moved to worker to save main thread time)
 function encodeWAV(samples: Float32Array, sampleRate: number): Blob {
@@ -47,10 +43,12 @@ self.onmessage = async (event: MessageEvent) => {
     try {
       ctx.postMessage({ type: 'status', status: 'loading', message: 'Downloading model...' });
       
+      const { KokoroTTS } = await import('kokoro-js');
+      
       tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
         dtype: "q8",
         device: "wasm",
-        // @ts-ignore - progress_callback is common in transformers.js wrappers
+        // @ts-ignore
         progress_callback: (p: any) => {
             if (p.status === 'progress') {
                 ctx.postMessage({ type: 'progress', progress: p.progress, file: p.file });
@@ -58,10 +56,9 @@ self.onmessage = async (event: MessageEvent) => {
         }
       });
 
-
       ctx.postMessage({ type: 'status', status: 'ready', message: 'Engine Ready' });
     } catch (err: any) {
-      ctx.postMessage({ type: 'error', message: err.message });
+      ctx.postMessage({ type: 'error', message: err.message || "Failed to download local neural assets." });
     }
   }
 

@@ -13,7 +13,8 @@ import {
   Meh,
   Loader2,
   CheckCircle2,
-  FlaskConical
+  FlaskConical,
+  AlertCircle
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import VoiceLab from "./VoiceLab";
@@ -78,6 +79,12 @@ export default function VoiceTools() {
           break;
 
       }
+    };
+
+    worker.onerror = (e) => {
+      console.error("Local TTS Worker failed to spawn:", e);
+      setTtsStatus('error');
+      setStatusMessage('Neural engine failed to initialize due to missing hardware acceleration or module error.');
     };
 
     worker.postMessage({ type: 'load' });
@@ -365,8 +372,17 @@ export default function VoiceTools() {
                     id="tts-text" 
                     value={ttsText} 
                     onChange={(e) => setTtsText(e.target.value)} 
-                    className="w-full h-48 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg" 
+                    className={`w-full h-48 p-4 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg ${ttsStatus === 'error' ? 'border-red-500 dark:border-red-500/50' : 'border-slate-200 dark:border-slate-700'}`} 
                   />
+                  
+                  {ttsStatus === 'error' && (
+                    <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-lg flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                        {statusMessage}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <button 
