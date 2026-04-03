@@ -49,6 +49,46 @@ export const voiceCloningResolvers = {
         };
       }
     },
+    
+    removeVoice: async (_: any, __: any, context: AppContext) => {
+      try {
+        if (!context.user) throw new Error("Unauthorized");
+        const userId = context.user.userId;
+
+        logger.info(`🗑️ Deleting voice profile for user ${userId}`);
+
+        // 1. Delete Files from Storage
+        const { error: storageError } = await supabase.storage
+          .from("biometric_faces")
+          .remove([
+            `voice-latents/${userId}/gpt_cond_latent.npy.enc`,
+            `voice-latents/${userId}/speaker_embedding.npy.enc`,
+            `voice-latents/${userId}/speechbrain.npy.enc`
+          ]);
+
+        if (storageError) {
+          logger.warn(`⚠️ Supabase Storage cleanup warning: ${storageError.message}`);
+          // We continue anyway, as the DB record is the primary source of truth for the UI
+        }
+
+        // 2. Delete Embedding from DB
+        await supabase
+          .from("voice_embeddings")
+          .delete()
+          .eq("user_id", userId);
+
+        // 3. Update User Flag
+        await context.prisma.user.update({
+          where: { id: userId },
+          data: { hasVoiceRegistered: false }
+        });
+
+        return { success: true, message: "Voice profile removed successfully." };
+      } catch (err: any) {
+        logger.error("❌ removeVoice Error:", err);
+        return { success: false, message: err.message || "Failed to remove voice profile" };
+      }
+    },
 
     cloneVoice: async (_: any, { text, referenceAudio }: { text: string; referenceAudio?: any }, context: AppContext) => {
       try {

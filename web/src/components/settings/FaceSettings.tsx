@@ -129,7 +129,7 @@ export default function FaceSettings() {
                 </p>
             </div>
           
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             {!hasFace ? (
               <button
                 onClick={() => setIsCapturing(true)}
@@ -138,13 +138,21 @@ export default function FaceSettings() {
                 <ScanFace size={18} /> Set up Face ID
               </button>
             ) : (
-              <button
-                onClick={handleRemove}
-                disabled={removing}
-                className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl transition flex items-center gap-2 font-medium"
-              >
-                <Trash2 size={18} /> Disable Face ID
-              </button>
+              <>
+                <button
+                  onClick={() => setIsCapturing(true)}
+                  className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 rounded-xl transition flex items-center gap-2 font-medium"
+                >
+                  <ScanFace size={18} /> Update Face ID
+                </button>
+                <button
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl transition flex items-center gap-2 font-medium"
+                >
+                  <Trash2 size={18} /> Disable Face ID
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -214,6 +214,8 @@ export const typeDefs = gql`
     
     registerVoice(referenceAudio: Upload!): VoiceCloneResponse!
     
+    removeVoice: GenericResponse!
+    
     cloneVoice(text: String!, referenceAudio: Upload): VoiceCloneResponse!
     
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!

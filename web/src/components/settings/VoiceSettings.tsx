@@ -1,10 +1,10 @@
 // src/components/settings/VoiceSettings.tsx
 import { useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { GET_ME, REGISTER_VOICE } from "../../graphql/users";
+import { GET_ME, REGISTER_VOICE, REMOVE_VOICE } from "../../graphql/users";
 import { VoiceCapture } from "../auth/VoiceCapture";
 import { useToast } from "../ui/toastContext";
-import { Mic, CheckCircle, Volume2, Shield } from "lucide-react";
+import { Mic, CheckCircle, Volume2, Shield, Trash2, RefreshCw } from "lucide-react";
 
 interface User {
   id: string;
@@ -22,6 +22,13 @@ interface RegisterVoiceData {
   };
 }
 
+interface RemoveVoiceData {
+  removeVoice: {
+    success: boolean;
+    message: string;
+  };
+}
+
 export default function VoiceSettings() {
   const { addToast } = useToast();
   const [isCapturing, setIsCapturing] = useState(false);
@@ -30,6 +37,7 @@ export default function VoiceSettings() {
   const hasVoice = data?.me?.hasVoiceRegistered;
 
   const [registerVoice, { loading: adding }] = useMutation<RegisterVoiceData>(REGISTER_VOICE);
+  const [removeVoice, { loading: removing }] = useMutation<RemoveVoiceData>(REMOVE_VOICE);
 
   const handleRegister = async (file: File) => {
     try {
@@ -41,6 +49,20 @@ export default function VoiceSettings() {
         refetch(); 
       } else {
         addToast({ type: 'error', title: 'Registration Failed', message: responseData?.registerVoice.message || 'Failed to register voice profile' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      addToast({ type: 'error', title: 'Error', message: errorMessage });
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm("Permanently delete your voice identity? This will disable voice-based login and instant synthesis.")) return;
+    try {
+      const { data: responseData } = await removeVoice();
+      if (responseData?.removeVoice.success) {
+        addToast({ type: 'success', title: 'Deleted', message: responseData.removeVoice.message });
+        refetch();
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
@@ -88,7 +110,7 @@ export default function VoiceSettings() {
                 </p>
             </div>
           
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             {!hasVoice ? (
               <button
                 onClick={() => setIsCapturing(true)}
@@ -97,15 +119,21 @@ export default function VoiceSettings() {
                 <Volume2 size={18} /> Register Voice Profile
               </button>
             ) : (
-              <div className="flex flex-col gap-2">
-                 <button
-                   disabled
-                   className="px-5 py-2.5 bg-slate-700/50 text-slate-400 border border-slate-600 rounded-xl cursor-not-allowed flex items-center gap-2 font-medium"
-                 >
-                   <CheckCircle size={18} /> Voice Profile Active
-                 </button>
-                 <p className="text-[10px] text-slate-500 ml-1">To update your voice profile, please contact support.</p>
-              </div>
+              <>
+                <button
+                  onClick={() => setIsCapturing(true)}
+                  className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 rounded-xl transition flex items-center gap-2 font-medium"
+                >
+                  <RefreshCw size={18} /> Update Voice Profile
+                </button>
+                <button
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl transition flex items-center gap-2 font-medium"
+                >
+                  <Trash2 size={18} /> Delete Voice Identity
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -139,6 +139,15 @@ export const REGISTER_VOICE = gql`
   }
 `;
 
+export const REMOVE_VOICE = gql`
+  mutation RemoveVoice {
+    removeVoice {
+      success
+      message
+    }
+  }
+`;
+
 export const GET_VOICE_LOGIN_CHALLENGE = gql`
   query GetVoiceLoginChallenge($email: String!) {
     getVoiceLoginChallenge(email: $email)

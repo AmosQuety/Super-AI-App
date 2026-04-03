@@ -5,8 +5,14 @@ import { Upload } from "../types/upload";
 import { SecurityConfig } from "../../auth/security"; 
 import { logger } from "../../utils/logger";
 import { FaceRecognitionService } from "../../services/faceRecognitionService";
+import { createClient } from "@supabase/supabase-js";
 
 const faceService = new FaceRecognitionService();
+
+// Initialize Supabase for cleanup
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.Supabase_Service_Role_Secret || process.env.SUPABASE_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const faceAuthMutations = {
   
@@ -203,8 +209,47 @@ export const faceAuthMutations = {
   // ==========================================
   removeFace: async (_: any, __: any, context: AppContext) => {
     if (!context.user) throw new AuthenticationError("Unauthorized");
-    await context.prisma.user.update({ where: { id: context.user.userId }, data: { hasFaceRegistered: false } });
-    return { success: true, message: "Face ID disabled." };
+    const userId = context.user.userId;
+
+    try {
+      // 1. Get User Email
+      const currentUser = await context.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (currentUser?.email) {
+        logger.info(`🗑️ Disabling Face ID for user: ${currentUser.email}`);
+
+        // 2. Delete Embedding from DB
+        await supabase
+          .from("face_embeddings")
+          .delete()
+          .eq("user_id", userId)
+          .eq("workspace_id", "global");
+
+        // 3. Delete Image from Storage
+        // We try JPG and PNG since the suffix might vary
+        await supabase.storage
+          .from("biometric_faces")
+          .remove([
+            `${userId}/global/${currentUser.email}.jpg`,
+            `${userId}/global/${currentUser.email}.png`,
+            `${userId}/global/${currentUser.email}.webm`
+          ]);
+      }
+
+      // 4. Update User Flag
+      await context.prisma.user.update({
+        where: { id: userId },
+        data: { hasFaceRegistered: false }
+      });
+
+      return { success: true, message: "Face ID disabled." };
+    } catch (err: any) {
+      logger.error("❌ removeFace Error:", err);
+      return { success: false, message: err.message || "Failed to remove Face ID" };
+    }
   },
 
   analyzeFaceAttribute: async (_: any, { image }: { image: Promise<Upload> }, _context: AppContext) => {

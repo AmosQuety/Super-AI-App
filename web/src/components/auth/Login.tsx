@@ -153,16 +153,26 @@ export default function LoginScreen() {
                   )}
                 </div>
 
-                {/* Face Login Button */}
-                {/* Voice Login Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsVoiceMode(true)}
-                  className="w-full py-3 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition flex items-center justify-center gap-2"
-                >
-                  <Mic className="w-5 h-5" />
-                  Login with Voice Identity
-                </button>
+                {/* Biometric Login Options */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsFaceMode(true)}
+                    className="py-3 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition flex items-center justify-center gap-2"
+                  >
+                    <ScanFace className="w-5 h-5" />
+                    Face ID
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVoiceMode(true)}
+                    className="py-3 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition flex items-center justify-center gap-2"
+                  >
+                    <Mic className="w-5 h-5" />
+                    Voice ID
+                  </button>
+                </div>
 
                 <p className="text-center text-[10px] text-gray-500 mt-2 italic">
                   * Biometric factors must be enabled in your profile settings.
