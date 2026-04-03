@@ -11,6 +11,9 @@ export default defineConfig({
     host: true, // This tells Vite: "Let anyone on the Wi-Fi connect"
     port: 5173,
   },
+  worker: {
+    format: "es",
+  },
   optimizeDeps: {
     include: ["@apollo/client"],
   },
