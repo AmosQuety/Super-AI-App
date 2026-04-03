@@ -1,4 +1,3 @@
-import React from "react";
 import { useQuery } from "@apollo/client/react";
 import { Shield, AlertTriangle, CheckCircle, Clock, Info, User, Globe, Monitor } from "lucide-react";
 import { GET_SECURITY_AUDIT_LOGS } from "../graphql/users";
@@ -183,22 +182,22 @@ export default function SecurityPage() {
                         <EventBadge event={log.event} />
                       </td>
                       <td className="px-6 py-4">
-                         <div className="flex flex-col gap-1">
-                            <span className="flex items-center gap-1.5 text-slate-400 text-xs">
-                               <Monitor size={10} /> {log.userAgent?.split(' ')[0] || "Unknown Client"}
-                            </span>
-                         </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="flex items-center gap-1.5 text-slate-400 text-xs">
+                            <Monitor size={10} /> {log.userAgent?.split(' ')[0] || "Unknown Client"}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-slate-300 text-xs font-mono flex items-center gap-1.5">
-                           <Globe size={10} className="text-slate-500" /> {log.ipAddress || "127.0.0.1"}
+                          <Globe size={10} className="text-slate-500" /> {log.ipAddress || "127.0.0.1"}
                         </p>
                       </td>
                       <td className="px-6 py-4">
                         <div className="max-w-[150px]">
-                           <p className="text-slate-500 text-[10px] break-all group-hover:text-slate-400 transition-colors">
-                              {log.details || "No additional context"}
-                           </p>
+                          <p className="text-slate-500 text-[10px] break-all group-hover:text-slate-400 transition-colors">
+                            {log.details || "No additional context"}
+                          </p>
                         </div>
                       </td>
                     </tr>
