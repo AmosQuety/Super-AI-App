@@ -11,6 +11,7 @@ import {
   User,
   Home,
   ScanFace,
+  Shield,
   ChevronRight,
   Sun,
   Moon
@@ -46,6 +47,12 @@ const navigation = [
     href: "/playground",
     icon: ScanFace,
     description: "Biometric experiments."
+  },
+  {
+    name: "Security SOC",
+    href: "/security",
+    icon: Shield,
+    description: "Audit & identity logs."
   }
 ];
 

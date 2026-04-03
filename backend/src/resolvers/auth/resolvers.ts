@@ -5,6 +5,10 @@ import bcrypt from "bcryptjs";
 import { SecurityConfig, JWTPayload } from "../../auth/security";
 import { AuthorizationService, UserRole } from "../../auth/authorization";
 import { AppContext } from "../types/context"; // Import the full AppContext
+import { VoiceCloningService } from "../../services/voiceCloningService";
+import { redisClient } from "../../lib/redis";
+
+const voiceCloningService = new VoiceCloningService();
 
 // Use the full AppContext instead of limited AuthContext
 type UserResponse = {
@@ -51,6 +55,53 @@ export const authResolvers = {
       });
 
       return users;
+    },
+
+    getVoiceLoginChallenge: async (_: any, { email }: { email: string }, context: AppContext): Promise<string> => {
+      if (!email) throw new UserInputError("Email is required");
+      
+      const user = await context.prisma.user.findUnique({
+        where: { email: email.toLowerCase().trim() },
+        select: { hasVoiceRegistered: true, id: true }
+      });
+
+      if (!user) throw new UserInputError("User not found");
+      if (!user.hasVoiceRegistered) throw new UserInputError("Voice not enrolled for this account");
+
+      // Check rate limit for challenge generation
+      if (redisClient) {
+        const lockoutKey = `voice_lockout:${user.id}`;
+        const isLocked = await redisClient.get(lockoutKey);
+        if (isLocked) {
+          throw new AuthenticationError("Account temporarily locked due to multiple failed voice login attempts. Please try again later.");
+        }
+      }
+
+      // Generate a random 6-digit challenge code
+      const challenge = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store in Redis with 60s TTL
+      if (redisClient) {
+        const challengeKey = `voice_challenge:${user.id}`;
+        await redisClient.setex(challengeKey, 60, challenge);
+      }
+
+      return challenge;
+    },
+
+    securityAuditLogs: async (_: any, { userId, limit }: { userId?: string, limit?: number }, context: AppContext): Promise<any[]> => {
+      const currentUser = AuthorizationService.requireAuth(context);
+      
+      // If not admin, only show own logs
+      const finalUserId = currentUser.role === UserRole.ADMIN ? userId : currentUser.userId;
+
+      const logs = await context.prisma.securityAuditLog.findMany({
+        where: finalUserId ? { userId: finalUserId } : {},
+        orderBy: { createdAt: "desc" },
+        take: limit || 50,
+      });
+
+      return logs;
     },
   },
 
@@ -236,6 +287,121 @@ export const authResolvers = {
         message: "Password updated successfully",
       };
     },
+
+    loginWithVoice: async (
+      _: any,
+      args: { email: string; challengeCode: string; audio: Promise<any> },
+      context: AppContext
+    ): Promise<{ user: UserResponse; token: string }> => {
+      const { email, challengeCode, audio } = args;
+
+      if (!email || !challengeCode || !audio) {
+        throw new UserInputError("Email, challenge code, and audio recording are required");
+      }
+
+      const user = await context.prisma.user.findUnique({
+        where: { email: email.toLowerCase().trim() },
+      });
+
+      if (!user) {
+        throw new AuthenticationError("User not found");
+      }
+
+      if (!user.hasVoiceRegistered) {
+        throw new AuthenticationError("Voice profile not found for this account");
+      }
+
+      if (redisClient) {
+        const lockoutKey = `voice_lockout:${user.id}`;
+        const isLocked = await redisClient.get(lockoutKey);
+        if (isLocked) {
+          throw new AuthenticationError("Account temporarily locked due to multiple failed voice login attempts.");
+        }
+
+        const challengeKey = `voice_challenge:${user.id}`;
+        const storedChallenge = await redisClient.get(challengeKey);
+        
+        if (!storedChallenge) {
+          throw new AuthenticationError("Challenge expired. Please request a new challenge code.");
+        }
+        
+        if (storedChallenge !== challengeCode) {
+           throw new AuthenticationError("Invalid challenge code sequence provided.");
+        }
+        
+        // Invalidate challenge immediately to prevent replay
+        await redisClient.del(challengeKey);
+      }
+
+      // Verify voice with Python AI Engine (Embedding + STT)
+      const result = await voiceCloningService.verifyVoice(user.id, challengeCode, audio);
+
+      if (!result.success) {
+        // Handle Rate Limiting
+        if (redisClient) {
+           const attemptsKey = `voice_attempts:${user.id}`;
+           const attempts = await redisClient.incr(attemptsKey);
+           if (attempts === 1) {
+              await redisClient.expire(attemptsKey, 600); // 10 mins window
+           }
+           
+           if (attempts >= 5) {
+              // Lock account for 15 mins
+              await redisClient.setex(`voice_lockout:${user.id}`, 900, "locked");
+              await context.prisma.securityAuditLog.create({
+                 data: {
+                    userId: user.id,
+                    userEmail: user.email,
+                    event: "ACCOUNT_LOCKED",
+                    details: JSON.stringify({ reason: "Max voice attempts exceeded", attempts }),
+                 }
+              });
+              throw new AuthenticationError("Too many failed attempts. Account locked for 15 minutes.");
+           }
+        }
+        
+        await context.prisma.securityAuditLog.create({
+           data: {
+              userId: user.id,
+              userEmail: user.email,
+              event: "VOICE_LOGIN_FAILED",
+              details: JSON.stringify({ error: result.error, similarity: result.similarity }),
+           }
+        });
+
+        throw new AuthenticationError(result.error || "Voice verification failed");
+      }
+
+      // Success Path
+      if (redisClient) {
+         await redisClient.del(`voice_attempts:${user.id}`); // reset attempts
+      }
+
+      await context.prisma.securityAuditLog.create({
+         data: {
+            userId: user.id,
+            userEmail: user.email,
+            event: "VOICE_LOGIN_SUCCESS",
+            details: JSON.stringify({ similarity: result.similarity }),
+         }
+      });
+
+      // Generate Token
+      const token = SecurityConfig.createToken({
+        userId: user.id,
+        email: user.email,
+        role: UserRole.USER,
+      });
+
+      const { password, ...userWithoutPassword } = user;
+
+      console.log(`User ${user.email} logged in successfully via Voice Identity`);
+
+      return {
+        user: userWithoutPassword,
+        token,
+      };
+    },
   },
 
   User: {
@@ -250,6 +416,12 @@ export const authResolvers = {
 
     hasVoiceRegistered: (parent: any) => {
       return !!parent.hasVoiceRegistered;
+    },
+  },
+
+  SecurityAuditLog: {
+    createdAt: (parent: any) => {
+      return parent.createdAt ? new Date(parent.createdAt).toISOString() : null;
     },
   },
 };

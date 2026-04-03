@@ -210,3 +210,18 @@ model VoiceEmbedding {
 
   @@map("voice_embeddings")
 }
+
+model SecurityAuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  userEmail   String?
+  event       String   // "VOICE_LOGIN_SUCCESS", "VOICE_LOGIN_FAILED", "ACCOUNT_LOCKED", etc.
+  ipAddress   String?
+  userAgent   String?
+  details     String?  // JSON string for metadata (confidence score, etc.)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("security_audit_logs")
+}

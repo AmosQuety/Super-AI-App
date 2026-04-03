@@ -3,7 +3,7 @@
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { SignInFormData, SignUpFormData } from '../types/auth';
-import { LOGIN_WITH_FACE } from '../graphql/users';
+import { LOGIN_WITH_FACE, LOGIN_WITH_VOICE } from '../graphql/users';
 import client from '../lib/apolloClient';
 
 interface User {
@@ -21,6 +21,7 @@ interface AuthContextType {
   signUp: (data: SignUpFormData) => Promise<void>;
   signOut: () => Promise<void>;
   loginWithFace: (file: File) => Promise<string>;
+  loginWithVoice: (email: string, challengeCode: string, audio: File) => Promise<string>;
 }
 
 interface LoginWithFaceResult {
@@ -29,6 +30,13 @@ interface LoginWithFaceResult {
     token: string;
     user: User;
     message?: string;
+  };
+}
+
+interface LoginWithVoiceResult {
+  loginWithVoice: {
+    token: string;
+    user: User;
   };
 }
 
@@ -218,6 +226,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loginWithVoice = async (email: string, challengeCode: string, audio: File): Promise<string> => {
+    try {
+      setIsLoading(true);
+
+      const result = await client.mutate<LoginWithVoiceResult>({
+        mutation: LOGIN_WITH_VOICE,
+        variables: { email, challengeCode, audio },
+        context: {
+          headers: {
+            'apollo-require-preflight': 'true',
+          },
+        },
+      });
+
+      const { token: authToken, user: userData } = result.data!.loginWithVoice;
+
+      // 1. Store auth data
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(userData));
+
+      // 2. Update state
+      setToken(authToken);
+      setUser(userData);
+
+      // 3. Reset Apollo cache
+      await client.resetStore();
+
+      return 'Voice login successful';
+    } catch (error: unknown) {
+      console.error('Voice Login Error:', error);
+      if (error instanceof Error) {
+        throw new Error(error.message || 'Voice login failed');
+      }
+      throw new Error('Voice login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -227,6 +274,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     signOut,
     loginWithFace,
+    loginWithVoice,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

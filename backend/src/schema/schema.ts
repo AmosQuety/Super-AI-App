@@ -132,6 +132,17 @@ export const typeDefs = gql`
     audioUrl: String
     error: String
   }
+
+  type SecurityAuditLog {
+    id: ID!
+    userId: ID
+    userEmail: String
+    event: String!
+    ipAddress: String
+    userAgent: String
+    details: String
+    createdAt: DateTime!
+  }
   # ===== END NEW TYPES =====
 
   type Query {
@@ -155,6 +166,8 @@ export const typeDefs = gql`
     myWorkspaces: [Workspace!]!
 
     getVoiceJobStatus(jobId: String!): VoiceJobStatus!
+
+    securityAuditLogs(userId: ID, limit: Int): [SecurityAuditLog!]!
   }
 
   type Mutation {

@@ -181,4 +181,52 @@ export class VoiceCloningService {
       return { status: 'FAILED', success: false, error: 'Could not retrieve job status.' };
     }
   }
+
+  /**
+   * Verify a voice — sends audio and challenge code to Python for
+   * Speaker Verification + STT anti-replay check.
+   */
+  async verifyVoice(userId: string, challengeCode: string, audio: Promise<Upload>) {
+    try {
+      const { createReadStream, filename, mimetype } = await audio;
+      const audioBuffer = await streamToBuffer(createReadStream());
+      
+      logger.info(`🎙️ Verifying voice for user ${userId} with challenge ${challengeCode}`);
+
+      if (audioBuffer.byteLength === 0) {
+        return { success: false, error: 'Received empty audio file' };
+      }
+
+      const formData = new FormData();
+      formData.append('user_id', userId);
+      formData.append('challenge_code', challengeCode);
+      formData.append('file', audioBuffer, { filename, contentType: mimetype });
+
+      const { data } = await axios.post(
+        `${PYTHON_SERVICE_URL}/audio/verify`,
+        formData,
+        { 
+            headers: { ...formData.getHeaders() }, 
+            timeout: 60000 // Verification might take longer due to STT
+        }
+      );
+
+      return {
+        success: data.access === 'GRANTED',
+        message: data.message,
+        similarity: data.similarity,
+        error: data.error
+      };
+    } catch (error: any) {
+      logger.error('❌ Voice Verification Request Failed', {
+        message: error.message,
+        status: error.response?.status,
+        responseData: error.response?.data
+      });
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Verification service unreachable'
+      };
+    }
+  }
 }

@@ -138,3 +138,39 @@ export const REGISTER_VOICE = gql`
     }
   }
 `;
+
+export const GET_VOICE_LOGIN_CHALLENGE = gql`
+  query GetVoiceLoginChallenge($email: String!) {
+    getVoiceLoginChallenge(email: $email)
+  }
+`;
+
+export const LOGIN_WITH_VOICE = gql`
+  mutation LoginWithVoice($email: String!, $challengeCode: String!, $audio: Upload!) {
+    loginWithVoice(email: $email, challengeCode: $challengeCode, audio: $audio) {
+      token
+      user {
+        id
+        email
+        name
+        role
+        createdAt
+      }
+    }
+  }
+`;
+
+export const GET_SECURITY_AUDIT_LOGS = gql`
+  query GetSecurityAuditLogs($userId: ID, $limit: Int) {
+    securityAuditLogs(userId: $userId, limit: $limit) {
+      id
+      userId
+      userEmail
+      event
+      ipAddress
+      userAgent
+      details
+      createdAt
+    }
+  }
+`;

@@ -21,6 +21,7 @@ const VoiceTools = lazy(() => import("./src/components/VoiceTools"));
 const ProfilePage = lazy(() => import("./src/pages/ProfilePage"));
 const PlaygroundPage = lazy(() => import("./src/pages/PlaygroundPage"));
 const DocumentUploader = lazy(() => import("./src/components/chat/DocumentUploader"));
+const SecurityPage = lazy(() => import("./src/pages/SecurityPage"));
 
 // ==============================
 // 🔹 PRODUCT CONFIG (single source of truth)
@@ -148,6 +149,7 @@ const AppRoutes = () => {
           <Route path="voice" element={<VoiceTools/>} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="document-uploader" element={<DocumentUploader />} />
+          <Route path="security" element={<SecurityPage />} />
         </Route>
 
         {/* Catch-all: redirect to landing page */}

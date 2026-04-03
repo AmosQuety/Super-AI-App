@@ -1,13 +1,14 @@
 // src/components/auth/LoginScreen.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, ScanFace } from 'lucide-react';
+import { Eye, EyeOff, Mail, ScanFace, Mic } from 'lucide-react';
 import { useToast } from '../ui/toastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signInSchema, type SignInFormData } from '../../lib/validation-schemas';
 import { FaceCapture } from "./FaceCapture";
+import { VoiceLogin } from "./VoiceLogin";
 
 export default function LoginScreen() {
   const { showSuccess, showError } = useToast();
@@ -16,6 +17,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFaceMode, setIsFaceMode] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [faceLoading, setFaceLoading] = useState(false);
 
   const {
@@ -95,6 +97,12 @@ export default function LoginScreen() {
             loading={faceLoading}
             mode="login"
           />
+        ) : isVoiceMode ? (
+          // VOICE LOGIN MODE
+          <VoiceLogin 
+            onCancel={() => setIsVoiceMode(false)}
+            email={"" /* could extract from form if partial */}
+          />
         ) : (
           // PASSWORD LOGIN MODE
           <>
@@ -146,16 +154,18 @@ export default function LoginScreen() {
                 </div>
 
                 {/* Face Login Button */}
+                {/* Voice Login Button */}
                 <button
                   type="button"
-                  onClick={() => setIsFaceMode(true)}
-                  className="w-full py-3 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition flex items-center justify-center gap-2"
+                  onClick={() => setIsVoiceMode(true)}
+                  className="w-full py-3 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition flex items-center justify-center gap-2"
                 >
-                  <ScanFace className="w-5 h-5" />
-                  Login with Face ID
+                  <Mic className="w-5 h-5" />
+                  Login with Voice Identity
                 </button>
-                <p className="text-center text-xs text-gray-500 mt-2">
-                  * Face ID must be enabled in your profile settings first.
+
+                <p className="text-center text-[10px] text-gray-500 mt-2 italic">
+                  * Biometric factors must be enabled in your profile settings.
                 </p>
 
                 {/* Sign In Button */}
