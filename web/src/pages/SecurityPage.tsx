@@ -63,8 +63,8 @@ export default function SecurityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4 text-slate-400">
+      <div className="min-h-screen flex items-center justify-center bg-theme-primary">
+        <div className="flex flex-col items-center gap-4 text-theme-tertiary">
           <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
           <p className="text-sm font-medium animate-pulse">Analyzing Audit Streams...</p>
         </div>
@@ -74,7 +74,7 @@ export default function SecurityPage() {
 
   if (error) {
     return (
-      <div className="p-8 bg-slate-950 min-h-screen">
+      <div className="p-8 bg-theme-primary min-h-screen">
         <div className="max-w-4xl mx-auto bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-red-400 flex items-start gap-4">
           <AlertTriangle className="shrink-0" size={24} />
           <div>
@@ -89,19 +89,19 @@ export default function SecurityPage() {
   const logs = data?.securityAuditLogs || [];
 
   return (
-    <div className="p-8 bg-slate-950 min-h-screen">
+    <div className="p-8 bg-theme-primary min-h-screen">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-theme-light pb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-theme-primary flex items-center gap-3">
               Security Operations Center <Shield className="text-indigo-400" size={28} />
             </h1>
-            <p className="text-slate-400 mt-2">Real-time monitoring of biometric authentication and identity events</p>
+            <p className="text-theme-tertiary mt-2">Real-time monitoring of biometric authentication and identity events</p>
           </div>
-          <div className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-3 bg-theme-secondary/50 p-2 rounded-xl border border-theme-light">
             <div className="flex flex-col items-end px-3">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">System Status</span>
+              <span className="text-[10px] uppercase tracking-wider text-theme-tertiary font-bold">System Status</span>
               <span className="text-emerald-400 text-xs flex items-center gap-1.5 font-medium">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Operational
               </span>
@@ -111,18 +111,18 @@ export default function SecurityPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 space-y-2">
-            <p className="text-slate-500 text-sm font-medium">Total Events (30d)</p>
-            <p className="text-3xl font-bold text-white">{logs.length}</p>
+          <div className="bg-theme-secondary border border-theme-light rounded-2xl p-6 space-y-2 shadow-theme-sm">
+            <p className="text-theme-tertiary text-sm font-medium">Total Events (30d)</p>
+            <p className="text-3xl font-bold text-theme-primary">{logs.length}</p>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 space-y-2">
-            <p className="text-slate-500 text-sm font-medium">Successful Logins</p>
+          <div className="bg-theme-secondary border border-theme-light rounded-2xl p-6 space-y-2 shadow-theme-sm">
+            <p className="text-theme-tertiary text-sm font-medium">Successful Logins</p>
             <p className="text-3xl font-bold text-emerald-400">
               {logs.filter(l => l.event === "VOICE_LOGIN_SUCCESS").length}
             </p>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 space-y-2">
-            <p className="text-slate-500 text-sm font-medium">Anomalies Detected</p>
+          <div className="bg-theme-secondary border border-theme-light rounded-2xl p-6 space-y-2 shadow-theme-sm">
+            <p className="text-theme-tertiary text-sm font-medium">Anomalies Detected</p>
             <p className="text-3xl font-bold text-rose-400">
               {logs.filter(l => l.event === "VOICE_LOGIN_FAILED" || l.event === "ACCOUNT_LOCKED").length}
             </p>
@@ -130,16 +130,16 @@ export default function SecurityPage() {
         </div>
 
         {/* Audit Table */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="px-6 py-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              Identity Event Logs <Clock size={18} className="text-slate-500" />
+        <div className="bg-theme-secondary border border-theme-light rounded-2xl overflow-hidden shadow-theme-xl">
+          <div className="px-6 py-4 bg-theme-secondary/80 border-b border-theme-light flex items-center justify-between">
+            <h2 className="text-lg font-bold text-theme-primary flex items-center gap-2">
+              Identity Event Logs <Clock size={18} className="text-theme-tertiary" />
             </h2>
-            <button className="text-xs text-slate-400 hover:text-white transition-colors">Export Logs</button>
+            <button className="text-xs text-theme-tertiary hover:text-theme-primary transition-colors">Export Logs</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-slate-800/20 text-slate-500 text-[10px] uppercase font-bold tracking-widest border-b border-slate-800/50">
+              <thead className="bg-theme-tertiary/10 text-theme-tertiary text-[10px] uppercase font-bold tracking-widest border-b border-theme-light">
                 <tr>
                   <th className="px-6 py-4">Timestamp</th>
                   <th className="px-6 py-4">Identity</th>
@@ -149,21 +149,21 @@ export default function SecurityPage() {
                   <th className="px-6 py-4">Metadata</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-theme-light/50">
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic">
+                    <td colSpan={6} className="px-6 py-12 text-center text-theme-tertiary italic">
                       No security events recorded yet in the current observation window.
                     </td>
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-800/20 transition-all duration-200 group">
+                    <tr key={log.id} className="hover:bg-theme-tertiary/20 transition-all duration-200 group">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-white text-sm font-medium font-mono">
+                        <p className="text-theme-primary text-sm font-medium font-mono">
                           {formatLogDate(log.createdAt).time}
                         </p>
-                        <p className="text-slate-500 text-[10px]">
+                        <p className="text-theme-tertiary text-[10px]">
                           {formatLogDate(log.createdAt).day}
                         </p>
                       </td>
@@ -173,8 +173,8 @@ export default function SecurityPage() {
                             <User size={14} />
                           </div>
                           <div>
-                            <p className="text-white text-sm font-medium">{log.userEmail || "Anonymous"}</p>
-                            <p className="text-slate-500 text-[10px]">{log.userId?.substring(0, 8)}...</p>
+                            <p className="text-theme-primary text-sm font-medium">{log.userEmail || "Anonymous"}</p>
+                            <p className="text-theme-tertiary text-[10px]">{log.userId?.substring(0, 8)}...</p>
                           </div>
                         </div>
                       </td>
@@ -183,19 +183,19 @@ export default function SecurityPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="flex items-center gap-1.5 text-slate-400 text-xs">
+                          <span className="flex items-center gap-1.5 text-theme-tertiary text-xs">
                             <Monitor size={10} /> {log.userAgent?.split(' ')[0] || "Unknown Client"}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-slate-300 text-xs font-mono flex items-center gap-1.5">
-                          <Globe size={10} className="text-slate-500" /> {log.ipAddress || "127.0.0.1"}
+                        <p className="text-theme-secondary text-xs font-mono flex items-center gap-1.5">
+                          <Globe size={10} className="text-theme-tertiary" /> {log.ipAddress || "127.0.0.1"}
                         </p>
                       </td>
                       <td className="px-6 py-4">
                         <div className="max-w-[150px]">
-                          <p className="text-slate-500 text-[10px] break-all group-hover:text-slate-400 transition-colors">
+                          <p className="text-theme-tertiary text-[10px] break-all group-hover:text-theme-secondary transition-colors">
                             {log.details || "No additional context"}
                           </p>
                         </div>

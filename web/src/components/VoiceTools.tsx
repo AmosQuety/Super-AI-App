@@ -152,13 +152,13 @@ export default function VoiceTools() {
       </div>
 
       <div className="flex justify-center mb-8">
-        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+        <div className="inline-flex p-1 bg-theme-tertiary rounded-2xl border border-theme-light">
           <button
             onClick={() => setActiveTab('intelligence')}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
               activeTab === 'intelligence' 
-                ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                ? 'bg-theme-secondary text-blue-600 shadow-theme-md' 
+                : 'text-theme-secondary hover:text-theme-primary'
             }`}
           >
             <Activity className="w-5 h-5" />
@@ -168,8 +168,8 @@ export default function VoiceTools() {
             onClick={() => setActiveTab('lab')}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
               activeTab === 'lab' 
-                ? 'bg-white dark:bg-slate-900 text-purple-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                ? 'bg-theme-secondary text-purple-600 shadow-theme-md' 
+                : 'text-theme-secondary hover:text-theme-primary'
             }`}
           >
             <FlaskConical className="w-5 h-5" />
@@ -188,7 +188,7 @@ export default function VoiceTools() {
         <div className="space-y-6">
           
           {/* Main Recorder Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+          <div className="bg-theme-secondary rounded-3xl p-8 shadow-theme-xl border border-theme-light relative overflow-hidden">
             
             {/* Background Pulse Effect when listening */}
             {isListening && (
@@ -206,7 +206,7 @@ export default function VoiceTools() {
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
                      <span className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`} />
-                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                     <p className="text-theme-secondary text-sm font-medium">
                        {isListening ? 'Microphone Active' : 'Ready to record'}
                      </p>
                   </div>
@@ -231,13 +231,13 @@ export default function VoiceTools() {
             </div>
 
             {/* Transcript Area */}
-            <div className="min-h-[18rem] p-5 border-2 border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-950/50 text-slate-900 dark:text-white relative overflow-y-auto mb-6 transition-colors focus-within:border-blue-500/50">
+            <div className="min-h-[18rem] p-5 border-2 border-theme-light rounded-2xl bg-theme-input text-theme-primary relative overflow-y-auto mb-6 transition-colors focus-within:border-blue-500/50">
                {fullDisplay ? (
                  <p className="whitespace-pre-wrap break-words leading-relaxed text-lg">
                    {transcript} <span className="text-blue-500 dark:text-blue-400 animate-pulse">{interimTranscript}</span>
                  </p>
                ) : (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
+                 <div className="absolute inset-0 flex flex-col items-center justify-center text-theme-tertiary">
                     <Mic className="w-8 h-8 mb-2 opacity-20" />
                     <span className="italic">Try saying "Go to Dashboard", "Switch to Dark Mode", or "Logout"...</span>
                  </div>
@@ -271,7 +271,7 @@ export default function VoiceTools() {
                  <button 
                   onClick={handleCopyTranscript}
                   disabled={!fullDisplay}
-                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  className="p-4 bg-theme-tertiary text-theme-secondary rounded-xl hover:bg-theme-secondary transition-colors disabled:opacity-50 border border-theme-light"
                   title="Copy Text"
                 >
                   {copied ? <Check className="w-6 h-6 text-green-500" /> : <Copy className="w-6 h-6" />}
@@ -279,7 +279,7 @@ export default function VoiceTools() {
                 <button 
                   onClick={handleSaveTranscript}
                   disabled={!fullDisplay}
-                  className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  className="p-4 bg-theme-tertiary text-theme-secondary rounded-xl hover:bg-theme-secondary transition-colors disabled:opacity-50 border border-theme-light"
                   title="Download"
                 >
                   <Download className="w-6 h-6" />
@@ -291,7 +291,7 @@ export default function VoiceTools() {
           {/* Metrics & Sentiment Card */}
           <div className="grid grid-cols-2 gap-4">
              {/* Biometric Card */}
-             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800">
+             <div className="bg-theme-secondary rounded-3xl p-6 shadow-theme-lg border border-theme-light">
                 <div className="flex items-center gap-3 mb-4 text-violet-500">
                    <Activity className="w-6 h-6" />
                    <h3 className="font-bold text-slate-700 dark:text-slate-200">Voice Bio</h3>
@@ -302,7 +302,7 @@ export default function VoiceTools() {
                         <span>Volume</span>
                         <span>{Math.round(audioMetrics.vol * 100)}%</span>
                       </div>
-                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-2 bg-theme-tertiary rounded-full overflow-hidden">
                          <div className="h-full bg-violet-500 transition-all duration-100" style={{ width: `${Math.min(100, audioMetrics.vol * 100)}%` }} />
                       </div>
                    </div>
@@ -311,7 +311,7 @@ export default function VoiceTools() {
                         <span>Pitch (Est.)</span>
                         <span>{Math.round(audioMetrics.pitch)} Hz</span>
                       </div>
-                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-2 bg-theme-tertiary rounded-full overflow-hidden">
                          <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${Math.min(100, (audioMetrics.pitch / 500) * 100)}%` }} />
                       </div>
                    </div>
@@ -319,7 +319,7 @@ export default function VoiceTools() {
              </div>
 
              {/* Sentiment Card */}
-             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800">
+             <div className="bg-theme-secondary rounded-3xl p-6 shadow-theme-lg border border-theme-light">
                 <div className="flex items-center gap-3 mb-4 text-pink-500">
                    {sentiment?.label === 'POSITIVE' ? <Smile className="w-6 h-6" /> : <Meh className="w-6 h-6" />}
                    <h3 className="font-bold text-slate-700 dark:text-slate-200">Emotion</h3>
@@ -344,7 +344,7 @@ export default function VoiceTools() {
         </div>
 
         {/* --- RIGHT: TEXT TO SPEECH --- */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 h-fit min-h-[500px] flex flex-col">
+        <div className="bg-theme-secondary rounded-3xl p-8 shadow-theme-xl border border-theme-light h-fit min-h-[500px] flex flex-col">
           <div className="flex items-center space-x-4 mb-6">
             <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
               <Volume2 className="w-7 h-7 text-white" />
@@ -372,7 +372,7 @@ export default function VoiceTools() {
                     id="tts-text" 
                     value={ttsText} 
                     onChange={(e) => setTtsText(e.target.value)} 
-                    className={`w-full h-48 p-4 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all duration-300 text-lg ${ttsStatus === 'error' ? 'border-red-500 dark:border-red-500/50' : 'border-slate-200 dark:border-slate-700'}`} 
+                    className={`w-full h-48 p-4 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-theme-input text-theme-primary placeholder-theme-tertiary resize-none transition-all duration-300 text-lg ${ttsStatus === 'error' ? 'border-red-500' : 'border-theme-light'}`} 
                   />
                   
                   {ttsStatus === 'error' && (
@@ -413,7 +413,7 @@ export default function VoiceTools() {
                       <span>Progress</span>
                       <span>{ttsProgress}%</span>
                    </div>
-                   <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                   <div className="h-1.5 w-full bg-theme-tertiary rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" 
                         style={{ width: `${ttsProgress}%` }} 
@@ -445,7 +445,7 @@ export default function VoiceTools() {
                    </p>
                    
                    {finalAudioUrl && (
-                    <div className="w-full bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg">
+                    <div className="w-full bg-theme-primary p-4 rounded-2xl border border-theme-light shadow-theme-md">
                        <audio controls src={finalAudioUrl} className="w-full h-12" autoPlay />
                     </div>
                    )}
@@ -454,7 +454,7 @@ export default function VoiceTools() {
                 <div className="flex flex-col gap-3">
                   <button 
                     onClick={handleResetTTS} 
-                    className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-theme-tertiary hover:bg-theme-secondary text-theme-primary rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-theme-light"
                   >
                     <Mic className="w-5 h-5" />
                     Synthesize New Thought

@@ -2,7 +2,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
-import { useTheme } from "../../contexts/useTheme";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
@@ -15,7 +14,6 @@ const InputArea: React.FC<InputAreaProps> = ({
   disabled = false,
   isOnline = true,
 }) => {
-  const { theme } = useTheme();
   const [text, setText] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -127,18 +125,14 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       {/* Attachment Preview */}
       {attachment && (
-        <div className={`mb-3 p-3 backdrop-blur rounded-xl border flex items-center justify-between animate-slide-in ${
-          theme === 'dark'
-            ? 'bg-white/10 border-white/20'
-            : 'bg-black/5 border-gray-200'
-        }`}>
+        <div className={`mb-3 p-3 backdrop-blur rounded-xl border flex items-center justify-between animate-slide-in bg-theme-tertiary border-theme-light`}>
           <div className="flex items-center space-x-3 text-sm min-w-0 flex-1">
             {getFileIcon(attachment)}
             <div className="min-w-0 flex-1">
-              <span className="text-white font-medium truncate block">
+              <span className="text-theme-primary font-medium truncate block">
                 {attachment.name}
               </span>
-              <span className="text-purple-200 text-xs">
+              <span className="text-theme-tertiary text-xs">
                 {(attachment.size / 1024).toFixed(1)} KB
               </span>
             </div>
@@ -166,18 +160,14 @@ const InputArea: React.FC<InputAreaProps> = ({
       )}
 
       {/* Main Input Container */}
-      <div className={`
-       relative backdrop-blur-xl border rounded-2xl transition-all duration-300
-        ${theme === 'dark'
-          ? isFocused
-            ? 'border-purple-500/60 shadow-lg shadow-purple-500/20 bg-gray-900/60'
-            : 'border-white/10 hover:border-white/20 bg-gray-900/60'
-          : isFocused
-            ? 'border-purple-500/60 shadow-lg shadow-purple-500/20 bg-white/60'
-            : 'border-gray-200 hover:border-gray-300 bg-white/60'
+       <div className={`
+        relative backdrop-blur-xl border rounded-2xl transition-all duration-300
+        ${isFocused 
+          ? 'border-purple-500/60 shadow-theme-lg bg-theme-input' 
+          : 'border-theme-light hover:border-theme-medium bg-theme-input'
         }
         ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
-        ${isDragging ? 'border-purple-400 shadow-lg shadow-purple-400/30' : ''}
+        ${isDragging ? 'border-purple-400 shadow-theme-xl' : ''}
       `}>
 
 
@@ -218,8 +208,8 @@ const InputArea: React.FC<InputAreaProps> = ({
                 "Type your message... "
               }
               className={`
-                w-full p-3 bg-transparent text-white placeholder-purple-200/60 
-                focus:outline-none resize-none scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent
+                w-full p-3 bg-transparent text-theme-primary placeholder-theme-tertiary 
+                focus:outline-none resize-none scrollbar-thin scrollbar-thumb-theme-tertiary scrollbar-track-transparent
                 text-base leading-relaxed transition-all duration-300
                 ${disabled || !isOnline ? 'cursor-not-allowed' : ''}
               `}
@@ -240,17 +230,17 @@ const InputArea: React.FC<InputAreaProps> = ({
           </div>
 
           {/* Send Button */}
-          <button
+           <button
             onClick={handleSendMessage}
             disabled={isSendDisabled}
             className={`
               p-3 rounded-xl focus:outline-none transition-all duration-300 transform 
               flex-shrink-0 backdrop-blur border
               ${isSendDisabled
-                ? 'bg-gray-700/50 border-gray-600/50 text-gray-400 cursor-not-allowed scale-100' 
+                ? 'bg-theme-tertiary border-theme-light text-theme-tertiary cursor-not-allowed scale-100' 
                 : `
                   bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/50 
-                  text-white shadow-lg hover:shadow-purple-500/30 
+                  text-white shadow-theme-lg hover:shadow-theme-xl 
                   hover:scale-105 active:scale-95
                   hover:from-purple-700 hover:to-blue-700
                 `
@@ -269,14 +259,12 @@ const InputArea: React.FC<InputAreaProps> = ({
         )}
       </div>
 
-      {/* Helper text */}
-      <div className="mt-2 text-center">
-        <p className={`text-xs ${
-          theme === 'dark' ? 'text-purple-300/60' : 'text-gray-500'
-        }`}>
-          {!isOnline ? "🔴 Offline - Reconnect to send messages" : "Press Enter to send, Shift+Enter for new line"}
-        </p>
-      </div>
+       {/* Helper text */}
+       <div className="mt-2 text-center">
+         <p className="text-xs text-theme-tertiary">
+           {!isOnline ? "🔴 Offline - Reconnect to send messages" : "Press Enter to send, Shift+Enter for new line"}
+         </p>
+       </div>
     </div>
   );
 };

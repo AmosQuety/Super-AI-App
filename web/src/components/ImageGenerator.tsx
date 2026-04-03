@@ -219,7 +219,7 @@ export default function ImageGenerator() {
       </div>
 
       {/* Prompt input */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 mb-10 sticky top-20 z-10 backdrop-blur-lg">
+      <div className="bg-theme-secondary rounded-2xl p-6 shadow-theme-xl border border-theme-light mb-10 sticky top-20 z-10 backdrop-blur-lg">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <input
@@ -227,7 +227,7 @@ export default function ImageGenerator() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="e.g., A majestic lion wearing a crown, cinematic lighting, hyperrealistic"
-              className="w-full p-4 pl-5 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition-all duration-300"
+              className="w-full p-4 pl-5 border-2 border-theme-light rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-theme-input text-theme-primary transition-all duration-300"
               disabled={loading || !isServiceAvailable}
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
               maxLength={500}
@@ -270,16 +270,16 @@ export default function ImageGenerator() {
       {loading ? (
         <div className="w-full max-w-4xl mx-auto py-12">
             <div className="text-center mb-6">
-                <h4 className="text-xl font-bold text-slate-800 dark:text-white">Neural Pathway Folding...</h4>
-                <p className="text-xs text-slate-500 italic mt-1 mb-4">The AI is processing your request</p>
+                <h4 className="text-xl font-bold text-theme-primary">Neural Pathway Folding...</h4>
+                <p className="text-xs text-theme-tertiary italic mt-1 mb-4">The AI is processing your request</p>
             </div>
             <LoadingGameEngine />
-            <p className="text-slate-505 dark:text-slate-500 text-sm mt-6 text-center">
+            <p className="text-theme-tertiary text-sm mt-6 text-center">
                 This may take 10-30 seconds depending on server load
             </p>
         </div>
       ) : images.length > 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800">
+        <div className="bg-theme-secondary rounded-3xl p-6 md:p-8 shadow-theme-xl border border-theme-light">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
               Your Creations
@@ -288,7 +288,7 @@ export default function ImageGenerator() {
               <button
                 onClick={handleRegenerate}
                 disabled={loading || !isServiceAvailable}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 font-medium"
+                className="px-4 py-2 bg-theme-tertiary text-theme-secondary rounded-lg hover:bg-theme-secondary transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 font-medium border border-theme-light"
               >
                 <RotateCcw className="w-4 h-4" />
                 Regenerate
@@ -300,7 +300,7 @@ export default function ImageGenerator() {
             {images.map((src, i) => (
               <div
                 key={i}
-                className="group relative bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden aspect-square shadow-lg border border-slate-200 dark:border-slate-700"
+                className="group relative bg-theme-tertiary rounded-xl overflow-hidden aspect-square shadow-theme-md border border-theme-light"
               >
                 <img
                   src={src}
@@ -314,7 +314,7 @@ export default function ImageGenerator() {
                     disabled={downloading === i}
                     title="Download Image"
                     aria-label={`Download image ${i + 1}`}
-                    className="p-3 bg-white/90 text-slate-900 rounded-full hover:bg-white transition-colors duration-200 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 shadow-lg disabled:opacity-50"
+                    className="p-3 bg-white/90 text-slate-950 rounded-full hover:bg-white transition-colors duration-200 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 shadow-theme-lg disabled:opacity-50"
                   >
                     {downloading === i ? (
                       <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
@@ -331,18 +331,18 @@ export default function ImageGenerator() {
           </div>
           
           {/* Generation info */}
-          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
-            <p className="text-slate-600 dark:text-slate-400 text-sm text-center">
+          <div className="mt-6 pt-6 border-t border-theme-light">
+            <p className="text-theme-tertiary text-sm text-center">
               Images generated using Stable Diffusion XL • Save your favorites by downloading them
             </p>
           </div>
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg">
+          <div className="w-24 h-24 mx-auto mb-6 bg-theme-tertiary rounded-full flex items-center justify-center border-4 border-theme-light shadow-theme-lg">
             <ImageIcon className="w-12 h-12 text-blue-500" />
           </div>
-          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+          <h3 className="text-2xl font-bold text-theme-primary mb-2">
             Nothing generated yet
           </h3>
           <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto mb-6">

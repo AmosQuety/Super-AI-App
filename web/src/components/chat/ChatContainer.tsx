@@ -495,14 +495,14 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   if (chatsLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse">Loading workspace...</div>;
 
   return (
-     <div className="h-screen w-screen flex bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden relative font-sans selection:bg-indigo-500/30">
+     <div className="h-screen w-screen flex bg-theme-primary text-theme-primary overflow-hidden relative font-sans selection:bg-indigo-500/30">
       {renderConnectionStatus}
       
       {/* Subtle Background Mesh */}
       <div className={`fixed inset-0 -z-10 ${
         theme === 'dark' 
-          ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-gray-900 to-black' 
-          : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-white to-gray-50'
+          ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-theme-secondary to-theme-primary' 
+          : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-theme-primary to-theme-secondary'
       }`} />
 
       <div className="flex flex-1 relative z-10 w-full max-w-full">
@@ -518,7 +518,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
         <main className="flex-1 flex flex-col min-w-0 h-full relative transition-all duration-300">
           {/* Mobile Header */}
-          <div className="lg:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 z-20">
+          <div className="lg:hidden flex items-center justify-between p-4 bg-theme-secondary/80 backdrop-blur border-b border-theme-light z-20">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-700 dark:text-gray-200">
               <Menu className="w-6 h-6" />
             </button>
@@ -529,7 +529,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           <div 
              ref={chatContainerRef} 
              onScroll={handleScroll} 
-             className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-800"
+             className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-theme-tertiary"
           >
             <div className="max-w-5xl mx-auto w-full min-h-full flex flex-col pt-4 md:pt-8 pb-32 px-4 md:px-8">
               {historyLoading ? (
@@ -542,16 +542,16 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                  >
                     <div className="relative group">
                        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-1000"></div>
-                       <div className="relative w-24 h-24 bg-white dark:bg-gray-900 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-800 shadow-xl">
-                          <Bot className="w-12 h-12 text-indigo-500 dark:text-indigo-400" />
+                       <div className="relative w-24 h-24 bg-theme-secondary rounded-full flex items-center justify-center border border-theme-light shadow-theme-xl">
+                          <Bot className="w-12 h-12 text-indigo-500" />
                        </div>
                     </div>
                     
                     <div className="space-y-3 max-w-md">
-                      <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+                      <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-theme-primary to-theme-tertiary">
                         How can I help you today?
                       </h2>
-                      <p className="text-gray-500 dark:text-gray-400">
+                      <p className="text-theme-tertiary">
                         I can help you analyze data, generate code, write copy, or just chat.
                       </p>
                     </div>
@@ -567,12 +567,12 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                         <button 
                           key={idx}
                           onClick={() => handleSendMessage(item.text)}
-                          className="flex items-center space-x-3 p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left shadow-sm hover:shadow-md group"
+                          className="flex items-center space-x-3 p-4 bg-theme-secondary border border-theme-light rounded-xl hover:bg-theme-tertiary transition-all text-left shadow-theme-sm hover:shadow-theme-md group"
                         >
-                          <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 ${item.color} group-hover:scale-110 transition-transform`}>
+                          <div className={`p-2 rounded-lg bg-theme-tertiary ${item.color} group-hover:scale-110 transition-transform`}>
                             <item.icon className="w-5 h-5" />
                           </div>
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.text}</span>
+                          <span className="text-sm font-medium text-theme-secondary">{item.text}</span>
                         </button>
                       ))}
                     </div>
@@ -605,7 +605,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex justify-start py-4"
                 >
-                  <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-2xl shadow-sm text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center space-x-3 bg-theme-secondary border border-theme-light px-4 py-3 rounded-2xl shadow-theme-sm text-sm text-theme-secondary">
                      {aiState === "thinking" ? (
                        <div className="flex space-x-1">
                           <span className="animate-bounce delay-0">●</span>
@@ -629,7 +629,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     onClick={scrollToBottomManual}
-                    className="absolute bottom-32 left-1/2 -translate-x-1/2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-full shadow-xl hover:shadow-2xl z-30 transition-all hover:-translate-y-1"
+                    className="absolute bottom-32 left-1/2 -translate-x-1/2 p-3 bg-theme-secondary border border-theme-light text-theme-primary rounded-full shadow-theme-xl hover:shadow-theme-2xl z-30 transition-all hover:-translate-y-1"
                 >
                     <ArrowDown size={20} />
                 </motion.button>
@@ -639,10 +639,10 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           {/* Floating Input Area Wrapper */}
           <div className="fixed bottom-0 left-0 w-full lg:pl-80 z-20 pointer-events-none">
              {/* Gradient fade overlay for smooth content disappear behind input */}
-             <div className="h-24 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-black dark:via-black/80 dark:to-transparent pointer-events-none" />
+             <div className="h-24 bg-gradient-to-t from-theme-primary via-theme-primary/80 to-transparent pointer-events-none" />
              
-             <div className="bg-white dark:bg-black p-4 md:p-6 pb-6 pointer-events-auto">
-                <div className="max-w-4xl mx-auto shadow-2xl rounded-2xl ring-1 ring-gray-900/5 dark:ring-white/10">
+             <div className="bg-theme-primary p-4 md:p-6 pb-6 pointer-events-auto">
+                <div className="max-w-4xl mx-auto shadow-theme-xl rounded-2xl ring-1 ring-theme-light">
                   <InputArea
                     onSendMessage={handleSendMessage}
                     disabled={historyLoading || aiState !== "idle"}

@@ -12,7 +12,6 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { useTheme } from "../../contexts/useTheme";
 
 interface MessageProps {
   message: {
@@ -42,7 +41,7 @@ const Message: React.FC<MessageProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
   const { showSuccess, showError } = useToast();
-  const { theme } = useTheme(); 
+  
 
 
   // REFACTOR: Enhanced copy functionality with better feedback
@@ -92,16 +91,16 @@ const Message: React.FC<MessageProps> = ({
         style={style}
       >
         <div className="flex items-start space-x-3">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-slate-200 dark:bg-slate-700">
-            <Bot className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-theme-tertiary">
+            <Bot className="w-5 h-5 text-theme-secondary" />
           </div>
-          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-md">
+          <div className="bg-theme-input p-4 rounded-2xl rounded-tl-none shadow-theme-md">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            <div className="text-xs text-theme-tertiary mt-2">
               AI is thinking...
             </div>
           </div>
@@ -164,30 +163,26 @@ const Message: React.FC<MessageProps> = ({
       <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-300 ${
         isUserMessage 
           ? 'bg-blue-500 hover:bg-blue-600' 
-          : theme === 'dark' 
-            ? 'bg-gray-700 hover:bg-gray-600' 
-            : 'bg-gray-300 hover:bg-gray-400'
+          : 'bg-theme-tertiary hover:bg-theme-input'
       }`}>
         {isUserMessage ? 
           <User className="w-3 h-3 sm:w-4 sm:h-4 text-white" /> : 
-          <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-gray-300 dark:text-gray-300" />
+          <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-theme-secondary" />
         }
       </div>
 
       {/* Message Bubble & Content */}
-      <div className={`flex-1 p-2 sm:p-4 rounded-2xl shadow-md transition-all duration-300 ${
+      <div className={`flex-1 p-2 sm:p-4 rounded-2xl shadow-theme-md transition-all duration-300 ${
         isUserMessage 
             ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-br-none hover:opacity-90' 
-            : theme === 'dark'
-              ? 'bg-gray-800 text-gray-100 rounded-bl-none hover:bg-gray-700'
-              : 'bg-slate-100 text-gray-800 rounded-bl-none hover:bg-slate-200'
+            : 'bg-theme-secondary text-theme-primary rounded-bl-none hover:bg-theme-tertiary border border-theme-light'
         } ${message.status === "error" ? 'border border-red-400' : ''}`}>
           
         <div className="flex justify-between items-center mb-1 sm:mb-2">
           <span className="text-xs sm:text-sm font-bold">
             {isUserMessage ? 'You' : 'Assistant'}
           </span>
-          <span className={`text-xs ${isUserMessage ? 'text-blue-100' : 'text-gray-400'}`}>
+          <span className={`text-xs ${isUserMessage ? 'text-blue-100' : 'text-theme-tertiary'}`}>
             {formatTime(message.timestamp)}
           </span>
         </div>
@@ -264,10 +259,10 @@ const Message: React.FC<MessageProps> = ({
       <div className="opacity-0 group-hover:opacity-100 transition-opacity self-center hidden sm:block flex-shrink-0">
         <Menu as="div" className="relative">
           <Menu.Button 
-            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-2 rounded-full hover:bg-theme-tertiary transition-colors"
             disabled={message.status === "sending" || message.status === "retrying"}
           >
-            <MoreHorizontal className="w-4 h-4 text-slate-500" />
+            <MoreHorizontal className="w-4 h-4 text-theme-tertiary" />
           </Menu.Button>
           <Transition 
             as={React.Fragment} 
@@ -278,13 +273,13 @@ const Message: React.FC<MessageProps> = ({
             leaveFrom="transform opacity-100 scale-100" 
             leaveTo="transform opacity-0 scale-95"
           >
-            <Menu.Items className={`absolute ${isUserMessage ? "right-0" : "left-0"} top-8 w-48 rounded-xl shadow-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 ring-1 ring-black ring-opacity-5 z-10`}>
+            <Menu.Items className={`absolute ${isUserMessage ? "right-0" : "left-0"} top-8 w-48 rounded-xl shadow-theme-lg bg-theme-secondary border border-theme-light ring-1 ring-black ring-opacity-5 z-10`}>
               <div className="py-1">
                 <Menu.Item>
                   {({ active }) => (
                     <button 
                       onClick={handleCopyToClipboard}
-                      className={`${active ? 'bg-slate-100 dark:bg-slate-700' : ''} flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 transition-colors`}
+                      className={`${active ? 'bg-theme-tertiary' : ''} flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-theme-primary transition-colors`}
                     >
                       <Copy className="w-4 h-4" />
                       <span>Copy</span>
@@ -296,7 +291,7 @@ const Message: React.FC<MessageProps> = ({
                     {({ active }) => (
                       <button 
                         onClick={() => setIsEditing(true)}
-                        className={`${active ? 'bg-slate-100 dark:bg-slate-700' : ''} flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 transition-colors`}
+                        className={`${active ? 'bg-theme-tertiary' : ''} flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-theme-primary transition-colors`}
                       >
                         <Edit3 className="w-4 h-4" />
                         <span>Edit</span>

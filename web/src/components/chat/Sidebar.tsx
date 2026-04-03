@@ -107,11 +107,11 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
         variants={sidebarVariants}
         className={`
           fixed inset-y-0 left-0 z-40 w-80 h-full flex flex-col
-          bg-white/80 dark:bg-gray-950/90 backdrop-blur-xl
-          border-r border-gray-200/50 dark:border-white/10
+          bg-theme-secondary/80 backdrop-blur-xl
+          border-r border-theme-light
           lg:relative lg:translate-x-0 lg:opacity-100 lg:block
           ${!isOpen ? "lg:hidden" : ""} 
-          shadow-2xl lg:shadow-none
+          shadow-theme-2xl lg:shadow-none
         `}
       >
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -132,11 +132,11 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onCreateNewConversation}
-              className="w-full group relative flex items-center justify-center space-x-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium py-2.5 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full group relative flex items-center justify-center space-x-2 bg-theme-primary text-theme-primary font-medium py-2.5 px-4 rounded-lg shadow-theme-lg hover:shadow-theme-xl transition-all duration-200 border border-theme-light"
             >
               <Plus className="w-4 h-4" />
               <span>New Conversation</span>
-              <div className="absolute inset-0 rounded-lg bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 rounded-lg bg-theme-tertiary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </motion.button>
 
              {/* Search */}
@@ -147,13 +147,13 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
                 placeholder="Search history..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-900/50 border border-transparent dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-theme-input border border-theme-light rounded-lg text-sm text-theme-primary placeholder-theme-tertiary focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-theme-secondary transition-all"
               />
             </div>
           </div>
 
           {/* Chat List - Grouped */}
-          <div className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-800">
+          <div className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-thin scrollbar-thumb-theme-tertiary">
             <motion.div 
               variants={containerVariants}
               initial="hidden"
@@ -178,8 +178,8 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
                           className={`
                             w-full relative group flex flex-col items-start p-3 rounded-xl transition-all duration-200
                             ${activeConversationId === session.id
-                              ? "bg-indigo-50/80 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
-                              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200"
+                              ? "bg-indigo-500/10 text-indigo-400"
+                              : "text-theme-secondary hover:bg-theme-tertiary/50 hover:text-theme-primary"
                             }
                           `}
                         >
@@ -211,29 +211,29 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
 
               {filteredSessions.length === 0 && (
                 <div className="text-center py-10 px-4">
-                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Search className="w-5 h-5 text-gray-400" />
+                  <div className="w-12 h-12 bg-theme-input rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Search className="w-5 h-5 text-theme-tertiary" />
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No conversations found</p>
+                  <p className="text-sm text-theme-tertiary">No conversations found</p>
                 </div>
               )}
             </motion.div>
           </div>
 
            {/* User Footer */}
-           <div className="p-4 bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-white/5 backdrop-blur-sm">
+           <div className="p-4 bg-theme-primary border-t border-theme-light backdrop-blur-sm">
             <div className="flex items-center justify-between group">
                <div className="flex items-center space-x-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5">
-                     <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
-                        <User className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                     <div className="w-full h-full rounded-full bg-theme-secondary flex items-center justify-center">
+                        <User className="w-4 h-4 text-theme-secondary" />
                      </div>
                   </div>
                   <div className="flex flex-col">
-                     <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                     <span className="text-sm font-semibold text-theme-primary">
                         {user?.name || "Admin User"}
                      </span>
-                     <span className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</span>
+                     <span className="text-xs text-theme-tertiary">{user?.email}</span>
                   </div>
                </div>
                
