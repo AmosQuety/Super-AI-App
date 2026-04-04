@@ -121,7 +121,7 @@ const corsOptions: cors.CorsOptions = {
 
     // Helper to decide if error is safe to show
     const isExposedError = (code: string) => {
-      return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(code);
+      return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN', 'GRAPHQL_VALIDATION_FAILED', 'BAD_REQUEST'].includes(code);
     };
 
     app.options("*", cors(corsOptions));

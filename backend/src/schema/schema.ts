@@ -119,6 +119,7 @@ export const typeDefs = gql`
 
   type VoiceCloneResponse {
     success: Boolean!
+    message: String
     audioUrl: String
     jobId: String
     status: String

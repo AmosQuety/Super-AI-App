@@ -24,6 +24,7 @@ export const voiceCloningResolvers = {
         if (!result.success) {
           return {
             success: false,
+            message: result.error || "Voice registration failed",
             error: result.error || "Voice registration failed"
           };
         }
@@ -38,6 +39,7 @@ export const voiceCloningResolvers = {
 
         return {
           success: true,
+          message: result.message || "Voice registered successfully",
           jobId: result.jobId,
           status: "COMPLETED",
         };

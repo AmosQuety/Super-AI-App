@@ -50,6 +50,8 @@ export const REGISTER_VOICE = gql`
     registerVoice(referenceAudio: $referenceAudio) {
       success
       message
+      jobId
+      status
     }
   }
 `;

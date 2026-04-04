@@ -29,11 +29,23 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error) {
-    // Send to our monitor
-    const errorId = ErrorMonitor.capture(error, {
-      // componentStack: errorInfo.componentStack
-    });
-    
+    // Detect stale-cache chunk loading failures (e.g. after a Vercel redeployment).
+    // These look like: "Failed to fetch dynamically imported module: .../assets/SomePage-[hash].js"
+    const isChunkLoadError =
+      error.message?.includes("Failed to fetch dynamically imported module") ||
+      error.message?.includes("Importing a module script failed") ||
+      error.message?.includes("error loading dynamically imported module") ||
+      error.name === "ChunkLoadError";
+
+    if (isChunkLoadError) {
+      // Auto-recover: hard reload once to pick up the fresh build
+      console.warn("🔄 Stale chunk detected — reloading to fetch fresh build...");
+      window.location.reload();
+      return;
+    }
+
+    // Send all other errors to the monitor
+    const errorId = ErrorMonitor.capture(error, {});
     this.setState({ errorId });
   }
 
