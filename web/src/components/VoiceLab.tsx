@@ -18,7 +18,7 @@ interface CloneVoiceData {
 }
 
 interface VoiceJobStatusData {
-  voiceJobStatus: {
+  getVoiceJobStatus: {
     status: string;
     success: boolean;
     audioUrl?: string;
@@ -168,7 +168,7 @@ export default function VoiceLab() {
 
   // Handle job status updates
   React.useEffect(() => {
-    const job = jobStatusData?.voiceJobStatus;
+    const job = jobStatusData?.getVoiceJobStatus;
     if (!job) return;
 
     if (job.status === 'COMPLETED' && job.audioUrl) {

@@ -69,7 +69,7 @@ export const CLONE_VOICE = gql`
 
 export const GET_VOICE_JOB_STATUS = gql`
   query GetVoiceJobStatus($jobId: String!) {
-    voiceJobStatus(jobId: $jobId) {
+    getVoiceJobStatus(jobId: $jobId) {
       status
       success
       audioUrl
