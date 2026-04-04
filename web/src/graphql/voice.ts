@@ -60,8 +60,21 @@ export const CLONE_VOICE = gql`
   mutation CloneVoice($text: String!, $referenceAudio: Upload) {
     cloneVoice(text: $text, referenceAudio: $referenceAudio) {
       success
+      jobId
+      status
+      error
+    }
+  }
+`;
+
+export const GET_VOICE_JOB_STATUS = gql`
+  query GetVoiceJobStatus($jobId: String!) {
+    voiceJobStatus(jobId: $jobId) {
+      status
+      success
       audioUrl
       error
+      message
     }
   }
 `;

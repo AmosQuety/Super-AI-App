@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { 
-  Zap, AlertCircle, ShieldCheck, UserCheck, Settings, 
+import {
+  Zap, AlertCircle, ShieldCheck, UserCheck, Settings,
   ChevronDown, ChevronUp, Music4, RefreshCw,
-  Mic, Square, Upload, CheckCircle2, Trash2, Loader2 
+  Mic, Square, Upload, CheckCircle2, Trash2, Loader2
 } from 'lucide-react';
-import { useMutation } from '@apollo/client/react';
-import { REGISTER_VOICE, CLONE_VOICE } from '../graphql/voice';
+import { useMutation, useLazyQuery } from '@apollo/client/react';
+import { REGISTER_VOICE, CLONE_VOICE, GET_VOICE_JOB_STATUS } from '../graphql/voice';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 import LoadingGameEngine from './loading/LoadingGameEngine';
 
@@ -14,18 +14,28 @@ interface RegisterVoiceData {
 }
 
 interface CloneVoiceData {
-  cloneVoice: { success: boolean; audioUrl: string; error?: string };
+  cloneVoice: { success: boolean; jobId?: string; status?: string; error?: string };
+}
+
+interface VoiceJobStatusData {
+  voiceJobStatus: {
+    status: string;
+    success: boolean;
+    audioUrl?: string;
+    error?: string;
+    message?: string;
+  };
 }
 
 
 export default function VoiceLab() {
   // TTS State (for synthesis input)
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
-  
+
   // Workflow Phases: 1. Consent, 2. Enrollment, 3. Generation
   const [phase, setPhase] = useState<'consent' | 'enrollment' | 'generation'>('consent');
   const [hasConsent, setHasConsent] = useState(false);
-  
+
   // Audio Metrics & Transcript from context
   const { audioMetrics, transcript } = useVoiceIntelligence();
 
@@ -36,6 +46,7 @@ export default function VoiceLab() {
   // Advanced Parameters (for UI sliders)
   const [inferTimestep, setInferTimestep] = useState(32);
   const [pW, setPW] = useState(1.4);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [tW, setTW] = useState(3);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -78,8 +89,8 @@ export default function VoiceLab() {
         const actualMime = mediaRecorder.mimeType || 'audio/webm';
         const blob = new Blob(audioChunksRef.current, { type: actualMime });
         if (blob.size > 3 * 1024 * 1024) {
-            alert("Recording is too large! Please keep your audio under 3MB (approx 15 seconds) to ensure optimal AI cloning speed.");
-            return;
+          alert("Recording is too large! Please keep your audio under 3MB (approx 15 seconds) to ensure optimal AI cloning speed.");
+          return;
         }
         const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: actualMime });
         setAudioBlob(file);
@@ -104,9 +115,9 @@ export default function VoiceLab() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 3 * 1024 * 1024) {
-          alert("Audio file is too large! Please upload a file smaller than 3MB (approx 15 seconds) to prevent AI memory crashes.");
-          e.target.value = ''; // Reset input
-          return;
+        alert("Audio file is too large! Please upload a file smaller than 3MB (approx 15 seconds) to prevent AI memory crashes.");
+        e.target.value = ''; // Reset input
+        return;
       }
       setAudioBlob(file);
       setAudioUrl(URL.createObjectURL(file));
@@ -140,49 +151,81 @@ export default function VoiceLab() {
     } catch (err: any) {
       console.error("Registration Error:", err);
       setCloningStatus('error');
-      
-      const errorMessage = err.graphQLErrors?.[0]?.message 
-        || err.networkError?.result?.errors?.[0]?.message 
-        || err.message 
+
+      const errorMessage = err.graphQLErrors?.[0]?.message
+        || err.networkError?.result?.errors?.[0]?.message
+        || err.message
         || 'Connection to server failed.';
-        
+
       setSpaceStatus(errorMessage);
     }
   };
 
+  // Polling query for job status
+  const [getJobStatus, { data: jobStatusData }] = useLazyQuery<VoiceJobStatusData>(GET_VOICE_JOB_STATUS, {
+    fetchPolicy: 'network-only'
+  });
+
+  // Handle job status updates
+  React.useEffect(() => {
+    const job = jobStatusData?.voiceJobStatus;
+    if (!job) return;
+
+    if (job.status === 'COMPLETED' && job.audioUrl) {
+      setClonedAudioUrl(job.audioUrl);
+      setCloningStatus('done');
+      setSpaceStatus('Done');
+      setCurrentJobId(null);
+    } else if (job.status === 'FAILED') {
+      setCloningStatus('error');
+      setSpaceStatus(job.error || 'Synthesis failed');
+      setCurrentJobId(null);
+    } else {
+      setSpaceStatus(job.message || 'Synthesizing Neural Speech...');
+    }
+  }, [jobStatusData]);
+
+  // Polling effect
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (currentJobId && (cloningStatus === 'processing' || cloningStatus === 'uploading')) {
+      interval = setInterval(() => {
+        getJobStatus({ variables: { jobId: currentJobId } });
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [currentJobId, cloningStatus, getJobStatus]);
+
   const handleCloneVoice = async () => {
     if (!ttsText.trim()) return;
     setCloningStatus('processing');
-    setSpaceStatus('Synthesizing Neural Speech...');
+    setSpaceStatus('Initiating Neural Synthesis...');
+    setClonedAudioUrl(null);
 
     try {
-      // Use the local GraphQL backend
       const { data } = await cloneVoiceMutation({
-        variables: { 
+        variables: {
           text: ttsText,
-          // If they just recorded but didn't "register", we could pass the blob
-          // But usually we use the registered voice for the logged-in user.
-          referenceAudio: phase === 'enrollment' ? audioBlob : undefined 
+          referenceAudio: phase === 'enrollment' ? audioBlob : undefined
         }
       });
 
-      if (data?.cloneVoice?.success && data.cloneVoice.audioUrl) {
-          setClonedAudioUrl(data.cloneVoice.audioUrl);
-          setCloningStatus('done');
-          setSpaceStatus('Done');
+      if (data?.cloneVoice?.success && data.cloneVoice.jobId) {
+        setCurrentJobId(data.cloneVoice.jobId);
+        setSpaceStatus('Job Queued — Synthesizing...');
       } else {
-          setCloningStatus('error');
-          setSpaceStatus(data?.cloneVoice?.error || 'Synthesis failed');
+        setCloningStatus('error');
+        setSpaceStatus(data?.cloneVoice?.error || 'Synthesis initiation failed');
       }
     } catch (err: any) {
       console.error("Local Clone Error:", err);
       setCloningStatus('error');
-      
-      const errorMessage = err.graphQLErrors?.[0]?.message 
-        || err.networkError?.result?.errors?.[0]?.message 
-        || err.message 
+
+      const errorMessage = err.graphQLErrors?.[0]?.message
+        || err.networkError?.result?.errors?.[0]?.message
+        || err.message
         || 'Connection to AI server failed. Please try again.';
-        
+
       setSpaceStatus(errorMessage);
     }
   };
@@ -210,10 +253,10 @@ export default function VoiceLab() {
           </div>
 
           <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-            <input 
-              type="checkbox" 
-              id="tos" 
-              checked={hasConsent} 
+            <input
+              type="checkbox"
+              id="tos"
+              checked={hasConsent}
               onChange={(e) => setHasConsent(e.target.checked)}
               className="mt-1 w-5 h-5 rounded border-theme-light text-blue-600 focus:ring-blue-500 bg-theme-input"
             />
@@ -256,76 +299,76 @@ export default function VoiceLab() {
               >
                 {isRecording ? <Square className="w-8 h-8 text-white" /> : <Mic className="w-8 h-8 text-theme-secondary group-hover:text-red-500 transition-colors" />}
               </button>
-              
-              <div className="mt-8 text-center">
-                  <p className="text-lg font-bold text-theme-primary mb-1">
-                    {isRecording ? 'Capturing Biometrics...' : 'Reference Audio'}
-                  </p>
-                  <p className="text-sm text-theme-tertiary mb-6 font-medium">Capture a 10s sample for best results</p>
-                  
-                  {isRecording && (
-                    <div className="space-y-4 mb-6">
-                      <div className="flex items-center gap-2 justify-center">
-                         <div className="flex items-end gap-1 h-6">
-                            {[...Array(8)].map((_, i) => (
-                              <div 
-                                key={i} 
-                                className="w-1 bg-red-500 rounded-full transition-all duration-75"
-                                style={{ 
-                                  height: `${Math.max(20, Math.random() * (audioMetrics.vol * 150))}%`,
-                                  opacity: 0.7 + (i * 0.04)
-                                }} 
-                              />
-                            ))}
-                         </div>
-                         <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Noise Level</span>
-                      </div>
-                      {transcript && (
-                        <div className="px-6 py-3 bg-theme-input rounded-xl border border-theme-light animate-in fade-in duration-300">
-                          <p className="text-xs text-theme-tertiary italic">"{transcript}..."</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
-                  {!isRecording && (
-                    <label className="cursor-pointer bg-theme-secondary border-2 border-theme-light px-6 py-2 rounded-xl text-sm font-bold hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300 flex items-center gap-2 mx-auto w-fit hover:-translate-y-0.5">
-                      <Upload className="w-4 h-4 text-red-500" />
-                      Upload .wav
-                      <input type="file" accept="audio/wav,audio/mp3" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                  )}
+              <div className="mt-8 text-center">
+                <p className="text-lg font-bold text-theme-primary mb-1">
+                  {isRecording ? 'Capturing Biometrics...' : 'Reference Audio'}
+                </p>
+                <p className="text-sm text-theme-tertiary mb-6 font-medium">Capture a 10s sample for best results</p>
+
+                {isRecording && (
+                  <div className="space-y-4 mb-6">
+                    <div className="flex items-center gap-2 justify-center">
+                      <div className="flex items-end gap-1 h-6">
+                        {[...Array(8)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-1 bg-red-500 rounded-full transition-all duration-75"
+                            style={{
+                              height: `${Math.max(20, Math.random() * (audioMetrics.vol * 150))}%`,
+                              opacity: 0.7 + (i * 0.04)
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Noise Level</span>
+                    </div>
+                    {transcript && (
+                      <div className="px-6 py-3 bg-theme-input rounded-xl border border-theme-light animate-in fade-in duration-300">
+                        <p className="text-xs text-theme-tertiary italic">"{transcript}..."</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isRecording && (
+                  <label className="cursor-pointer bg-theme-secondary border-2 border-theme-light px-6 py-2 rounded-xl text-sm font-bold hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300 flex items-center gap-2 mx-auto w-fit hover:-translate-y-0.5">
+                    <Upload className="w-4 h-4 text-red-500" />
+                    Upload .wav
+                    <input type="file" accept="audio/wav,audio/mp3" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                )}
               </div>
             </div>
           ) : (
             <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                <div className="p-6 bg-green-500/10 border-2 border-dashed border-green-500/30 rounded-3xl flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-theme-lg shadow-green-500/20">
-                      <CheckCircle2 className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-theme-primary">Sample Captured</p>
-                      <p className="text-xs text-theme-tertiary">Neural signature extracted</p>
-                    </div>
+              <div className="p-6 bg-green-500/10 border-2 border-dashed border-green-500/30 rounded-3xl flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-theme-lg shadow-green-500/20">
+                    <CheckCircle2 className="w-6 h-6 text-white" />
                   </div>
-                  <button onClick={() => setAudioUrl(null)} className="p-3 bg-theme-tertiary rounded-xl text-theme-tertiary hover:text-red-500 transition-all shadow-theme-sm">
-                    <Trash2 className="w-6 h-6" />
-                  </button>
+                  <div>
+                    <p className="font-bold text-theme-primary">Sample Captured</p>
+                    <p className="text-xs text-theme-tertiary">Neural signature extracted</p>
+                  </div>
                 </div>
-                
-                <div className="bg-theme-input p-4 rounded-2xl border border-theme-light">
-                   <audio controls src={audioUrl} className="w-full h-10" />
-                </div>
-
-                <button
-                  onClick={handleRegisterVoice}
-                  disabled={cloningStatus === 'uploading'}
-                  className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0"
-                >
-                  {cloningStatus === 'uploading' ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserCheck className="w-5 h-5" />}
-                  Confirm & Finalize
+                <button onClick={() => setAudioUrl(null)} className="p-3 bg-theme-tertiary rounded-xl text-theme-tertiary hover:text-red-500 transition-all shadow-theme-sm">
+                  <Trash2 className="w-6 h-6" />
                 </button>
+              </div>
+
+              <div className="bg-theme-input p-4 rounded-2xl border border-theme-light">
+                <audio controls src={audioUrl} className="w-full h-10" />
+              </div>
+
+              <button
+                onClick={handleRegisterVoice}
+                disabled={cloningStatus === 'uploading'}
+                className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                {cloningStatus === 'uploading' ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserCheck className="w-5 h-5" />}
+                Confirm & Finalize
+              </button>
             </div>
           )}
         </div>
@@ -348,39 +391,39 @@ export default function VoiceLab() {
               Re-enroll
             </button>
           </div>
-          
+
           <div className="flex items-center gap-4">
-             <div className="flex-1 bg-theme-input p-3 rounded-2xl border border-theme-light">
-                <audio src={audioUrl || ''} controls className="w-full h-8" />
-             </div>
+            <div className="flex-1 bg-theme-input p-3 rounded-2xl border border-theme-light">
+              <audio src={audioUrl || ''} controls className="w-full h-8" />
+            </div>
           </div>
         </div>
 
         {/* Synthesis Input */}
         <div className="bg-theme-secondary p-8 rounded-3xl border border-theme-light shadow-theme-xl space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-theme-tertiary uppercase tracking-widest flex items-center gap-2">
-                Text to Generate
-              </h3>
-              <button 
-                onClick={handleSyncTranscript}
-                disabled={!transcript.trim()}
-                className="text-[10px] font-bold text-orange-500 hover:text-orange-600 disabled:opacity-30 flex items-center gap-1 uppercase tracking-widest transition-all"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Sync with Transcript
-              </button>
-            </div>
-            <textarea
-              value={ttsText}
-              onChange={(e) => setTtsText(e.target.value)}
-              className="w-full h-40 p-5 bg-theme-input rounded-2xl border-2 border-theme-light focus:border-orange-500 focus:ring-0 resize-none transition-all text-lg font-medium leading-relaxed text-theme-primary"
-              placeholder="Enter the text you want to synthesize..."
-            />
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-theme-tertiary uppercase tracking-widest flex items-center gap-2">
+              Text to Generate
+            </h3>
+            <button
+              onClick={handleSyncTranscript}
+              disabled={!transcript.trim()}
+              className="text-[10px] font-bold text-orange-500 hover:text-orange-600 disabled:opacity-30 flex items-center gap-1 uppercase tracking-widest transition-all"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Sync with Transcript
+            </button>
+          </div>
+          <textarea
+            value={ttsText}
+            onChange={(e) => setTtsText(e.target.value)}
+            className="w-full h-40 p-5 bg-theme-input rounded-2xl border-2 border-theme-light focus:border-orange-500 focus:ring-0 resize-none transition-all text-lg font-medium leading-relaxed text-theme-primary"
+            placeholder="Enter the text you want to synthesize..."
+          />
 
           {/* Advanced Options */}
           <div className="border border-theme-light rounded-2xl overflow-hidden">
-            <button 
+            <button
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="w-full px-6 py-4 flex items-center justify-between bg-theme-tertiary/50 hover:bg-theme-tertiary transition-colors"
             >
@@ -390,40 +433,40 @@ export default function VoiceLab() {
               </div>
               {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-            
+
             {showAdvanced && (
               <div className="p-6 bg-theme-secondary border-t border-theme-light space-y-6 animate-in slide-in-from-top-2 duration-300">
                 <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Infer Timestep</label>
-                      <input 
-                        type="range" min="1" max="100" 
-                        value={inferTimestep} 
-                        onChange={(e) => setInferTimestep(parseInt(e.target.value))}
-                        className="w-full h-1.5 bg-theme-tertiary rounded-lg appearance-none cursor-pointer accent-orange-500"
-                      />
-                      <div className="text-[10px] font-black text-theme-tertiary text-right">{inferTimestep}</div>
-                   </div>
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Intelligibility (p_w)</label>
-                      <input 
-                        type="range" min="0" max="10" step="0.1"
-                        value={pW} 
-                        onChange={(e) => setPW(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-theme-tertiary rounded-lg appearance-none cursor-pointer accent-orange-500"
-                      />
-                      <div className="text-[10px] font-black text-theme-tertiary text-right">{pW.toFixed(1)}</div>
-                   </div>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Similarity (t_w)</label>
-                   <input 
-                      type="range" min="0" max="10" step="0.1"
-                      value={tW} 
-                      onChange={(e) => setTW(parseFloat(e.target.value))}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Infer Timestep</label>
+                    <input
+                      type="range" min="1" max="100"
+                      value={inferTimestep}
+                      onChange={(e) => setInferTimestep(parseInt(e.target.value))}
                       className="w-full h-1.5 bg-theme-tertiary rounded-lg appearance-none cursor-pointer accent-orange-500"
                     />
-                    <div className="text-[10px] font-black text-theme-tertiary text-right">{tW.toFixed(1)}</div>
+                    <div className="text-[10px] font-black text-theme-tertiary text-right">{inferTimestep}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Intelligibility (p_w)</label>
+                    <input
+                      type="range" min="0" max="10" step="0.1"
+                      value={pW}
+                      onChange={(e) => setPW(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-theme-tertiary rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                    <div className="text-[10px] font-black text-theme-tertiary text-right">{pW.toFixed(1)}</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest block">Similarity (t_w)</label>
+                  <input
+                    type="range" min="0" max="10" step="0.1"
+                    value={tW}
+                    onChange={(e) => setTW(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-theme-tertiary rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                  <div className="text-[10px] font-black text-theme-tertiary text-right">{tW.toFixed(1)}</div>
                 </div>
               </div>
             )}
@@ -436,97 +479,97 @@ export default function VoiceLab() {
           >
             <div className="absolute inset-0 bg-white/20 w-0 group-hover:w-full transition-all duration-500 ease-out z-0"></div>
             <span className="relative z-10 flex items-center gap-2">
-                {cloningStatus === 'uploading' || cloningStatus === 'processing' ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6 group-hover:scale-110 transition-transform" />}
-                Generate Speech
+              {cloningStatus === 'uploading' || cloningStatus === 'processing' ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6 group-hover:scale-110 transition-transform" />}
+              Generate Speech
             </span>
           </button>
         </div>
 
         <div className="px-6 py-2">
-           <p className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest flex items-center gap-2">
-              <Zap className="w-3 h-3 text-blue-500" />
-              Neural Engine: Biometric Brain v2.0
-           </p>
+          <p className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest flex items-center gap-2">
+            <Zap className="w-3 h-3 text-blue-500" />
+            Neural Engine: Biometric Brain v2.0
+          </p>
         </div>
       </div>
 
       {/* Right Column: Output & Visualization */}
       <div className="space-y-6">
         <div className="bg-theme-secondary rounded-3xl border border-theme-light shadow-theme-xl min-h-[500px] flex flex-col overflow-hidden">
-           <div className="p-6 border-b border-theme-light flex items-center justify-between">
-              <h3 className="text-sm font-bold text-theme-tertiary uppercase tracking-widest">
-                Generated Audio
-              </h3>
-              <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${cloningStatus === 'done' ? 'bg-green-500' : cloningStatus === 'error' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
-                 <span className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">{spaceStatus}</span>
+          <div className="p-6 border-b border-theme-light flex items-center justify-between">
+            <h3 className="text-sm font-bold text-theme-tertiary uppercase tracking-widest">
+              Generated Audio
+            </h3>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${cloningStatus === 'done' ? 'bg-green-500' : cloningStatus === 'error' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
+              <span className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">{spaceStatus}</span>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col p-8">
+            {cloningStatus === 'idle' && !clonedAudioUrl && (
+              <div className="flex-1 flex flex-col items-center justify-center text-theme-tertiary">
+                <Music4 className="w-32 h-32 mb-4 opacity-5" />
+                <p className="font-bold text-theme-tertiary uppercase tracking-[0.3em] text-[10px]">Awaiting Synthesis</p>
               </div>
-           </div>
+            )}
 
-           <div className="flex-1 flex flex-col p-8">
-              {cloningStatus === 'idle' && !clonedAudioUrl && (
-                <div className="flex-1 flex flex-col items-center justify-center text-theme-tertiary">
-                   <Music4 className="w-32 h-32 mb-4 opacity-5" />
-                   <p className="font-bold text-theme-tertiary uppercase tracking-[0.3em] text-[10px]">Awaiting Synthesis</p>
+            {(cloningStatus === 'uploading' || cloningStatus === 'processing') && (
+              <div className="flex-1 flex flex-col space-y-8 animate-in zoom-in-95 duration-500">
+                <div className="flex flex-col items-center text-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
+                  <h4 className="text-xl font-bold text-theme-primary">Neural Pathway Folding...</h4>
+                  <p className="text-xs text-theme-tertiary italic mt-1">MegaTTS3 is processing your biometric sample</p>
                 </div>
-              )}
 
-              {(cloningStatus === 'uploading' || cloningStatus === 'processing') && (
-                <div className="flex-1 flex flex-col space-y-8 animate-in zoom-in-95 duration-500">
-                   <div className="flex flex-col items-center text-center">
-                       <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
-                       <h4 className="text-xl font-bold text-theme-primary">Neural Pathway Folding...</h4>
-                       <p className="text-xs text-theme-tertiary italic mt-1">MegaTTS3 is processing your biometric sample</p>
-                   </div>
-                   
-                   <div className="flex-1 bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-theme-xl relative min-h-[300px]">
-                      <LoadingGameEngine />
-                   </div>
+                <div className="flex-1 bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-theme-xl relative min-h-[300px]">
+                  <LoadingGameEngine />
                 </div>
-              )}
+              </div>
+            )}
 
-              {cloningStatus === 'done' && clonedAudioUrl && (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-in scale-in-95 duration-500">
-                   <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center shadow-xl shadow-green-500/30">
-                      <CheckCircle2 className="w-12 h-12 text-white" />
-                   </div>
-                   <div className="text-center">
-                      <h4 className="text-2xl font-black text-theme-primary italic tracking-tighter">SYNTHESIS COMPLETE</h4>
-                      <p className="text-sm text-theme-tertiary mt-1 uppercase tracking-widest font-bold">Neural Clone Active</p>
-                   </div>
-                   
-                   <div className="w-full bg-theme-input p-6 rounded-3xl border-2 border-theme-light shadow-inner">
-                      <audio src={clonedAudioUrl} controls autoPlay className="w-full h-12" />
-                      <div className="mt-4 flex justify-between text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">
-                         <span>MegaTTS3 Model v1.0</span>
-                         <span>Ready for Export</span>
-                      </div>
-                   </div>
-
-                   <button onClick={() => { setCloningStatus('idle'); setClonedAudioUrl(null); }} className="text-xs font-bold text-orange-500 hover:underline uppercase tracking-widest">
-                      Generate New Variant
-                   </button>
+            {cloningStatus === 'done' && clonedAudioUrl && (
+              <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-in scale-in-95 duration-500">
+                <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center shadow-xl shadow-green-500/30">
+                  <CheckCircle2 className="w-12 h-12 text-white" />
                 </div>
-              )}
-
-              {cloningStatus === 'error' && (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in shake duration-500">
-                   <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                      <AlertCircle className="w-10 h-10 text-red-500" />
-                   </div>
-                   <div className="text-center max-w-xs">
-                      <h4 className="text-xl font-bold text-theme-primary">Neural Synapse Failed</h4>
-                      <p className="text-sm text-theme-tertiary mt-2">{spaceStatus}</p>
-                   </div>
-                   <p className="text-xs text-theme-tertiary text-center px-4">
-                       Please ensure your microphone is connected and try a shorter text sample.
-                    </p>
-                   <button onClick={() => setCloningStatus('idle')} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">
-                      Reset Engine
-                   </button>
+                <div className="text-center">
+                  <h4 className="text-2xl font-black text-theme-primary italic tracking-tighter">SYNTHESIS COMPLETE</h4>
+                  <p className="text-sm text-theme-tertiary mt-1 uppercase tracking-widest font-bold">Neural Clone Active</p>
                 </div>
-              )}
-           </div>
+
+                <div className="w-full bg-theme-input p-6 rounded-3xl border-2 border-theme-light shadow-inner">
+                  <audio src={clonedAudioUrl} controls autoPlay className="w-full h-12" />
+                  <div className="mt-4 flex justify-between text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">
+                    <span>MegaTTS3 Model v1.0</span>
+                    <span>Ready for Export</span>
+                  </div>
+                </div>
+
+                <button onClick={() => { setCloningStatus('idle'); setClonedAudioUrl(null); }} className="text-xs font-bold text-orange-500 hover:underline uppercase tracking-widest">
+                  Generate New Variant
+                </button>
+              </div>
+            )}
+
+            {cloningStatus === 'error' && (
+              <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in shake duration-500">
+                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-10 h-10 text-red-500" />
+                </div>
+                <div className="text-center max-w-xs">
+                  <h4 className="text-xl font-bold text-theme-primary">Neural Synapse Failed</h4>
+                  <p className="text-sm text-theme-tertiary mt-2">{spaceStatus}</p>
+                </div>
+                <p className="text-xs text-theme-tertiary text-center px-4">
+                  Please ensure your microphone is connected and try a shorter text sample.
+                </p>
+                <button onClick={() => setCloningStatus('idle')} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">
+                  Reset Engine
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
