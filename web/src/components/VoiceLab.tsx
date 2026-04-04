@@ -46,10 +46,6 @@ export default function VoiceLab() {
   const [cloningStatus, setCloningStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [hfSpaceId, setHfSpaceId] = useState('xemora/MegaTTS3');
-  const [hfToken, setHfToken] = useState('');
-  const [showTokenInput] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -446,21 +442,11 @@ export default function VoiceLab() {
           </button>
         </div>
 
-        {/* HF Space Settings (Mini) */}
-        <div className="flex items-center gap-4 px-6">
-           <button onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-bold text-theme-tertiary hover:text-blue-500 flex items-center gap-2 uppercase tracking-widest">
-              <Settings className="w-3 h-3" />
-              API Topology
-           </button>
-           {showSettings && (
-             <input 
-               type="text" 
-               value={hfSpaceId} 
-               onChange={(e) => setHfSpaceId(e.target.value)}
-               className="flex-1 bg-transparent border-b border-theme-light text-[10px] py-1 focus:border-blue-500 text-theme-secondary"
-               placeholder="Space ID"
-             />
-           )}
+        <div className="px-6 py-2">
+           <p className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest flex items-center gap-2">
+              <Zap className="w-3 h-3 text-blue-500" />
+              Neural Engine: Biometric Brain v2.0
+           </p>
         </div>
       </div>
 
@@ -532,19 +518,9 @@ export default function VoiceLab() {
                       <h4 className="text-xl font-bold text-theme-primary">Neural Synapse Failed</h4>
                       <p className="text-sm text-theme-tertiary mt-2">{spaceStatus}</p>
                    </div>
-                   {showTokenInput && (
-                     <div className="w-full space-y-3 p-4 bg-theme-tertiary rounded-2xl border border-theme-light">
-                        <p className="text-[10px] font-bold text-theme-tertiary uppercase tracking-widest">Authentication Required</p>
-                        <input 
-                          type="password" 
-                          value={hfToken} 
-                          onChange={(e) => setHfToken(e.target.value)}
-                          placeholder="hf_..."
-                          className="w-full p-3 text-xs bg-theme-secondary border border-theme-light rounded-xl focus:ring-2 focus:ring-blue-500 text-theme-primary"
-                        />
-                        <button onClick={handleCloneVoice} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Retry Connection</button>
-                     </div>
-                   )}
+                   <p className="text-xs text-theme-tertiary text-center px-4">
+                       Please ensure your microphone is connected and try a shorter text sample.
+                    </p>
                    <button onClick={() => setCloningStatus('idle')} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">
                       Reset Engine
                    </button>
