@@ -64,7 +64,7 @@ self.onmessage = async (event: MessageEvent) => {
 
   if (type === 'generate') {
     if (!tts) {
-      ctx.postMessage({ type: 'error', message: 'Model not loaded' });
+      ctx.postMessage({ type: 'error', message: 'Neural engine not ready. Wait for initialization.' });
       return;
     }
 
@@ -74,7 +74,7 @@ self.onmessage = async (event: MessageEvent) => {
       const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
       const allSamples: Float32Array[] = [];
       let totalLength = 0;
-      let samplingRate = 24000; // Default for Kokoro
+      let samplingRate = 24000;
 
       for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i].trim();
@@ -83,8 +83,13 @@ self.onmessage = async (event: MessageEvent) => {
         ctx.postMessage({ 
           type: 'status', 
           status: 'generating', 
-          message: `Synthesizing part ${i+1}/${sentences.length}...`,
+          message: `Synthesizing Neural Pathway (${i + 1}/${sentences.length})...`,
         });
+
+        // Add a sanity check for extremely long text
+        if (sentence.length > 500) {
+           console.warn("Sentence too long for browser-local synthesis, splitting further...");
+        }
 
         const result = await tts.generate(sentence, {
           voice: voice || "af_heart",
@@ -93,11 +98,17 @@ self.onmessage = async (event: MessageEvent) => {
         if (result.audio) {
           allSamples.push(result.audio);
           totalLength += result.audio.length;
-          if (result.sampling_rate) samplingRate = result.sampling_rate;
+          if (result.samplingRate) samplingRate = result.samplingRate;
+        } else {
+           throw new Error(`Synthesis engine returned null on part ${i + 1}. This usually indicates a memory limit was hit.`);
         }
       }
 
-      // Concatenate all samples into one continuous buffer
+      if (totalLength === 0) throw new Error("No audio was generated from the provided text.");
+
+      ctx.postMessage({ type: 'status', status: 'generating', message: 'Merging audio synapses...' });
+
+      // Concatenate carefully
       const mergedSamples = new Float32Array(totalLength);
       let offset = 0;
       for (const samples of allSamples) {
@@ -105,7 +116,7 @@ self.onmessage = async (event: MessageEvent) => {
         offset += samples.length;
       }
 
-      // Encode single WAV
+      // Encode WAV
       const audioBlob = encodeWAV(mergedSamples, samplingRate);
       const arrayBuffer = await audioBlob.arrayBuffer();
 
@@ -115,9 +126,10 @@ self.onmessage = async (event: MessageEvent) => {
         isFinal: true 
       }, [arrayBuffer]);
 
-      ctx.postMessage({ type: 'status', status: 'ready', message: 'Synchronization complete' });
+      ctx.postMessage({ type: 'status', status: 'done', message: 'Synchronization complete' });
     } catch (err: any) {
-      ctx.postMessage({ type: 'error', message: err.message });
+      console.error("Worker Generation Error:", err);
+      ctx.postMessage({ type: 'error', message: `Neural Synthesis Failed: ${err.message || 'Fatal Worker Error'}` });
     }
   }
 

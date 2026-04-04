@@ -27,9 +27,9 @@ export default function EmojiCatcher({ settings, onGameOver }: { settings: any, 
   };
 
   const DIFFICULTY_MAP = {
-    easy: { spawnRate: 0.02, speedScale: 1 },
-    medium: { spawnRate: 0.04, speedScale: 1.5 },
-    hard: { spawnRate: 0.08, speedScale: 2.2 },
+    easy: { spawnRate: 0.015, speedScale: 0.8 },
+    medium: { spawnRate: 0.03, speedScale: 1.1 },
+    hard: { spawnRate: 0.06, speedScale: 1.6 },
   };
 
   const diff = DIFFICULTY_MAP[settings.difficulty as keyof typeof DIFFICULTY_MAP] || DIFFICULTY_MAP.medium;
@@ -46,7 +46,7 @@ export default function EmojiCatcher({ settings, onGameOver }: { settings: any, 
         x: Math.random() * 100,
         y: -10,
         emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-        speed: (2 + Math.random() * 3) * diff.speedScale,
+        speed: (1.5 + Math.random() * 2) * diff.speedScale,
       });
     }
 

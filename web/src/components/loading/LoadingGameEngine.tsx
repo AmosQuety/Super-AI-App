@@ -1,4 +1,4 @@
-import  { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Settings, X, Volume2, VolumeX, Trophy } from 'lucide-react';
 import EmojiCatcher from './games/EmojiCatcher';
 import PopTheBubbles from './games/PopTheBubbles';
@@ -16,23 +16,19 @@ interface HighScores {
 }
 
 export default function LoadingGameEngine() {
-  const [currentGame, setCurrentGame] = useState<GameType | null>(null);
+  const [currentGame] = useState<GameType>(() => {
+    const games: GameType[] = ['emoji-catcher', 'pop-bubbles', 'tap-dodge'];
+    return games[Math.floor(Math.random() * games.length)];
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<GameSettings>(() => {
     const saved = localStorage.getItem('loading-game-settings');
-    return saved ? JSON.parse(saved) : { soundEnabled: true, difficulty: 'medium' };
+    return saved ? JSON.parse(saved) : { soundEnabled: true, difficulty: 'easy' };
   });
   const [highScores, setHighScores] = useState<HighScores>(() => {
     const saved = localStorage.getItem('loading-game-scores');
     return saved ? JSON.parse(saved) : {};
   });
-
-  // Randomize game on mount
-  useEffect(() => {
-    const games: GameType[] = ['emoji-catcher', 'pop-bubbles', 'tap-dodge'];
-    const randomGame = games[Math.floor(Math.random() * games.length)];
-    setCurrentGame(randomGame);
-  }, []);
 
   const saveSettings = (newSettings: GameSettings) => {
     setSettings(newSettings);
