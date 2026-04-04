@@ -8,8 +8,8 @@ export const webhookRouter = express.Router();
  * Endpoint for Python AI Engine to hit once it finishes generating a Voice Clone.
  * Webhook URL: /api/webhooks/python/:jobId
  */
-webhookRouter.post('/python/:jobId', express.json(), async (req, res) => {
-    const { jobId } = req.params;
+webhookRouter.post('/python/:jobId?', express.json(), async (req, res) => {
+    const jobId = req.params.jobId || req.body.jobId;
     const { status, audioUrl, error, result } = req.body;
     
     logger.info(`🔔 [Webhook] Received Python Callback for Job ${jobId} -> Status: ${status}`);
