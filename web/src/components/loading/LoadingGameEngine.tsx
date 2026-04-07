@@ -44,6 +44,16 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
     setShowIntro(true);
   }, [currentGame, games]);
 
+  // Phase 5b: Ensure splash always clears (Issue 5.3)
+  useEffect(() => {
+    if (showIntro) {
+      const timer = setTimeout(() => {
+        setShowIntro(false);
+      }, 2500); // Fail-safe: force hide after 2.5s
+      return () => clearTimeout(timer);
+    }
+  }, [showIntro]);
+
   const updateHighScore = useCallback((game: GameType, score: number) => {
     setHighScores(prev => {
       const currentHigh = prev[game] || 0;
@@ -135,8 +145,9 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
         {/* Issue 5.3: Intro Splash Overlay */}
         {showIntro && (
             <div 
-                className="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500"
+                className={`absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500 cursor-pointer`}
                 onAnimationEnd={() => setShowIntro(false)}
+                onClick={() => setShowIntro(false)} // Allow manual skip
             >
                 <div className="relative">
                     <div className="absolute inset-0 bg-blue-500/20 blur-3xl animate-pulse" />
