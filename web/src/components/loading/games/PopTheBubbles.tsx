@@ -42,9 +42,17 @@ export default function PopTheBubbles({ settings, autoStart, onGameOver, onSwitc
     gameOverFiredRef.current = false;
     setScore(0);
     setGameState('playing');
-    setBubbles([]);
-    bubblesRef.current = [];
-    nextId.current = 0;
+    const firstBubble: Bubble = {
+      id: nextId.current++,
+      x: 20 + Math.random() * 60,
+      y: 20 + Math.random() * 60,
+      size: 40 + Math.random() * 40,
+      hue: Math.random() * 360,
+      life: 1.0
+    };
+    setBubbles([firstBubble]);
+    bubblesRef.current = [firstBubble];
+    
     lastTimeRef.current = performance.now();
     spawnTimerRef.current = 0;
   };

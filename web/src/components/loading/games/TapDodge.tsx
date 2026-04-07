@@ -48,13 +48,21 @@ export default function TapDodge({ settings, autoStart, onGameOver, onSwitchGame
     gameStateRef.current = 'playing';
     gameOverFiredRef.current = false;
     playerXRef.current = 50;
-    obstaclesRef.current = [];
+    const firstObstacle: Obstacle = {
+      id: nextId.current++,
+      x: 10 + Math.random() * 80,
+      y: -10,
+      width: 20 + Math.random() * 20,
+      height: 6,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    };
+    obstaclesRef.current = [firstObstacle];
     spawnTimerRef.current = 0;
     lastTimeRef.current = performance.now();
 
     setScore(0);
     setPlayerX(50);
-    setObstacles([]);
+    setObstacles([firstObstacle]);
     setGameState('playing');
   };
 

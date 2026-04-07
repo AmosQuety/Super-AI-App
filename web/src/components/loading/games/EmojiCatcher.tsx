@@ -82,14 +82,23 @@ export default function EmojiCatcher({ settings, autoStart, onGameOver, onSwitch
     ctx.shadowColor = '#3b82f6';
     ctx.fillStyle = '#3b82f6';
     ctx.beginPath();
-    ctx.roundRect(x - catcherWidth / 2, H - 38, catcherWidth, 18, 9);
+    // Use fallback for roundRect to support older browsers (Issue 2 fix)
+    if (ctx.roundRect) {
+      ctx.roundRect(x - catcherWidth / 2, H - 38, catcherWidth, 18, 9);
+    } else {
+      ctx.rect(x - catcherWidth / 2, H - 38, catcherWidth, 18);
+    }
     ctx.fill();
     ctx.shadowBlur = 0;
 
     // Draw shimmer on catcher
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.beginPath();
-    ctx.roundRect(x - catcherWidth / 2 + 4, H - 36, catcherWidth * 0.4, 6, 3);
+    if (ctx.roundRect) {
+      ctx.roundRect(x - catcherWidth / 2 + 4, H - 36, catcherWidth * 0.4, 6, 3);
+    } else {
+      ctx.rect(x - catcherWidth / 2 + 4, H - 36, catcherWidth * 0.4, 6);
+    }
     ctx.fill();
 
     // Draw emojis
@@ -199,11 +208,23 @@ export default function EmojiCatcher({ settings, autoStart, onGameOver, onSwitch
 
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        canvas.width = entry.contentRect.width;
-        canvas.height = entry.contentRect.height;
-        draw();
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          canvas.width = entry.contentRect.width;
+          canvas.height = entry.contentRect.height;
+          // Trigger a draw to clear the black screen immediately
+          draw();
+        }
       }
     });
+
+    // Set initial size
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      draw();
+    }
+
     observer.observe(container);
     return () => observer.disconnect();
   }, [draw]);

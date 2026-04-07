@@ -145,7 +145,10 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
         {/* Issue 5.3: Intro Splash Overlay */}
         {showIntro && (
           <div
-            className={`absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500 cursor-pointer`}
+            className={`absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500 cursor-pointer ${
+              // Issue 2: Ensure pointer events are disabled once fade starts
+              progress !== undefined && progress > 5 ? 'pointer-events-none' : ''
+            }`}
             onAnimationEnd={() => setShowIntro(false)}
             onClick={() => setShowIntro(false)} // Allow manual skip
           >
