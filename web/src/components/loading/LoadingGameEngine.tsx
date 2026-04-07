@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Settings, X, Volume2, VolumeX, Trophy, Gamepad2 } from 'lucide-react';
 import EmojiCatcher from './games/EmojiCatcher';
 import PopTheBubbles from './games/PopTheBubbles';
@@ -67,11 +67,11 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
   }, []);
 
   const renderGame = () => {
-    const commonProps = { 
-        settings, 
-        autoStart: autoStart && !showIntro, // Don't start until intro finishes
-        onGameOver: (score: number) => updateHighScore(currentGame, score),
-        onSwitchGame: switchGame 
+    const commonProps = {
+      settings,
+      autoStart: autoStart && !showIntro, // Don't start until intro finishes
+      onGameOver: (score: number) => updateHighScore(currentGame, score),
+      onSwitchGame: switchGame
     };
 
     switch (currentGame) {
@@ -93,7 +93,7 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
       {/* Progress Bar (Issue 3) */}
       {(progress !== undefined) && (
         <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-30">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
           />
@@ -103,38 +103,38 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
       {/* Header Info */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-20 pointer-events-none">
         <div className="flex flex-col items-start">
-            <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-700/50 shadow-lg">
+          <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-700/50 shadow-lg">
             <Trophy className="w-4 h-4 text-yellow-500" />
             <div className="flex flex-col">
-                <span className="text-[10px] text-slate-500 uppercase font-black leading-none">High Score</span>
-                <span className="text-sm font-black text-white leading-none">
+              <span className="text-[10px] text-slate-500 uppercase font-black leading-none">High Score</span>
+              <span className="text-sm font-black text-white leading-none">
                 {currentGame ? (highScores[currentGame] || 0) : 0}
-                </span>
+              </span>
             </div>
+          </div>
+          {operationLabel && (
+            <div className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 animate-pulse">
+              {operationLabel}
             </div>
-            {operationLabel && (
-                <div className="mt-2 text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 animate-pulse">
-                    {operationLabel}
-                </div>
-            )}
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-            <button 
-                onClick={switchGame}
-                className="pointer-events-auto p-2 bg-slate-900/80 backdrop-blur-md text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all hover:scale-110 active:scale-95 flex items-center gap-2 px-3"
-                title="Switch Game"
-            >
-                <Gamepad2 className="w-4 h-4" />
-                <span className="text-[10px] font-black uppercase hidden sm:block">Switch</span>
-            </button>
+          <button
+            onClick={switchGame}
+            className="pointer-events-auto p-2 bg-slate-900/80 backdrop-blur-md text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all hover:scale-110 active:scale-95 flex items-center gap-2 px-3"
+            title="Switch Game"
+          >
+            <Gamepad2 className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase hidden sm:block">Switch</span>
+          </button>
 
-            <button 
-                onClick={() => setShowSettings(true)}
-                className="pointer-events-auto p-2 bg-slate-900/80 backdrop-blur-md text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all hover:scale-110 active:scale-95"
-            >
-                <Settings className="w-4 h-4" />
-            </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="pointer-events-auto p-2 bg-slate-900/80 backdrop-blur-md text-slate-400 hover:text-white rounded-xl border border-slate-700/50 transition-all hover:scale-110 active:scale-95"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -144,30 +144,30 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
 
         {/* Issue 5.3: Intro Splash Overlay */}
         {showIntro && (
-            <div 
-                className={`absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500 cursor-pointer`}
-                onAnimationEnd={() => setShowIntro(false)}
-                onClick={() => setShowIntro(false)} // Allow manual skip
-            >
-                <div className="relative">
-                    <div className="absolute inset-0 bg-blue-500/20 blur-3xl animate-pulse" />
-                    <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter relative z-10 animate-in zoom-in-50 duration-500">
-                        {currentGame.replace('-', ' ').toUpperCase()}
-                    </h2>
-                </div>
-                <div className="mt-8 flex items-center gap-4">
-                    <div className="h-[2px] w-12 bg-gradient-to-r from-transparent to-blue-500" />
-                    <span className="text-xs font-black text-blue-500 uppercase tracking-[0.3em] animate-pulse">
-                        Neural Link Established
-                    </span>
-                    <div className="h-[2px] w-12 bg-gradient-to-l from-transparent to-blue-500" />
-                </div>
-                
-                {/* Visual Countdown Progress */}
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-900">
-                    <div className="h-full bg-blue-600 animate-[progress_1.5s_linear_forwards]" />
-                </div>
+          <div
+            className={`absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center animate-out fade-out fill-mode-forwards duration-500 delay-1500 cursor-pointer`}
+            onAnimationEnd={() => setShowIntro(false)}
+            onClick={() => setShowIntro(false)} // Allow manual skip
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500/20 blur-3xl animate-pulse" />
+              <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter relative z-10 animate-in zoom-in-50 duration-500">
+                {currentGame.replace('-', ' ').toUpperCase()}
+              </h2>
             </div>
+            <div className="mt-8 flex items-center gap-4">
+              <div className="h-[2px] w-12 bg-gradient-to-r from-transparent to-blue-500" />
+              <span className="text-xs font-black text-blue-500 uppercase tracking-[0.3em] animate-pulse">
+                Neural Link Established
+              </span>
+              <div className="h-[2px] w-12 bg-gradient-to-l from-transparent to-blue-500" />
+            </div>
+
+            {/* Visual Countdown Progress */}
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-900">
+              <div className="h-full bg-blue-600 animate-[progress_1.5s_linear_forwards]" />
+            </div>
+          </div>
         )}
       </div>
 
@@ -188,7 +188,7 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
                   {settings.soundEnabled ? <Volume2 className="w-5 h-5 text-blue-400" /> : <VolumeX className="w-5 h-5 text-slate-500" />}
                   <span className="font-bold text-slate-200">Audio Feedback</span>
                 </div>
-                <button 
+                <button
                   onClick={() => saveSettings({ ...settings, soundEnabled: !settings.soundEnabled })}
                   className={`w-12 h-6 rounded-full transition-all relative ${settings.soundEnabled ? 'bg-blue-600' : 'bg-slate-700'}`}
                 >
@@ -212,7 +212,7 @@ export default function LoadingGameEngine({ autoStart = true, operationLabel, pr
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setShowSettings(false)}
               className="w-full py-4 bg-white text-slate-950 rounded-2xl font-black text-sm tracking-widest hover:bg-slate-200 transition-colors"
             >
