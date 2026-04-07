@@ -1,4 +1,51 @@
 @import './animation.css';
+
+/* ============================================================================
+   MARKDOWN CONTENT STYLING
+   ============================================================================ */
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3 {
+  color: var(--text-white);
+  line-height: 1.2;
+}
+
+.markdown-content p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content pre {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content code {
+  color: #93c5fd; /* blue-300 */
+}
+
+/* Light mode overrides for AI messages */
+.light .ai-message .markdown-content p,
+.light .ai-message .markdown-content span,
+.light .ai-message .markdown-content em {
+  color: var(--text-primary);
+}
+
+.light .ai-message .markdown-content h1, 
+.light .ai-message .markdown-content h2, 
+.light .ai-message .markdown-content h3 {
+  color: var(--color-primary);
+  opacity: 0.9;
+}
+
+.light .ai-message .markdown-content strong {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
 @import "tailwindcss";
 
 /* ============================================================================

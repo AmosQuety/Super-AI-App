@@ -138,16 +138,96 @@ const Message: React.FC<MessageProps> = ({
     }
   };
 
-  // REFACTOR: Render basic Markdown bold and italics securely
+  // REFACTOR: Enhanced line-by-line Markdown parsing
   const renderFormattedText = (text: string) => {
-    // Split by **text** or *text* capturing the delimiters
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    if (!text) return null;
+
+    // Handle code blocks first (they can span multiple lines)
+    const blocks = text.split(/(```[\s\S]*?```)/g);
+    
+    return blocks.map((block, blockIndex) => {
+      if (block.startsWith('```') && block.endsWith('```')) {
+        const codeContent = block.slice(3, -3).trim();
+        return (
+          <div key={blockIndex} className="my-4 bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden group">
+            <div className="flex justify-between items-center px-4 py-2 bg-slate-900/50 border-b border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              <span>Code Block</span>
+              <button 
+                onClick={() => navigator.clipboard.writeText(codeContent)}
+                className="hover:text-blue-400 transition-colors"
+                title="Copy code"
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="p-4 text-xs font-mono text-blue-300 overflow-x-auto">
+              <code>{codeContent}</code>
+            </pre>
+          </div>
+        );
+      }
+
+      // Handle standard text lines
+      const lines = block.split('\n');
+      return lines.map((line, lineIndex) => {
+        const trimmed = line.trim();
+        if (!trimmed && lineIndex !== lines.length - 1) return <div key={`${blockIndex}-${lineIndex}`} className="h-2" />;
+
+        // --- Heading Detection ---
+        if (trimmed.startsWith('### ')) {
+          return <h3 key={`${blockIndex}-${lineIndex}`} className="text-lg font-black mt-4 mb-2 text-white italic tracking-tighter">{renderInline(trimmed.slice(4))}</h3>;
+        }
+        if (trimmed.startsWith('## ')) {
+          return <h2 key={`${blockIndex}-${lineIndex}`} className="text-xl font-black mt-6 mb-3 text-white italic tracking-tighter border-b border-white/10 pb-1">{renderInline(trimmed.slice(3))}</h2>;
+        }
+        if (trimmed.startsWith('# ')) {
+          return <h1 key={`${blockIndex}-${lineIndex}`} className="text-2xl font-black mt-8 mb-4 text-white italic tracking-tighter underline decoration-blue-500/50">{renderInline(trimmed.slice(2))}</h1>;
+        }
+
+        // --- List Detection ---
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          return (
+            <div key={`${blockIndex}-${lineIndex}`} className="flex items-start gap-3 my-1 pl-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+              <span className="flex-1 text-sm sm:text-base leading-relaxed">{renderInline(trimmed.slice(2))}</span>
+            </div>
+          );
+        }
+
+        // --- Numbered List Detection ---
+        const numberedMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+        if (numberedMatch) {
+          return (
+            <div key={`${blockIndex}-${lineIndex}`} className="flex items-start gap-3 my-1 pl-2">
+              <span className="text-xs font-black text-blue-400 mt-1 min-w-[1.2rem]">{numberedMatch[1]}.</span>
+              <span className="flex-1 text-sm sm:text-base leading-relaxed">{renderInline(numberedMatch[2])}</span>
+            </div>
+          );
+        }
+
+        // --- Standard Paragraph ---
+        return (
+          <p key={`${blockIndex}-${lineIndex}`} className="text-sm sm:text-base leading-relaxed mb-2 last:mb-0">
+            {renderInline(line)}
+          </p>
+        );
+      });
+    });
+  };
+
+  // Helper for inline markers (bold, italic, code)
+  const renderInline = (text: string) => {
+    // Split by **text** or *text* or `text`
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-bold">{part.slice(2, -2)}</strong>;
+        return <strong key={index} className="font-black text-white">{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith('*') && part.endsWith('*')) {
-        return <em key={index} className="italic">{part.slice(1, -1)}</em>;
+        return <em key={index} className="italic text-blue-100">{part.slice(1, -1)}</em>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={index} className="px-1.5 py-0.5 bg-slate-950/50 text-blue-300 rounded font-mono text-[0.8em] border border-white/10">{part.slice(1, -1)}</code>;
       }
       return <span key={index}>{part}</span>;
     });
@@ -224,9 +304,9 @@ const Message: React.FC<MessageProps> = ({
           </div>
         ) : (
           <>
-            <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
+            <div className="text-sm sm:text-base leading-relaxed break-words markdown-content">
               {renderFormattedText(message.text)}
-            </p>
+            </div>
             
             {/* Error message with retry option */}
             {message.status === "error" && onRetry && (
