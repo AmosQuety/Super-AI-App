@@ -18,12 +18,14 @@ import {
 } from "lucide-react";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import VoiceLab from "./VoiceLab";
-import LoadingGameEngine from "./loading/LoadingGameEngine";
+import ProcessingState from "./loading/ProcessingState";
+import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
 import VoiceVisualizer from "./ui/VoiceVisualizer";
 import { useEffect, useRef } from "react";
 
 export default function VoiceTools() {
+  const { requestPermission, notifyWhenReady } = useBrowserNotification();
   const { 
     isListening, 
     transcript, 
@@ -74,6 +76,7 @@ export default function VoiceTools() {
           setFinalAudioUrl(url);
           setTtsStatus('done');
           setStatusMessage('Synchronization Complete');
+          notifyWhenReady("Local TTS Complete", { body: "Your synthesized audio is ready." });
           break;
         case 'error':
           setTtsStatus('error');
@@ -99,6 +102,7 @@ export default function VoiceTools() {
     if (!workerRef.current || !ttsText.trim()) return;
     setFinalAudioUrl(null);
     setTtsStatus('generating');
+    requestPermission();
     audioChunksBuffer.current = [];
     workerRef.current.postMessage({ type: 'generate', text: ttsText });
   };
@@ -411,19 +415,9 @@ export default function VoiceTools() {
                    </div>
                 </div>
 
-                {/* Loading Game Wrapper with Skeletons */}
-                <div className="flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px] flex flex-col p-4 gap-4">
-                   <div className="flex justify-between items-center px-4 pt-4">
-                       <Skeleton variant="circular" width={40} height={40} />
-                       <Skeleton width={120} height={20} />
-                       <Skeleton variant="circular" width={40} height={40} />
-                   </div>
-                   <LoadingGameEngine operationLabel="Neural Synthesis Active" progress={ttsProgress} />
+                <div className="flex-1 w-full relative min-h-[300px] flex flex-col p-4 gap-4">
+                   <ProcessingState operationLabel="Neural Synthesis Active" progress={ttsProgress} />
                 </div>
-                
-                <p className="text-center text-[10px] text-slate-500 font-medium uppercase tracking-widest">
-                  Game controls: Use keyboard, tap, or click
-                </p>
               </div>
             )}
 

@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { useToast } from "./ui/toastContext";
-import LoadingGameEngine from "./loading/LoadingGameEngine";
+import ProcessingState from "./loading/ProcessingState";
+import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
 
 
@@ -34,6 +35,7 @@ export default function ImageGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
   const { addToast } = useToast();
+  const { requestPermission, notifyWhenReady } = useBrowserNotification();
  
 
   // Check AI service status on component mount
@@ -64,6 +66,7 @@ export default function ImageGenerator() {
     setLoading(true);
     setError(null);
     setImages([]);
+    requestPermission();
 
     try {
       const { data } = await generateImagesMutation({
@@ -78,6 +81,8 @@ export default function ImageGenerator() {
           title: 'Images Generated!',
           message: `Created ${data.generateAIImageVariants.images.length} images in ${data.generateAIImageVariants.generationTime}`,
         });
+        
+        notifyWhenReady("Images Generated", { body: `Your AI images are ready.` });
 
         console.log(`✅ Generated ${data.generateAIImageVariants.images.length} images in ${data.generateAIImageVariants.generationTime}`);
       } else {
@@ -89,6 +94,8 @@ export default function ImageGenerator() {
           title: 'Generation Failed',
           message: errorMsg,
         });
+        
+        notifyWhenReady("Generation Failed", { body: errorMsg });
       
         console.error("Generation failed:", errorMsg);
         
@@ -110,6 +117,8 @@ export default function ImageGenerator() {
         title: 'Generation Error',
         message: errorMessage,
       });
+      
+      notifyWhenReady("Generation Error", { body: errorMessage });
 
       // Fallback on error for development
       if (import.meta.env.MODE === 'development') {
@@ -280,7 +289,7 @@ export default function ImageGenerator() {
                 ))}
             </div>
 
-            <LoadingGameEngine operationLabel="Generating AI Imagery" progress={45} />
+            <ProcessingState operationLabel="Generating AI Imagery" />
             
             <p className="text-theme-tertiary text-sm mt-6 text-center">
                 This may take 10-30 seconds depending on server load

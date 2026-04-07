@@ -7,8 +7,9 @@ import {
 import { useMutation, useLazyQuery } from '@apollo/client/react';
 import { REGISTER_VOICE, CLONE_VOICE, GET_VOICE_JOB_STATUS } from '../graphql/voice';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
-import LoadingGameEngine from './loading/LoadingGameEngine';
+import ProcessingState from './loading/ProcessingState';
 import { useToast } from './ui/toastContext';
+import { useBrowserNotification } from '../hooks/useBrowserNotification';
 
 interface RegisterVoiceData {
   registerVoice: { success: boolean; message: string };
@@ -31,6 +32,7 @@ interface VoiceJobStatusData {
 
 export default function VoiceLab() {
   const { showWarning } = useToast();
+  const { requestPermission, notifyWhenReady } = useBrowserNotification();
   // TTS State (for synthesis input)
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
   // ... rest of state
@@ -177,10 +179,12 @@ export default function VoiceLab() {
       setCloningStatus('done');
       setSpaceStatus('Done');
       setCurrentJobId(null);
+      notifyWhenReady("Synthesis Complete", { body: "Your neural voice clone is ready to play." });
     } else if (job.status === 'FAILED') {
       setCloningStatus('error');
       setSpaceStatus(job.error || 'Synthesis failed');
       setCurrentJobId(null);
+      notifyWhenReady("Synthesis Error", { body: "Your voice cloning job failed. Please check the logs." });
     } else {
       setSpaceStatus(job.message || 'Synthesizing Neural Speech...');
     }
@@ -202,6 +206,7 @@ export default function VoiceLab() {
     setCloningStatus('processing');
     setSpaceStatus('Initiating Neural Synthesis...');
     setClonedAudioUrl(null);
+    requestPermission();
 
     try {
       const { data } = await cloneVoiceMutation({
@@ -517,13 +522,12 @@ export default function VoiceLab() {
             {(cloningStatus === 'uploading' || cloningStatus === 'processing') && (
               <div className="flex-1 flex flex-col space-y-8 animate-in zoom-in-95 duration-500">
                 <div className="flex flex-col items-center text-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
                   <h4 className="text-xl font-bold text-theme-primary">Neural Pathway Folding...</h4>
-                  <p className="text-xs text-theme-tertiary italic mt-1">MegaTTS3 is processing your biometric sample</p>
+                  <p className="text-xs text-theme-tertiary italic mt-1 pb-4">MegaTTS3 is processing your biometric sample</p>
                 </div>
 
-                <div className="flex-1 bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-theme-xl relative min-h-[300px]">
-                  <LoadingGameEngine />
+                <div className="flex-1 w-full relative min-h-[300px]">
+                  <ProcessingState operationLabel="Folding Neural Pathways" />
                 </div>
               </div>
             )}
