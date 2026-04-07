@@ -22,9 +22,17 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 ## ✨ Key Features
 
 ### 🛡️ Biometric Security Center
-*   **Face ID Login:** Passwordless authentication using 512-dimensional vector embeddings.
-*   **Liveness Detection:** Anti-spoofing system that analyzes micro-expressions (e.g., "Smile to Unlock") to prevent photo attacks.
-*   **Global Identity Index:** Centralized vector database for secure user verification.
+*   **Face ID Login:** Passwordless authentication using 512-dimensional vector embeddings and anti-spoofing liveness detection.
+*   **Voice Identity Login:** Biometric voice authentication using specialized speaker verification models.
+*   **Challenge-Response Security:** Secure "Speak the Code" mechanism to prevent replay attacks during logins.
+*   **Global Identity Index:** Centralized vector database for secure multi-modal user verification.
+
+### 🎮 Interactive Loading Experience
+*   **Mini-Game Lobby:** To bridge AI model "Cold Starts" and processing times, users can play integrated mini-games:
+    *   **Emoji Catcher:** Fast-paced reaction game.
+    *   **Pop the Bubbles:** Relaxing precision game.
+    *   **Tap Dodge:** Skill-based movement game.
+*   **Persistent High Scores:** Local storage integration to track your best performances while you wait.
 
 ### 🧪 The Biometric Lab (Playground)
 *   **Magic Mirror:** Real-time analysis of Age, Gender, and Emotional State using DeepFace.
@@ -33,14 +41,20 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 *   **Workspace Management:** Multi-tenant architecture allowing users to create isolated "Universes" (e.g., Marvel vs. Family) with separate facial databases.
 
 ### 🎙️ Voice Intelligence Layer
-*   **Local-First Speech:** Zero-latency transcription using the Web Speech API (no cloud costs).
-*   **Command Engine:** Navigate the app and trigger actions (e.g., "Switch to Dark Mode") via voice.
-*   **Biometric Visualization:** Real-time spectral analysis of voice data (Volume & Pitch monitoring).
+*   **Neural Voice Synthesis:** Advanced TTS for high-quality, natural-sounding voice cloning.
+*   **Speaker Verification:** Securely verify users' identity based on unique vocal characteristics.
+*   **Real-time Spectrum:** Visual monitoring of volume and pitch during recording and verification.
+*   **Local-First Commands:** Zero-latency navigation and UI control via the Web Speech API.
+
+### ⚙️ Biometric Lifecycle Management
+*   **Profile Control:** Full CRUD operations for Biometric IDs (Face & Voice).
+*   **Enrollment Flow:** Streamlined setup for registering biometric profiles with real-time feedback.
+*   **Security Audits:** Track and manage which biometric factors are active for your account.
 
 ### 🧠 The Knowledge Brain (RAG)
-*   **Chat with Data:** Upload PDF documents and chat with them.
-*   **Vector Search:** Uses Google Gemini Embeddings + pgvector to retrieve relevant context chunks.
-*   **Hybrid Intelligence:** Smart routing between "Context-Aware" answers and "General Knowledge" based on the user's prompt.
+*   **Chat with Data:** Upload PDF documents and chat with them using semantic search.
+*   **Hybrid Intelligence:** Smart routing between "Context-Aware" answers and "General Knowledge".
+*   **Async Processing:** All long-running AI tasks (Cloning, RAG) are handled via an asynchronous job pipeline for maximum reliability.
 
 ---
 
@@ -63,13 +77,14 @@ The system follows a **Distributed Microservices** pattern:
 
 ### 3. AI Engine (The Brain)
 *   **Runtime:** Python 3.9 + FastAPI
-*   **ML Libraries:** DeepFace (TensorFlow/Keras), OpenCV, NumPy
-*   **Models:** FaceNet512 (Recognition), VGG-Face (Analysis)
-*   **Hosting:** Hugging Face Spaces (Dockerized)
+*   **ML Libraries:** DeepFace (Vision), SpeechBrain (Voice), OpenCV, NumPy
+*   **Models:** FaceNet512, VGG-Face, XTTS v2 / Neural TTS
+*   **Hosting:** Hugging Face Spaces (Cloud-offloaded for both Dev & Prod)
 
 ### 4. Infrastructure (The Memory)
 *   **Database:** Supabase PostgreSQL + `pgvector` extension.
-*   **Storage:** Supabase Storage (S3-compatible) for images.
+*   **Caching:** Redis for job status tracking and challenge-response TTL.
+*   **Storage:** Supabase Storage (S3-compatible) for biometric assets.
 *   **LLM Provider:** Google Gemini 1.5 Flash (with Key Rotation & Rate Limiting).
 
 ---
@@ -116,18 +131,19 @@ echo "VITE_GRAPHQL_URL=http://localhost:4001/graphql" > .env
 npm run dev
 ```
 
-### 4. AI Engine Setup (Python)
+### 4. AI Engine Configuration
+By default, the system points to the local Python API. To use the cloud-offloaded brain (Hugging Face), update your backend `.env`:
+```bash
+# In src/apps/backend/.env
+PYTHON_FACE_SERVICE_URL=https://your-huggingface-space.hf.space
+```
+
+If running the Python Engine locally for development:
 ```bash
 cd FaceSearchProject
 python -m venv myenv
-source myenv/bin/activate  # or myenv\Scripts\activate on Windows
-
+source myenv/bin/activate
 pip install -r requirements.txt
-
-# Setup Environment
-# Create .env with SUPABASE_URL and SUPABASE_KEY
-
-# Start API
 uvicorn api:app --reload --port 8000
 ```
 
@@ -138,11 +154,17 @@ uvicorn api:app --reload --port 8000
 ### 🔄 Smart Key Rotation
 To bypass API rate limits on free tiers, the system implements a **Round-Robin Key Rotator** for Gemini and Hugging Face APIs, effectively tripling the available quota.
 
+### ⛓️ Asynchronous Job Pipeline
+To prevent timeouts during complex AI operations (like voice training or document indexing), the system uses an **Async Queue** pattern.
+1. The Node.js gateway Enqueues a job on the AI Engine.
+2. The AI Engine returns a `jobId` immediately.
+3. The Frontend displays a **Mini-Game** while polling for the result or receiving a **Webhook** push.
+
 ### ⚡ Optimistic UI Updates
 The frontend uses Apollo Client cache updates (`refetchQueries` and `optimisticResponse`) to ensure the UI feels instant, even when waiting for server logic.
 
-### 🐳 Dockerized AI
-The Python brain is containerized using a custom `Dockerfile` that pre-downloads heavy ML weights (500MB+) during the build phase, ensuring fast startup times on serverless platforms.
+### 🐳 Cloud-Native AI
+The Python brain is optimized for Hugging Face Spaces, leveraging high-performance hardware and pre-cached model weights to ensure low-latency inference across the platform.
 
 ---
 
