@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { playCatch, playGameOver } from '../../../utils/soundUtils';
 
 interface Point {
+  id: number;
   x: number;
   y: number;
   emoji: string;
@@ -111,7 +112,6 @@ export default function EmojiCatcher({ settings, autoStart, onGameOver, onSwitch
   const update = useCallback((time: number) => {
     if (gameStateRef.current !== 'playing') return;
 
-    const dt = Math.min(time - lastTimeRef.current, 50); // cap dt to prevent huge jumps
     lastTimeRef.current = time;
 
     const currentDiff = diffRef.current;

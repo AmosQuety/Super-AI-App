@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { playDodge, playGameOver } from '../../../utils/soundUtils';
+import { playGameOver } from '../../../utils/soundUtils';
 
 interface Obstacle {
   id: number;
