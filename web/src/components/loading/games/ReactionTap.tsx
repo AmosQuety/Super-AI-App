@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { playPop, playGameOver, playCatch } from '../../../utils/soundUtils';
+import { playGameOver, playCatch } from '../../../utils/soundUtils';
 
 interface Target {
   x: number;
@@ -19,7 +19,7 @@ export default function ReactionTap({ settings, autoStart, onGameOver, onSwitchG
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
   const [target, setTarget] = useState<Target | null>(null);
-  
+
   const scoreRef = useRef(0);
   const lastTimeRef = useRef(0);
   const nextId = useRef(0);
@@ -58,19 +58,19 @@ export default function ReactionTap({ settings, autoStart, onGameOver, onSwitchG
 
   const handleTap = (id: number) => {
     if (gameStateRef.current !== 'playing' || !target || target.id !== id) return;
-    
+
     // Calculate reaction time
     const reactionTime = performance.now() - lastTimeRef.current;
     const points = Math.max(10, Math.floor((timeLimitRef.current - reactionTime) / 10));
-    
+
     scoreRef.current += points;
     setScore(scoreRef.current);
-    
+
     if (settings.soundEnabled) playCatch();
-    
+
     // Decay the time limit to make it harder
     timeLimitRef.current = Math.max(diff.minTime, timeLimitRef.current * diff.decay);
-    
+
     spawnTarget();
   };
 
@@ -78,11 +78,11 @@ export default function ReactionTap({ settings, autoStart, onGameOver, onSwitchG
     if (gameStateRef.current !== 'playing') return;
 
     if (target && time > target.expiry) {
-        setGameState('gameover');
-        gameStateRef.current = 'gameover';
-        onGameOver(scoreRef.current);
-        if (settings.soundEnabled) playGameOver();
-        return;
+      setGameState('gameover');
+      gameStateRef.current = 'gameover';
+      onGameOver(scoreRef.current);
+      if (settings.soundEnabled) playGameOver();
+      return;
     }
 
     animationRef.current = requestAnimationFrame(update);
@@ -108,35 +108,35 @@ export default function ReactionTap({ settings, autoStart, onGameOver, onSwitchG
 
       {gameState === 'playing' && target && (
         <>
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 text-5xl font-black text-white/10 tabular-nums">
-                {score}
-            </div>
-            
-            {/* Progress countdown ring */}
-            <div className="absolute top-24 left-1/2 -translate-x-1/2 w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
-                 <div 
-                    className="h-full bg-blue-500"
-                    style={{ 
-                        width: `${Math.max(0, ((target.expiry - performance.now()) / timeLimitRef.current) * 100)}%`,
-                        transition: 'width 16ms linear'
-                    }}
-                 />
-            </div>
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 text-5xl font-black text-white/10 tabular-nums">
+            {score}
+          </div>
 
-            <button
-                onMouseDown={() => handleTap(target.id)}
-                onTouchStart={() => handleTap(target.id)}
-                className="absolute flex items-center justify-center rounded-full bg-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.6)] border-4 border-white/20 active:scale-90 transition-transform cursor-pointer"
-                style={{
-                    left: `${target.x}%`,
-                    top: `${target.y}%`,
-                    width: `${target.size}px`,
-                    height: `${target.size}px`,
-                    transform: 'translate(-50%, -50%)',
-                }}
-            >
-                <div className="w-4 h-4 bg-white rounded-full animate-ping" />
-            </button>
+          {/* Progress countdown ring */}
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500"
+              style={{
+                width: `${Math.max(0, ((target.expiry - performance.now()) / timeLimitRef.current) * 100)}%`,
+                transition: 'width 16ms linear'
+              }}
+            />
+          </div>
+
+          <button
+            onMouseDown={() => handleTap(target.id)}
+            onTouchStart={() => handleTap(target.id)}
+            className="absolute flex items-center justify-center rounded-full bg-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.6)] border-4 border-white/20 active:scale-90 transition-transform cursor-pointer"
+            style={{
+              left: `${target.x}%`,
+              top: `${target.y}%`,
+              width: `${target.size}px`,
+              height: `${target.size}px`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div className="w-4 h-4 bg-white rounded-full animate-ping" />
+          </button>
         </>
       )}
 
@@ -149,7 +149,7 @@ export default function ReactionTap({ settings, autoStart, onGameOver, onSwitchG
               RETRY SESSION
             </button>
             <button onClick={onSwitchGame} className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl transition-all border border-white/10 text-sm">
-                TRY ANOTHER GAME
+              TRY ANOTHER GAME
             </button>
           </div>
         </div>
