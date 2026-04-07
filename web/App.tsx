@@ -8,7 +8,6 @@ import { ToastProvider } from "./src/components/ui/Toast";
 import "./index.css";
 import Layout from "./src/components/Layout";
 import { lazy, Suspense } from "react";
-import LoadingGameEngine from "./src/components/loading/LoadingGameEngine";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
@@ -101,7 +100,7 @@ const AppRoutes = () => {
   };
 
   return (
-    <Suspense fallback={<LoadingGameEngine autoStart={false} />}>
+    <Suspense fallback={<LoadingSpinner />}>
       <Routes>
         {/* Landing Page - Accessible to everyone, no redirects */}
         <Route path="/" element={<LandingPage />} />
