@@ -10,6 +10,7 @@ import { useToast } from "../ui/toastContext";
 interface FindFaceResult {
   success: boolean;
   matches: number;
+  faces_scanned?: number;
   processed_image: string;
   error?: string;
 }
@@ -56,8 +57,15 @@ export default function FindMe() {
       
       if (data?.findFaceInCrowd.success) {
         setResult(data.findFaceInCrowd);
-        triggerSuccess();
-        showSuccess("Scan Complete", `Found ${data.findFaceInCrowd.matches} match(es) in the crowd.`);
+        if (data.findFaceInCrowd.matches > 0) triggerSuccess();
+        const scanned = data.findFaceInCrowd.faces_scanned;
+        const matchCount = data.findFaceInCrowd.matches;
+        showSuccess(
+          matchCount > 0 ? "Target Located" : "Scan Complete — No Match",
+          matchCount > 0
+            ? `Found ${matchCount} match(es) across ${scanned} detected face(s).`
+            : `Scanned ${scanned} face(s) — target not identified. Try a clearer photo.`
+        );
       } else {
         showError("Identification Failed", data?.findFaceInCrowd.error || "The AI could not identify a clear match.");
       }
