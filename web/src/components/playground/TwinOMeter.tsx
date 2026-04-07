@@ -1,3 +1,7 @@
+import React, { useState } from "react";
+import { useMutation } from "@apollo/client/react";
+import { COMPARE_FACES } from "../../graphql/playground";
+import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { compressImage } from "../../utils/imageUtils";
 

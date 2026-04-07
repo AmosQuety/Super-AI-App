@@ -30,6 +30,7 @@ import { logger } from "../utils/logger";
 declare global {
   interface ImportMetaEnv {
     VITE_GRAPHQL_URL?: string;
+    VITE_AI_ENGINE_URL?: string;
     MODE: string;
     DEV: boolean;
   }
