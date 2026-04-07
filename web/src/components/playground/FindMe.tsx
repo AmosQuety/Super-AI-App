@@ -4,6 +4,7 @@ import { FIND_FACE } from "../../graphql/playground";
 import { Upload, Search, Download, X, User, Users, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDelight } from "../../hooks/useDelight";
+import { useToast } from "../ui/toastContext";
 
 // --- TYPE DEFINITIONS ---
 interface FindFaceResult {
@@ -23,6 +24,7 @@ export default function FindMe() {
   const [targetPreview, setTargetPreview] = useState<string | null>(null);
   const [crowdPreview, setCrowdPreview] = useState<string | null>(null);
   const { triggerSuccess } = useDelight();
+  const { showSuccess, showError } = useToast();
   const [result, setResult] = useState<FindFaceResult | null>(null);
   
   // This mutation takes longer, so we handle loading state carefully
@@ -55,12 +57,13 @@ export default function FindMe() {
       if (data?.findFaceInCrowd.success) {
         setResult(data.findFaceInCrowd);
         triggerSuccess();
+        showSuccess("Scan Complete", `Found ${data.findFaceInCrowd.matches} match(es) in the crowd.`);
       } else {
-        alert("Error: " + (data?.findFaceInCrowd.error || "Unknown error"));
+        showError("Identification Failed", data?.findFaceInCrowd.error || "The AI could not identify a clear match.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Scan failed. Check console for details.");
+      showError("System Error", err.message || "Could not connect to the biometric engine.");
     }
   };
 

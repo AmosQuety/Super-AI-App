@@ -8,6 +8,7 @@ import { useMutation, useLazyQuery } from '@apollo/client/react';
 import { REGISTER_VOICE, CLONE_VOICE, GET_VOICE_JOB_STATUS } from '../graphql/voice';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 import LoadingGameEngine from './loading/LoadingGameEngine';
+import { useToast } from './ui/toastContext';
 
 interface RegisterVoiceData {
   registerVoice: { success: boolean; message: string };
@@ -29,10 +30,10 @@ interface VoiceJobStatusData {
 
 
 export default function VoiceLab() {
+  const { showWarning } = useToast();
   // TTS State (for synthesis input)
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
-
-  // Workflow Phases: 1. Consent, 2. Enrollment, 3. Generation
+  // ... rest of state
   const [phase, setPhase] = useState<'consent' | 'enrollment' | 'generation'>('consent');
   const [hasConsent, setHasConsent] = useState(false);
 
@@ -89,7 +90,7 @@ export default function VoiceLab() {
         const actualMime = mediaRecorder.mimeType || 'audio/webm';
         const blob = new Blob(audioChunksRef.current, { type: actualMime });
         if (blob.size > 3 * 1024 * 1024) {
-          alert("Recording is too large! Please keep your audio under 3MB (approx 15 seconds) to ensure optimal AI cloning speed.");
+          showWarning("File Too Large", "Recording is over 3MB. Please capture a shorter sample for optimal AI processing.");
           return;
         }
         const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: actualMime });
@@ -115,7 +116,7 @@ export default function VoiceLab() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 3 * 1024 * 1024) {
-        alert("Audio file is too large! Please upload a file smaller than 3MB (approx 15 seconds) to prevent AI memory crashes.");
+        showWarning("File Too Large", "Please upload a sample smaller than 3MB to prevent memory crashes on the AI server.");
         e.target.value = ''; // Reset input
         return;
       }

@@ -1,7 +1,7 @@
-// src/components/chat/InputArea.tsx
 import React, { useState, useRef, useCallback } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
+import { useToast } from "../ui/toastContext";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
@@ -14,7 +14,9 @@ const InputArea: React.FC<InputAreaProps> = ({
   disabled = false,
   isOnline = true,
 }) => {
+  const { showWarning } = useToast();
   const [text, setText] = useState("");
+  // ... rest of state
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -34,14 +36,14 @@ const InputArea: React.FC<InputAreaProps> = ({
   const handleAttachmentChange = useCallback((file: File | null) => {
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert("File size must be less than 10MB");
+        showWarning("Attachment Rejected", "Files must be smaller than 10MB to be processed by the neural engine.");
         return;
       }
       setAttachment(file);
     } else {
       setAttachment(null);
     }
-  }, []);
+  }, [showWarning]);
 
   // const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
   //   const file = e.target.files?.[0] || null;

@@ -4,6 +4,7 @@ import { COMPARE_FACES } from "../../graphql/playground";
 import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { compressImage } from "../../utils/imageUtils";
+import { useToast } from "../ui/toastContext";
 
 // --- TYPE DEFINITIONS ---
 interface ComparisonResult {
@@ -22,6 +23,7 @@ interface CompareFacesData {
 }
 
 export default function TwinOMeter() {
+  const { showError } = useToast();
   const [file1, setFile1] = useState<File | null>(null);
   const [file2, setFile2] = useState<File | null>(null);
   const [preview1, setPreview1] = useState<string | null>(null);
@@ -57,11 +59,11 @@ export default function TwinOMeter() {
       if (data?.compareFaces.success && data.compareFaces.data) {
         setResult(data.compareFaces.data);
       } else {
-        alert("Error: " + (data?.compareFaces.error || "Comparison failed"));
+        showError("Comparison Aborted", data?.compareFaces.error || "Neural engine could not process these faces.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Comparison failed. Check console.");
+      showError("System Failure", error.message || "Connection to the biometric bridge was interrupted.");
     }
   };
 
