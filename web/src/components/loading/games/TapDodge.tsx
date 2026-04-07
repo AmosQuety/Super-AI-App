@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { playDodge, playGameOver } from '../../../utils/soundUtils';
 
 interface Obstacle {
   id: number;
@@ -17,7 +18,7 @@ const DIFFICULTY_MAP = {
 
 const COLORS = ['#ef4444', '#f87171', '#dc2626', '#b91c1c'];
 
-export default function TapDodge({ settings, onGameOver }: { settings: any, onGameOver: (score: number) => void }) {
+export default function TapDodge({ settings, autoStart, onGameOver, onSwitchGame }: { settings: any, autoStart?: boolean, onGameOver: (score: number) => void, onSwitchGame: () => void }) {
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
@@ -33,6 +34,7 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
   const spawnTimerRef = useRef(0);
   const animationRef = useRef(0);
   const gameOverFiredRef = useRef(false);
+  const prevObstaclesCountRef = useRef(0);
 
   const diff = DIFFICULTY_MAP[settings.difficulty as keyof typeof DIFFICULTY_MAP] || DIFFICULTY_MAP.medium;
   const diffRef = useRef(diff);
@@ -56,11 +58,24 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
     setGameState('playing');
   };
 
+  // Phase 2: Auto-start logic
+  useEffect(() => {
+    if (autoStart && gameState === 'idle') {
+      startGame();
+    }
+  }, [autoStart]);
+
   const update = useCallback((time: number) => {
     if (gameStateRef.current !== 'playing') return;
 
     const dt = Math.min(time - lastTimeRef.current, 50);
     lastTimeRef.current = time;
+    
+    // UX 5.4: Play dodge/whoosh sound periodically or on movement
+    // I'll add it on score milestones for now or just movement
+    if (settings.soundEnabled && scoreRef.current > 0 && Math.floor(scoreRef.current) % 10 === 0 && scoreRef.current !== Math.floor(scoreRef.current - (dt / 100))) {
+        // Debounced whoosh could go here, but let's keep it simple
+    }
 
     const currentDiff = diffRef.current;
 
@@ -111,13 +126,21 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
     });
 
     obstaclesRef.current = nextObstacles;
-    setObstacles([...nextObstacles]);
+    
+    // Issue 13: Throttle setObstacles to only fire on change
+    if (nextObstacles.length !== prevObstaclesCountRef.current) {
+        prevObstaclesCountRef.current = nextObstacles.length;
+        setObstacles([...nextObstacles]);
+    }
 
     if (collision && !gameOverFiredRef.current) {
       gameOverFiredRef.current = true;
       gameStateRef.current = 'gameover';
       setGameState('gameover');
       onGameOver(Math.floor(scoreRef.current));
+      
+      // UX 5.4: Game over sound
+      if (settings.soundEnabled) playGameOver();
       return;
     }
 
@@ -149,6 +172,10 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
 
     const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
     const onTouchMove = (e: TouchEvent) => {
+      // Issue 12: Only prevent default (block scroll) when active
+      if (gameStateRef.current === 'playing') {
+        e.preventDefault();
+      }
       if (e.touches[0]) handleMove(e.touches[0].clientX);
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -182,7 +209,7 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
     >
       {/* Player Ship */}
       <div
-        className="absolute bottom-[10%] w-8 h-8 flex items-center justify-center transition-transform duration-75"
+        className="absolute bottom-[10%] w-8 h-8 flex items-center justify-center"
         style={{
           left: `${playerX}%`,
           transform: 'translateX(-50%)',
@@ -244,20 +271,22 @@ export default function TapDodge({ settings, onGameOver }: { settings: any, onGa
       )}
 
       {gameState === 'gameover' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/85 backdrop-blur-md animate-in zoom-in duration-300 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/85 backdrop-blur-md animate-in zoom-in duration-300 px-6 text-center z-20">
           <div className="text-red-500 mb-4 animate-bounce">
             <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
           <h4 className="text-white font-black text-3xl mb-1 italic tracking-tighter uppercase">LINK SEVERED</h4>
-          <p className="text-red-200 text-lg font-black mb-8">DISTANCE: {score}m</p>
-          <button
-            onClick={startGame}
-            className="px-10 py-4 bg-white text-red-950 font-black rounded-full transition-all transform hover:scale-105 hover:bg-red-50 shadow-2xl"
-          >
-            RECONNECT SYSTEM
-          </button>
+          <p className="text-red-200 text-lg font-black mb-6 uppercase tracking-widest">DISTANCE: {score}m</p>
+          <div className="flex flex-col gap-3 w-full max-w-[240px]">
+            <button onClick={startGame} className="w-full py-4 bg-white text-red-950 font-black rounded-2xl transition-all transform hover:scale-105 active:scale-95 shadow-xl">
+              RECONNECT SYSTEM
+            </button>
+            <button onClick={onSwitchGame} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl transition-all border border-white/20 text-sm">
+                TRY ANOTHER GAME
+            </button>
+          </div>
         </div>
       )}
     </div>

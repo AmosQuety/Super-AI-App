@@ -19,6 +19,8 @@ import {
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import VoiceLab from "./VoiceLab";
 import LoadingGameEngine from "./loading/LoadingGameEngine";
+import Skeleton from "./ui/Skeleton";
+import VoiceVisualizer from "./ui/VoiceVisualizer";
 import { useEffect, useRef } from "react";
 
 export default function VoiceTools() {
@@ -213,21 +215,8 @@ export default function VoiceTools() {
                 </div>
               </div>
 
-               {/* Biometric Visualizer (Mini) */}
-               {isListening && (
-                 <div className="flex items-end gap-1 h-8">
-                    {[...Array(5)].map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="w-1 bg-blue-500 rounded-full transition-all duration-75"
-                        style={{ 
-                          height: `${Math.max(20, Math.random() * (audioMetrics.vol * 100))}%`,
-                          opacity: 0.7 + (i * 0.05)
-                        }} 
-                      />
-                    ))}
-                 </div>
-               )}
+               {/* Biometric Visualizer (Memoized) */}
+               <VoiceVisualizer vol={audioMetrics.vol} isListening={isListening} />
             </div>
 
             {/* Transcript Area */}
@@ -325,7 +314,7 @@ export default function VoiceTools() {
                    <h3 className="font-bold text-slate-700 dark:text-slate-200">Emotion</h3>
                 </div>
                 {sentiment ? (
-                  <div>
+                  <div className="animate-in fade-in duration-300">
                     <div className="text-2xl font-black text-slate-800 dark:text-white">
                       {sentiment.label}
                     </div>
@@ -334,8 +323,9 @@ export default function VoiceTools() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-400 italic mt-2">
-                    Speak longer phrases to detect emotion...
+                  <div className="space-y-2">
+                    <Skeleton variant="text" width="80%" />
+                    <Skeleton variant="text" width="40%" />
                   </div>
                 )}
              </div>
@@ -421,9 +411,14 @@ export default function VoiceTools() {
                    </div>
                 </div>
 
-                {/* Loading Game Wrapper */}
-                <div className="flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px]">
-                   <LoadingGameEngine />
+                {/* Loading Game Wrapper with Skeletons */}
+                <div className="flex-1 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[300px] flex flex-col p-4 gap-4">
+                   <div className="flex justify-between items-center px-4 pt-4">
+                       <Skeleton variant="circular" width={40} height={40} />
+                       <Skeleton width={120} height={20} />
+                       <Skeleton variant="circular" width={40} height={40} />
+                   </div>
+                   <LoadingGameEngine operationLabel="Neural Synthesis Active" progress={ttsProgress} />
                 </div>
                 
                 <p className="text-center text-[10px] text-slate-500 font-medium uppercase tracking-widest">

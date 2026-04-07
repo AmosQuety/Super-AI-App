@@ -47,6 +47,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // UX 6.6: Wake up AI Engine early to mitigate cold starts
+  const wakeUpAIEngine = () => {
+    const aiUrl = import.meta.env.VITE_AI_ENGINE_URL || 'https://amosquety-biometric-brain.hf.space';
+    console.log('🚀 Pinging AI Engine for wake-up...');
+    fetch(aiUrl, { mode: 'no-cors' }).catch(() => {}); // Fire and forget
+  };
+
   // Check for existing session on app start
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken');
@@ -56,6 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setToken(storedToken);
         setUser(JSON.parse(userData) as User);
+        // Wake up engine if we have a session
+        wakeUpAIEngine();
       } catch (error) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
@@ -108,7 +117,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(authToken);
       setUser(userData);
 
-      // 3. Reset Apollo cache LAST
+      // 3. Wake up AI Engine
+      wakeUpAIEngine();
+
+      // 4. Reset Apollo cache LAST
       await client.resetStore();
 
       console.log('Token starts with:', authToken.substring(0, 5) + '...');
@@ -162,6 +174,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setToken(authToken);
       setUser(userData);
+      
+      // 3. Wake up AI Engine
+      wakeUpAIEngine();
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw new Error(error.message || 'Registration failed');

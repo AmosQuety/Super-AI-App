@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { playPop, playGameOver } from '../../../utils/soundUtils';
 
 interface Bubble {
   id: number;
@@ -15,7 +16,7 @@ const DIFFICULTY_MAP = {
   hard: { spawnRate: 600, lifeDecay: 1.6 },
 };
 
-export default function PopTheBubbles({ settings, onGameOver }: { settings: any, onGameOver: (score: number) => void }) {
+export default function PopTheBubbles({ settings, autoStart, onGameOver, onSwitchGame }: { settings: any, autoStart?: boolean, onGameOver: (score: number) => void, onSwitchGame: () => void }) {
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
@@ -26,8 +27,13 @@ export default function PopTheBubbles({ settings, onGameOver }: { settings: any,
   const gameOverFiredRef = useRef(false);
 
   const diff = DIFFICULTY_MAP[settings.difficulty as keyof typeof DIFFICULTY_MAP] || DIFFICULTY_MAP.easy;
-  // Keep a ref so intervals can read latest diff without restarting
+  // Keep a ref so AI logic can read latest diff without restarting
   const diffRef = useRef(diff);
+  const bubblesRef = useRef<Bubble[]>([]);
+  const lastTimeRef = useRef(0);
+  const spawnTimerRef = useRef(0);
+  const animationRef = useRef(0);
+
   useEffect(() => { diffRef.current = diff; }, [settings.difficulty]);
 
   const startGame = () => {
@@ -37,63 +43,91 @@ export default function PopTheBubbles({ settings, onGameOver }: { settings: any,
     setScore(0);
     setGameState('playing');
     setBubbles([]);
+    bubblesRef.current = [];
+    nextId.current = 0;
+    lastTimeRef.current = performance.now();
+    spawnTimerRef.current = 0;
   };
 
-  const spawnBubble = useCallback(() => {
-    const newBubble: Bubble = {
-      id: nextId.current++,
-      x: 10 + Math.random() * 80,
-      y: 10 + Math.random() * 80,
-      size: 44 + Math.random() * 40,
-      hue: Math.random() * 360,
-      life: 100,
-    };
-    setBubbles(prev => [...prev, newBubble]);
-  }, []);
+  // Phase 2: Auto-start logic
+  useEffect(() => {
+    if (autoStart && gameState === 'idle') {
+      startGame();
+    }
+  }, [autoStart]);
 
   const popBubble = (id: number) => {
     scoreRef.current += 10;
     setScore(scoreRef.current);
-    setBubbles(prev => prev.filter(b => b.id !== id));
+    bubblesRef.current = bubblesRef.current.filter(b => b.id !== id);
+    setBubbles(bubblesRef.current);
+    
+    // UX 5.4: Sound feedback
+    if (settings.soundEnabled) playPop();
   };
 
+  const update = useCallback((time: number) => {
+    if (gameStateRef.current !== 'playing') return;
+
+    const dt = Math.min(time - lastTimeRef.current, 50);
+    lastTimeRef.current = time;
+    const currentDiff = diffRef.current;
+
+    // 1. Handle Spawning
+    spawnTimerRef.current += dt;
+    // Issue 10: Limit max bubbles (e.g. 10) to prevent CPU waste
+    if (spawnTimerRef.current > currentDiff.spawnRate && bubblesRef.current.length < 10) {
+        spawnTimerRef.current = 0;
+        const newBubble: Bubble = {
+            id: nextId.current++,
+            x: 10 + Math.random() * 80,
+            y: 10 + Math.random() * 80,
+            size: 44 + Math.random() * 40,
+            hue: Math.random() * 360,
+            life: 100,
+        };
+        bubblesRef.current = [...bubblesRef.current, newBubble];
+    }
+
+    // 2. Handle Decay
+    let died = false;
+    bubblesRef.current = bubblesRef.current.map(b => {
+        const nextLife = b.life - currentDiff.lifeDecay * (dt / 50);
+        if (nextLife <= 0) died = true;
+        return { ...b, life: nextLife };
+    });
+
+    if (died && !gameOverFiredRef.current) {
+        gameOverFiredRef.current = true;
+        gameStateRef.current = 'gameover';
+        setGameState('gameover');
+        onGameOver(scoreRef.current);
+        
+        // UX 5.4: Game Over sound
+        if (settings.soundEnabled) playGameOver();
+        return;
+    }
+
+    // Issue 11: Throttle setBubbles (we still call it every frame for smooth life/opacity, 
+    // but the report suggests "only call setState when a meaningful threshold is crossed" 
+    // for PopTheBubbles specifically because it's DOM-based. 
+    // However, for smooth opacity/scale transitions, we do need updates. 
+    // I'll stick to direct setState for now but ensured it's RAF-synced.)
+    setBubbles([...bubblesRef.current]);
+
+    animationRef.current = requestAnimationFrame(update);
+  }, [onGameOver]);
+
   useEffect(() => {
-    if (gameState !== 'playing') return;
-
-    // Spawn interval — only depends on spawnRate, not score
-    const spawnInterval = setInterval(() => {
-      spawnBubble();
-    }, diffRef.current.spawnRate);
-
-    // Decay interval — uses ref for score to avoid stale closure
-    const decayInterval = setInterval(() => {
-      if (gameStateRef.current !== 'playing') return;
-
-      setBubbles(prev => {
-        const next = prev.map(b => ({ ...b, life: b.life - diffRef.current.lifeDecay }));
-        const died = next.find(b => b.life <= 0);
-
-        if (died && !gameOverFiredRef.current) {
-          gameOverFiredRef.current = true;
-          gameStateRef.current = 'gameover';
-          // Use setTimeout so state update isn't mid-render
-          setTimeout(() => {
-            setGameState('gameover');
-            onGameOver(scoreRef.current);
-          }, 0);
-          return prev; // keep bubbles visible for a moment
-        }
-        return next;
-      });
-    }, 50); // 50ms tick — smooth enough without thrashing
-
+    gameStateRef.current = gameState;
+    if (gameState === 'playing') {
+      lastTimeRef.current = performance.now();
+      animationRef.current = requestAnimationFrame(update);
+    }
     return () => {
-      clearInterval(spawnInterval);
-      clearInterval(decayInterval);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-    // Only restart when game state changes — NOT on score changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState, spawnBubble, onGameOver]);
+  }, [gameState, update]);
 
   // Keep gameStateRef in sync
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -150,12 +184,17 @@ export default function PopTheBubbles({ settings, onGameOver }: { settings: any,
       )}
 
       {gameState === 'gameover' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/80 backdrop-blur-md animate-in zoom-in duration-300">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/80 backdrop-blur-md animate-in zoom-in duration-300 px-6 text-center">
           <h4 className="text-white font-black text-3xl mb-1 italic tracking-tighter">TOO SLOW!</h4>
-          <p className="text-red-200 text-lg font-black mb-6">SCORE: {score}</p>
-          <button onClick={startGame} className="px-8 py-3 bg-white text-red-950 font-black rounded-full transition-all hover:scale-105">
-            RETRY SESSION
-          </button>
+          <p className="text-red-200 text-lg font-black mb-6 uppercase tracking-widest">FINAL SCORE: {score}</p>
+          <div className="flex flex-col gap-3 w-full max-w-[240px]">
+            <button onClick={startGame} className="w-full py-4 bg-white text-red-950 font-black rounded-2xl transition-all transform hover:scale-105 active:scale-95 shadow-xl">
+              RETRY SESSION
+            </button>
+            <button onClick={onSwitchGame} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl transition-all border border-white/20 text-sm">
+                TRY ANOTHER GAME
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -7,13 +7,11 @@ import { useAuth } from "./src/hooks/useAuth";
 import { ToastProvider } from "./src/components/ui/Toast";
 import "./index.css";
 import Layout from "./src/components/Layout";
-import LoginScreen from "./src/components/auth/Login";
-import RegisterScreen from "./src/components/auth/Register";
-import LandingPage from "./src/pages/LandingPage";
+import { lazy, Suspense } from "react";
+import LoadingGameEngine from "./src/components/loading/LoadingGameEngine";
 import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
-import { lazy, Suspense } from "react";
 
 const ChatContainer = lazy(() => import("./src/components/chat/ChatContainer"));
 const ImageGenerator = lazy(() => import("./src/components/ImageGenerator"));
@@ -22,6 +20,9 @@ const ProfilePage = lazy(() => import("./src/pages/ProfilePage"));
 const PlaygroundPage = lazy(() => import("./src/pages/PlaygroundPage"));
 const DocumentUploader = lazy(() => import("./src/components/chat/DocumentUploader"));
 const SecurityPage = lazy(() => import("./src/pages/SecurityPage"));
+const LoginScreen = lazy(() => import("./src/components/auth/Login"));
+const RegisterScreen = lazy(() => import("./src/components/auth/Register"));
+const LandingPage = lazy(() => import("./src/pages/LandingPage"));
 
 // ==============================
 // 🔹 PRODUCT CONFIG (single source of truth)
@@ -100,7 +101,7 @@ const AppRoutes = () => {
   };
 
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<LoadingGameEngine autoStart={false} />}>
       <Routes>
         {/* Landing Page - Accessible to everyone, no redirects */}
         <Route path="/" element={<LandingPage />} />

@@ -125,7 +125,8 @@ const retryLink = new RetryLink({
       logger.log('Retry attempt for operation:', operation.operationName);
       return !!error && (
         error.toString().includes('NetworkError') ||
-        error.toString().includes('Failed to fetch')
+        error.toString().includes('Failed to fetch') ||
+        error.toString().includes('429') // Issue 6.8: Retry on Rate Limit
       );
     },
   },

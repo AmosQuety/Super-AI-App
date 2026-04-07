@@ -5,6 +5,7 @@ import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCi
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { useToast } from "./ui/toastContext";
 import LoadingGameEngine from "./loading/LoadingGameEngine";
+import Skeleton from "./ui/Skeleton";
 
 
 // --- TYPE DEFINITIONS ---
@@ -195,9 +196,8 @@ export default function ImageGenerator() {
         
         {/* Service Status */}
         {statusLoading ? (
-          <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2" />
-            <span className="text-sm font-medium">Checking AI service status...</span>
+          <div className="mt-4 flex justify-center">
+            <Skeleton width={180} height={36} className="rounded-lg" />
           </div>
         ) : statusError ? (
           <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
@@ -268,12 +268,20 @@ export default function ImageGenerator() {
 
       {/* Results Section */}
       {loading ? (
-        <div className="w-full max-w-4xl mx-auto py-12">
+        <div className="w-full max-w-4xl mx-auto py-12 animate-in fade-in duration-500">
             <div className="text-center mb-6">
                 <h4 className="text-xl font-bold text-theme-primary">Neural Pathway Folding...</h4>
                 <p className="text-xs text-theme-tertiary italic mt-1 mb-4">The AI is processing your request</p>
             </div>
-            <LoadingGameEngine />
+            
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {[...Array(4)].map((_, i) => (
+                    <Skeleton key={i} className="aspect-square rounded-2xl" />
+                ))}
+            </div>
+
+            <LoadingGameEngine operationLabel="Generating AI Imagery" progress={45} />
+            
             <p className="text-theme-tertiary text-sm mt-6 text-center">
                 This may take 10-30 seconds depending on server load
             </p>
