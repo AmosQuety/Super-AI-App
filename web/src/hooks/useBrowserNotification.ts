@@ -47,7 +47,6 @@ export function useBrowserNotification() {
       return;
     }
 
-    // Only notify if the tab is hidden (backgrounded) or running on a mobile OS background
     if (document.visibilityState !== 'visible') {
       try {
         const notif = new Notification(title, {
@@ -56,7 +55,7 @@ export function useBrowserNotification() {
           vibrate: [200, 100, 200], // Haptic feedback for mobile
           requireInteraction: false, // Don't force them to explicitly dismiss it
           ...options,
-        });
+        } as any);
 
         // Clicking the notification should focus the window
         notif.onclick = () => {

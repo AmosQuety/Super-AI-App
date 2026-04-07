@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
 export type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
@@ -26,7 +25,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const showNotification = useCallback((message: string, type: NotificationType, duration = 5000) => {
-    const id = uuidv4();
+    const id = crypto.randomUUID();
     setNotifications((prev) => [...prev, { id, type, message, duration }]);
 
     if (duration > 0) {
