@@ -7,64 +7,72 @@ import { pubsub } from './subscriptionResolvers';
 import { DocumentProcessor } from "../services/documentProcessor";
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
 import { AIManager } from "../utils/aiManager"; // Import our new Manager
+import { DocumentRetrievalService } from "../services/ai/DocumentRetrievalService";
 
-const MAX_RECENT_MEMORY_MESSAGES = 12;
-const MAX_OLDER_MEMORY_LINES = 8;
-const MAX_LINE_LENGTH = 240;
+const MAX_HISTORY_TURNS = 20; // cap to avoid blowing context window
 
-const clipText = (input: string, max = MAX_LINE_LENGTH): string => {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) return '';
-  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
-};
-
-const toMemoryLine = (role: string, text: string): string => {
-  const safeText = clipText(text);
-  if (!safeText) return '';
-  return `${role === 'assistant' ? 'Assistant' : 'User'}: ${safeText}`;
-};
-
-const buildMemoryContext = (
-  history: Array<{ role: string; content: string }>
-): string => {
-  if (history.length === 0) return '';
-
-  const older = history.slice(0, Math.max(0, history.length - MAX_RECENT_MEMORY_MESSAGES));
-  const recent = history.slice(-MAX_RECENT_MEMORY_MESSAGES);
-
-  const olderLines = older
-    .slice(-MAX_OLDER_MEMORY_LINES)
-    .map((m) => toMemoryLine(m.role, m.content))
-    .filter(Boolean);
-
-  const recentLines = recent
-    .map((m) => toMemoryLine(m.role, m.content))
-    .filter(Boolean);
-
-  const olderSection = olderLines.length
-    ? `Earlier conversation summary:\n${olderLines.map((line) => `- ${line}`).join('\n')}`
-    : '';
-
-  const recentSection = recentLines.length
-    ? `Recent conversation turns:\n${recentLines.map((line) => `- ${line}`).join('\n')}`
-    : '';
-
-  return [olderSection, recentSection].filter(Boolean).join('\n\n');
-};
-
-const buildPromptWithMemory = (memoryContext: string, currentPrompt: string): string => {
-  if (!memoryContext.trim()) return currentPrompt;
-
-  return `
-You are continuing an ongoing conversation.
-Use the memory context below to stay consistent with prior turns.
-
-MEMORY CONTEXT:
-${memoryContext}
-
-CURRENT USER REQUEST:
-${currentPrompt}
+const SYSTEM_PROMPT = `
+You are Blaze, a helpful, intelligent, and conversational assistant.
+- Be clear, concise, and natural.
+- Maintain context across the conversation.
+- Be friendly but professional.
+- If external context (documents) is provided, use it when relevant.
 `;
+
+const summarizeHistory = (messages: Array<{ role: string; content: string }>): string => {
+  return messages
+    .map((m) => `${m.role}: ${m.content}`)
+    .join(' ')
+    .slice(0, 1000); // simple truncation for now (can upgrade later)
+};
+
+const buildContents = (
+  history: Array<{ role: string; content: string }>,
+  currentUserMessage: string
+): Array<{ role: string; parts: Array<{ text: string }> }> => {
+  const recent = history.slice(-MAX_HISTORY_TURNS);
+  const older = history.slice(0, -MAX_HISTORY_TURNS);
+
+  const contents = recent
+    .map((msg) => {
+      const normalizedRole = msg.role?.toLowerCase();
+      if (!['assistant', 'user'].includes(normalizedRole)) {
+        return null;
+      }
+
+      const safeRole = normalizedRole === 'assistant' ? 'model' : 'user';
+      const text = msg.content.replace(/\s+/g, ' ').trim();
+
+      return {
+        role: safeRole,
+        parts: [{ text }],
+      };
+    })
+    .filter((msg): msg is { role: string; parts: Array<{ text: string }> } => {
+      return msg !== null && msg.parts[0].text.length > 0;
+    });
+
+  if (older.length > 0) {
+    const summary = summarizeHistory(older);
+    contents.unshift({
+      role: 'user',
+      parts: [{
+        text: `Conversation summary (earlier context): ${summary}`,
+      }],
+    });
+  }
+
+  contents.unshift({
+    role: 'user', // Gemini-compatible system instruction workaround
+    parts: [{ text: SYSTEM_PROMPT.trim() }],
+  });
+
+  contents.push({
+    role: 'user',
+    parts: [{ text: currentUserMessage }],
+  });
+
+  return contents;
 };
 
 // Lazy init for Matcher
@@ -95,7 +103,8 @@ export const sendMessageWithResponse = {
     if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
 
     try {
-      let finalPrompt = content?.trim() || '';
+      const originalUserMessage = content?.trim() || '';
+      let modelUserMessage = originalUserMessage;
       let hasFileAttachment = false;
 
       // 3. Build conversation memory context from previous messages in this chat.
@@ -105,49 +114,39 @@ export const sendMessageWithResponse = {
         select: { role: true, content: true },
       });
 
-      const memoryContext = buildMemoryContext(priorMessages);
-
       // 4. Handle File Attachment
       if (fileUri && fileMimeType) {
         try {
           const extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
-          finalPrompt = `User Request: ${finalPrompt}\n\nAttached File Content:\n${extractedText}`;
           hasFileAttachment = true;
+          modelUserMessage = `FILE CONTENT:\n${extractedText}\n\nUSER MESSAGE:\n${originalUserMessage}`;
         } catch (e: any) {
           console.error("File processing error:", e);
         }
       }
 
-      finalPrompt = buildPromptWithMemory(memoryContext, finalPrompt);
+      // Build native Gemini multi-turn contents
+      const contents = buildContents(priorMessages, modelUserMessage);
 
       // 5. RAG SEARCH (Long Term Memory)
-      if (!hasFileAttachment && content?.trim()?.length > 5) {
+      if (!hasFileAttachment && originalUserMessage.length > 5) {
         try {
-          const queryEmbedding = await context.geminiAIService.getEmbedding(content.trim());
-          const vectorString = `[${queryEmbedding.join(",")}]`;
-
-          const relatedChunks: any[] = await context.prisma.$queryRaw`
-            SELECT content, similarity 
-            from match_documents(
-              ${vectorString}::vector, 
-              0.3,  
-              5, 
-              ${userId}
-            )
-          `;
+          const retrievalService = new DocumentRetrievalService(context.prisma, context.geminiAIService);
+          const relatedChunks = await retrievalService.retrieveRelevantChunks(userId, originalUserMessage, { topK: 3 });
 
           if (relatedChunks.length > 0) {
-            const knowledgeContext = relatedChunks.map(c => c.content).join("\n---\n");
-            finalPrompt = `
-You are a helpful AI assistant with access to the user's personal documents.
-CONTEXT FROM DOCUMENTS:
-${knowledgeContext}
-USER QUESTION:
-${finalPrompt}
-INSTRUCTIONS:
-1. Use the context to answer accurately if relevant.
-2. If not relevant, answer normally.
-`;
+            const knowledgeContext = relatedChunks
+              .slice(0, 3)
+              .map((c) => c.content)
+              .join('\n---\n');
+
+            const lastIndex = contents.length - 1;
+            contents[lastIndex] = {
+              role: 'user',
+              parts: [{
+                text: `CONTEXT:\n${knowledgeContext}\n\nUSER MESSAGE:\n${originalUserMessage}`,
+              }],
+            };
           }
         } catch (ragError) {
           console.error("⚠️ RAG Search failed:", ragError);
@@ -186,7 +185,29 @@ INSTRUCTIONS:
          // --- STRATEGY 1: CHECK DB QUOTA ---
          await AIManager.checkQuota(userId, 'chat');
 
-         aiResponse = await context.geminiAIService.generateContent(finalPrompt);
+        let fullStreamedText = '';
+        aiResponse = await context.geminiAIService.generateContentStream(contents, async (delta: string) => {
+          fullStreamedText += delta;
+
+          await pubsub.publish('MESSAGE_CHUNK_ADDED', {
+            messageChunkAdded: {
+              chatId,
+              delta,
+              fullContent: fullStreamedText,
+              isDone: false,
+            },
+          });
+        });
+
+        await pubsub.publish('MESSAGE_CHUNK_ADDED', {
+          messageChunkAdded: {
+            chatId,
+            delta: '',
+            fullContent: aiResponse,
+            isDone: true,
+          },
+        });
+
          usedGemini = true; // Mark that we hit the API
       }
 

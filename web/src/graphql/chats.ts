@@ -95,3 +95,26 @@ export const SEND_MESSAGE_WITH_RESPONSE = gql`
     }
   }
 `;
+
+export const UPLOAD_DOCUMENT = gql`
+  mutation UploadDocument($file: Upload!) {
+    uploadDocument(file: $file) {
+      success
+      message
+    }
+  }
+`;
+
+export const GET_DOCUMENT_LIFECYCLE = gql`
+  query GetDocumentLifecycle {
+    me {
+      id
+      documents {
+        id
+        filename
+        status
+        updatedAt
+      }
+    }
+  }
+`;

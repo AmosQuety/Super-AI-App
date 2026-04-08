@@ -19,6 +19,24 @@ import { chatOrchestrator, geminiProvider } from './OrchestratorFactory';
 import { logger } from '../../utils/logger';
 
 export class OrchestratorAIService {
+  private mapContentsToMessages(
+    contents: Array<{ role: string; parts: Array<{ text: string }> }>
+  ): ChatMessage[] {
+    return contents
+      .map((entry) => {
+        const text = entry.parts?.[0]?.text?.replace(/\s+/g, ' ').trim() ?? '';
+        const role: ChatMessage['role'] = entry.role === 'model' ? 'assistant' : 'user';
+
+        return {
+          id: crypto.randomUUID(),
+          role,
+          content: text,
+          createdAt: new Date().toISOString(),
+        };
+      })
+      .filter((message) => message.content.length > 0);
+  }
+
   // ── generateContent ────────────────────────────────────────────────────────
 
   /**
@@ -57,6 +75,60 @@ export class OrchestratorAIService {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('[OrchestratorAIService] generateContent failed', { message });
       throw error;
+    }
+  }
+
+  async generateContentMultiTurn(
+    contents: Array<{ role: string; parts: Array<{ text: string }> }>
+  ): Promise<string> {
+    const messages = this.mapContentsToMessages(contents);
+
+    if (messages.length === 0) {
+      throw new Error('Contents cannot be empty');
+    }
+
+    const options: CompletionOptions = {};
+
+    try {
+      const response = await chatOrchestrator.complete(messages, options);
+      return response.content;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('[OrchestratorAIService] generateContentMultiTurn failed', { message });
+      throw error;
+    }
+  }
+
+  async generateContentStream(
+    contents: Array<{ role: string; parts: Array<{ text: string }> }>,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    const messages = this.mapContentsToMessages(contents);
+
+    if (messages.length === 0) {
+      throw new Error('Contents cannot be empty');
+    }
+
+    const options: CompletionOptions = {};
+    let fullText = '';
+
+    try {
+      const stream = await chatOrchestrator.stream(messages, options);
+      for await (const chunk of stream) {
+        const text = chunk.delta ?? '';
+        if (text) {
+          fullText += text;
+          onChunk(text);
+        }
+      }
+      return fullText;
+    } catch (error: unknown) {
+      // Fallback keeps API usable even if provider streaming is unavailable.
+      const fallback = await this.generateContentMultiTurn(contents);
+      if (fallback) {
+        onChunk(fallback);
+      }
+      return fallback;
     }
   }
 

@@ -114,6 +114,7 @@ model Document {
  filename  String
   fileType  String   
   fileUrl   String   
+  status    String   @default("processing")
   chunks    DocumentChunk[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -127,6 +128,8 @@ model DocumentChunk {
   id         String   @id @default(cuid())
   content    String   // The actual text of this chunk
   chunkIndex Int      // To keep order (1, 2, 3...)
+  embeddingModel   String
+  embeddingVersion Int
   
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)

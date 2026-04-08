@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { IVectorStore, DocumentChunk, CompletionOptions } from '@super-ai/ai-orchestrator';
 import { GeminiProvider } from './GeminiProvider';
+import { DocumentRetrievalService } from './DocumentRetrievalService';
 
 export class PrismaVectorStore implements IVectorStore {
   constructor(
@@ -15,27 +16,7 @@ export class PrismaVectorStore implements IVectorStore {
       return [];
     }
 
-    // 1. Convert text to vector using our existing GeminiProvider
-    const queryEmbedding = await this.provider.getEmbedding(query);
-    const vectorString = `[${queryEmbedding.join(',')}]`;
-
-    // 2. Perform Postgres pgvector search via the `match_documents` function
-    // Format matches legacy graphql resolver behaviour exactly
-    const relatedChunks: any[] = await this.prisma.$queryRaw`
-      SELECT content, similarity 
-      from match_documents(
-        ${vectorString}::vector, 
-        0.3,  
-        ${topK}, 
-        ${userId}
-      )
-    `;
-
-    // 3. Map to orchestrator format
-    return relatedChunks.map((chunk, index) => ({
-      id: `chunk-${index}`,
-      content: chunk.content,
-      score: chunk.similarity,
-    }));
+    const retrievalService = new DocumentRetrievalService(this.prisma, this.provider);
+    return retrievalService.retrieveRelevantChunks(userId, query, { topK });
   }
 }

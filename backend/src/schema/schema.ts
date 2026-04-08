@@ -80,6 +80,7 @@ export const typeDefs = gql`
     title: String
     content: String!
     summary: String
+    status: String!
     createdAt: DateTime!
     updatedAt: DateTime!
   }
@@ -261,8 +262,16 @@ export const typeDefs = gql`
     usedCustomResponse: Boolean!
   }
 
+  type MessageChunk {
+    chatId: ID!
+    delta: String!
+    fullContent: String!
+    isDone: Boolean!
+  }
+
   type Subscription {
     messageAdded(chatId: ID!): Message
+    messageChunkAdded(chatId: ID!): MessageChunk
   }
 
   type FaceAnalysisResult {

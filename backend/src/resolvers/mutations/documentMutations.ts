@@ -1,9 +1,7 @@
 import { AppContext } from "../types/context";
 import { Upload } from "../types/upload";
 import { CloudinaryService } from "../../services/cloudinaryService";
-import { DocumentProcessor } from "../../services/documentProcessor";
-
-const processor = new DocumentProcessor();
+import { processDocument } from "../../services/documentIngestionService";
 
 export const documentMutations = {
   uploadDocument: async (
@@ -28,53 +26,28 @@ export const documentMutations = {
       const uploadResult: any = await CloudinaryService.uploadFile(buffer, "rag_documents");
       const fileUrl = uploadResult.secure_url;
 
-      // 3. Extract Text
-      const fullText = await processor.extractText(buffer, mimetype);
-      if (!fullText) throw new Error("Could not extract text from document");
-
-      // 4. Create Document in DB (Prisma)
+      // 3. Create the document in a processing state so ingestion can continue in the background.
       const document = await context.prisma.document.create({
         data: {
           filename,
           fileType: mimetype,
           fileUrl,
           userId: context.user.userId, // Use userId from token
-        }
+          status: "processing",
+        } as any
       });
 
-      // 5. Chunk & Embed
-      const textChunks = processor.chunkText(fullText, 800); // 800 chars per chunk
-      console.log(`📄 Splitting ${filename} into ${textChunks.length} chunks...`);
-
-      for (let i = 0; i < textChunks.length; i++) {
-        const content = textChunks[i];
-        
-        // A. Generate Vector (Gemini)
-        const vector = await context.geminiAIService.getEmbedding(content);
-
-        // B. Save Chunk (Prisma)
-        const chunk = await context.prisma.documentChunk.create({
-          data: {
-            content,
-            chunkIndex: i,
-            documentId: document.id
-          }
-        });
-
-        // C. Save Vector (Raw SQL because Prisma doesn't support vector writes easily yet)
-        // Format vector as string "[0.1, 0.2, ...]"
-        const vectorString = `[${vector.join(",")}]`;
-        
-        await context.prisma.$executeRaw`
-          UPDATE "DocumentChunk"
-          SET embedding = ${vectorString}::vector
-          WHERE id = ${chunk.id}
-        `;
-      }
+      // 4. Kick off ingestion asynchronously so the upload mutation returns immediately.
+      void processDocument(document.id, {
+        prisma: context.prisma,
+        embeddingService: context.geminiAIService,
+      }).catch((error) => {
+        console.error(`Document ingestion failed for ${document.id}:`, error);
+      });
 
       return {
         success: true,
-        message: `Processed ${filename} into ${textChunks.length} knowledge chunks.`
+        message: `Uploaded ${filename}. Document processing has started.`
       };
 
     } catch (error: any) {

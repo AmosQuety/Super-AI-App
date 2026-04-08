@@ -12,6 +12,8 @@ import type { ToastOptions } from 'react-toastify';
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
+import DocumentUploader from "./DocumentUploader";
+import { uploadToCloudinary } from "../../services/cloudinary";
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
 
@@ -306,6 +308,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
   const handleSendMessage = useCallback(async (text: string, attachment?: File) => {
     const trimmedText = text.trim();
+    const userContent = trimmedText || (attachment ? `[Attached: ${attachment.name}]` : '');
 
     if (trimmedText === "" && !attachment) {
       toast.warn("Please enter a message or add an attachment.", { theme: "dark" });
@@ -315,7 +318,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const optimisticMessage = addOptimisticMessage({
       tempId,
-      text: trimmedText,
+      text: userContent,
       sender: "user",
       attachment: attachment || undefined,
       conversationId: conversationId || undefined,
@@ -326,6 +329,17 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
     try {
       let currentConversationId = conversationId;
+      let uploadedAttachmentUrl: string | undefined;
+
+      if (attachment) {
+        updateMessageStatus(tempId, {
+          status: "sending",
+          error: "Uploading attachment...",
+        });
+
+        const uploadResult = await uploadToCloudinary(attachment);
+        uploadedAttachmentUrl = uploadResult.url;
+      }
 
       if (!currentConversationId) {
         // toast.info("Creating new conversation...", { autoClose: 1500, theme: "dark" });
@@ -333,8 +347,14 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
         const { data: chatData } = await createChat({
           variables: {
             userId: currentUser.id,
-            title: trimmedText.substring(0, 40) + (trimmedText.length > 40 ? "..." : ""),
-            messages: [{ role: "user", content: trimmedText }],
+            title: userContent.substring(0, 40) + (userContent.length > 40 ? "..." : ""),
+            messages: [{
+              role: "user",
+              content: userContent,
+              fileName: attachment?.name,
+              fileUri: uploadedAttachmentUrl,
+              fileMimeType: attachment?.type,
+            }],
           },
         });
 
@@ -357,7 +377,10 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
       const { data: messageData } = await sendMessage({
         variables: {
           chatId: currentConversationId,
-          content: trimmedText,
+          content: userContent,
+          fileName: attachment?.name,
+          fileUri: uploadedAttachmentUrl,
+          fileMimeType: attachment?.type,
         },
       });
 
@@ -373,7 +396,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
         const confirmedUserMessage: MessageType = {
           id: response.userMessage.id,
           conversationId: currentConversationId || undefined,
-          text: trimmedText,
+          text: userContent,
           sender: "user",
           timestamp: new Date(response.userMessage.createdAt),
           attachment: attachment || undefined,
@@ -643,6 +666,18 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
              
              <div className="bg-theme-primary p-4 md:p-6 pb-6 pointer-events-auto">
                 <div className="max-w-4xl mx-auto shadow-theme-xl rounded-2xl ring-1 ring-theme-light">
+                  <div className="px-3 pt-3">
+                    <DocumentUploader
+                      disabled={historyLoading}
+                      onStatus={(type, message) => {
+                        if (type === 'success') {
+                          toast.success(message, { theme: 'dark' });
+                        } else {
+                          toast.error(message, { theme: 'dark' });
+                        }
+                      }}
+                    />
+                  </div>
                   <InputArea
                     onSendMessage={handleSendMessage}
                     disabled={historyLoading || aiState !== "idle"}

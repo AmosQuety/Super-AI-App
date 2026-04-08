@@ -16,5 +16,13 @@ export const subscriptionResolvers = {
         }
       ),
     },
+    messageChunkAdded: {
+      subscribe: withFilter(
+        () => pubsub.asyncIterableIterator('MESSAGE_CHUNK_ADDED'),
+        (payload: any, variables: any) => {
+          return payload.messageChunkAdded.chatId === variables.chatId;
+        }
+      ),
+    },
   },
 };
