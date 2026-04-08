@@ -128,8 +128,8 @@ model DocumentChunk {
   id         String   @id @default(cuid())
   content    String   // The actual text of this chunk
   chunkIndex Int      // To keep order (1, 2, 3...)
-  embeddingModel   String
-  embeddingVersion Int
+  embeddingModel   String   @default("text-embedding-004")
+  embeddingVersion Int      @default(1)
   
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
