@@ -26,19 +26,7 @@ import ErrorMonitor from "./ErrorMonitor";
 import { createUploadLink } from "./uploadLink";
 import { logger } from "../utils/logger";
 
-// Extend Vite's ImportMeta type
-declare global {
-  interface ImportMetaEnv {
-    VITE_GRAPHQL_URL?: string;
-    VITE_AI_ENGINE_URL?: string;
-    MODE: string;
-    DEV: boolean;
-  }
 
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-}
 
 // phone IP address
 // const GRAPHQL_URL = "http://172.16.0.78:4001/graphql";

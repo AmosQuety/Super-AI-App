@@ -6,7 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_ENV: 'development' | 'staging' | 'production';
   readonly VITE_CLOUDINARY_CLOUD_NAME?: string;
   readonly VITE_CLOUDINARY_UPLOAD_PRESET?: string;
-  // Add other environment variables here as you need them
+  readonly VITE_GRAPHQL_URL?: string;
+  readonly VITE_AI_ENGINE_URL?: string;
 }
 
 interface ImportMeta {
