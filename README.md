@@ -12,10 +12,10 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 ## 🚀 Live Demo
 *  **Video Demo:** [https://youtu.be/E5pNRct9X4Q](https://youtu.be/E5pNRct9X4Q)
 *   **Frontend:** [https://prism-vision.vercel.app](https://prism-vision.vercel.app)
-*   **Backend API:** [https://super-ai-backend.onrender.com/graphql](https://super-ai-app.onrender.com/graphql)
-*   **AI Engine:** [https://amosquety-biometric-brain.hf.space](https://amosquety-biometric-brain.hf.space)
+*   **Backend API:** Available in the hosted app; direct deployment links are intentionally omitted.
+*   **AI Engine:** Available in the hosted app; direct deployment links are intentionally omitted.
 
-*(Note: Services are hosted on free tiers and may experience "Cold Starts" of 30-60s on first load.)*
+*If a hosted service is unavailable, use the video demo or screenshots instead of depending on a cold-started endpoint.*
 
 ---
 
@@ -28,7 +28,7 @@ It features a microservices architecture separating the "Manager" (Node.js) from
 *   **Global Identity Index:** Centralized vector database for secure multi-modal user verification.
 
 ### 🎮 Interactive Loading Experience
-*   **Mini-Game Lobby:** To bridge AI model "Cold Starts" and processing times, users can play integrated mini-games:
+*   **Mini-Game Lobby:** To bridge asynchronous processing times, users can play integrated mini-games:
     *   **Emoji Catcher:** Fast-paced reaction game.
     *   **Pop the Bubbles:** Relaxing precision game.
     *   **Tap Dodge:** Skill-based movement game.
@@ -137,6 +137,8 @@ By default, the system points to the local Python API. To use the cloud-offloade
 # In src/apps/backend/.env
 PYTHON_FACE_SERVICE_URL=https://your-huggingface-space.hf.space
 ```
+
+For public sharing, prefer screenshots, a short screen recording, or a dedicated status page over raw deployment URLs.
 
 If running the Python Engine locally for development:
 ```bash

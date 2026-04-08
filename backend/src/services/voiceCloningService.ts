@@ -59,7 +59,7 @@ export class VoiceCloningService {
       formData.append('reference_audio', audioBuffer, { filename, contentType: mimetype });
 
       // Build the webhook URL and pass it to Python
-      const WEBHOOK_BASE_URL = process.env.APP_URL || 'https://super-ai-app.onrender.com';
+      const WEBHOOK_BASE_URL = process.env.APP_URL || 'http://localhost:4001';
       
       formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
 
@@ -107,7 +107,7 @@ export class VoiceCloningService {
       const formData = new FormData();
       formData.append('text', text);
 
-      const WEBHOOK_BASE_URL = process.env.APP_URL || 'https://super-ai-app.onrender.com';
+      const WEBHOOK_BASE_URL = process.env.APP_URL || 'http://localhost:4001';
           
       // Python will append the Job ID when it hits this URL
       formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);

@@ -46,12 +46,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:4001/graphql';
+  const aiEngineUrl = import.meta.env.VITE_AI_ENGINE_URL;
 
-  // UX 6.6: Wake up AI Engine early to mitigate cold starts
   const wakeUpAIEngine = () => {
-    const aiUrl = import.meta.env.VITE_AI_ENGINE_URL || 'https://amosquety-biometric-brain.hf.space';
+    if (!aiEngineUrl) return;
+
     console.log('🚀 Pinging AI Engine for wake-up...');
-    fetch(aiUrl, { mode: 'no-cors' }).catch(() => {}); // Fire and forget
+    fetch(aiEngineUrl, { mode: 'no-cors' }).catch(() => {}); // Fire and forget
   };
 
   // Check for existing session on app start
@@ -79,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
 
-      const response = await fetch('https://super-ai-app.onrender.com/graphql', {
+      const response = await fetch(graphqlUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
 
-      const response = await fetch('https://super-ai-app.onrender.com/graphql', {
+      const response = await fetch(graphqlUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
