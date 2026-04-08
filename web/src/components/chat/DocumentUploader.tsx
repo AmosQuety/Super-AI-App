@@ -15,7 +15,6 @@ interface DocumentLifecycleData {
     id: string;
     documents: Array<{
       id: string;
-      filename: string;
       status: string;
       updatedAt: string;
     }>;

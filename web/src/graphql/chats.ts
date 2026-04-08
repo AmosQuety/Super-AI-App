@@ -111,7 +111,6 @@ export const GET_DOCUMENT_LIFECYCLE = gql`
       id
       documents {
         id
-        filename
         status
         updatedAt
       }
