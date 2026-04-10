@@ -101,6 +101,8 @@ export const UPLOAD_DOCUMENT = gql`
     uploadDocument(file: $file) {
       success
       message
+      fileUrl
+      documentId
     }
   }
 `;

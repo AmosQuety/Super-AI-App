@@ -40,8 +40,7 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
   const [localStatus, setLocalStatus] = useState<'processing' | 'ready' | 'failed' | null>(null);
 
   const [uploadDocument, { loading }] = useMutation<UploadDocumentResponse>(UPLOAD_DOCUMENT);
-  const { data: lifecycleData } = useQuery<DocumentLifecycleData>(GET_DOCUMENT_LIFECYCLE, {
-    pollInterval: 4000,
+  const { data: lifecycleData, startPolling, stopPolling } = useQuery<DocumentLifecycleData>(GET_DOCUMENT_LIFECYCLE, {
     fetchPolicy: 'cache-and-network',
   });
 
@@ -56,6 +55,18 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
       setLocalStatus(null);
     }
   }, [latestStatus]);
+
+  useEffect(() => {
+    const isProcessing = localStatus === 'processing' || latestStatus === 'processing';
+
+    if (isProcessing) {
+      startPolling(8000);
+    } else {
+      stopPolling();
+    }
+
+    return () => stopPolling();
+  }, [latestStatus, localStatus, startPolling, stopPolling]);
 
   const handleFilePicked = async (file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {

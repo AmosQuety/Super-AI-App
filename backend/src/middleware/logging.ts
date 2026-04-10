@@ -197,9 +197,18 @@ export const securityLoggingMiddleware = (req: Request, _: Response, next: NextF
 
 // Helper functions for security detection
 function hasSqlInjectionIndicators(req: Request): boolean {
-  const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', 'OR 1=1'];
-  const searchString = JSON.stringify({ ...req.query, ...req.body }).toUpperCase();
-  return sqlKeywords.some(keyword => searchString.includes(keyword));
+  const searchString = JSON.stringify({ ...req.query, ...req.body });
+  const patterns = [
+    /\bSELECT\b/i,
+    /\bINSERT\b/i,
+    /\bUPDATE\b/i,
+    /\bDELETE\b/i,
+    /\bDROP\b/i,
+    /\bUNION\b/i,
+    /\bOR\s+1\s*=\s*1\b/i,
+  ];
+
+  return patterns.some((pattern) => pattern.test(searchString));
 }
 
 function hasXSSIndicators(req: Request): boolean {

@@ -115,7 +115,7 @@ export const sendMessageWithResponse = {
       });
 
       // 4. Handle File Attachment
-      if (fileUri && fileMimeType) {
+      if (fileUri && fileMimeType?.startsWith('text/')) {
         try {
           const extractedText = await documentProcessor.extractTextFromUrl(fileUri, fileMimeType);
           hasFileAttachment = true;
@@ -183,32 +183,37 @@ export const sendMessageWithResponse = {
       // Step B: If no custom match, check Quota and call Gemini
       if (!aiResponse) {
          // --- STRATEGY 1: CHECK DB QUOTA ---
-         await AIManager.checkQuota(userId, 'chat');
+         try {
+          await AIManager.checkQuota(userId, 'chat');
 
-        let fullStreamedText = '';
-        aiResponse = await context.geminiAIService.generateContentStream(contents, async (delta: string) => {
-          fullStreamedText += delta;
+          let fullStreamedText = '';
+          aiResponse = await context.geminiAIService.generateContentStream(contents, async (delta: string) => {
+            fullStreamedText += delta;
+
+            await pubsub.publish('MESSAGE_CHUNK_ADDED', {
+              messageChunkAdded: {
+                chatId,
+                delta,
+                fullContent: fullStreamedText,
+                isDone: false,
+              },
+            });
+          });
 
           await pubsub.publish('MESSAGE_CHUNK_ADDED', {
             messageChunkAdded: {
               chatId,
-              delta,
-              fullContent: fullStreamedText,
-              isDone: false,
+              delta: '',
+              fullContent: aiResponse,
+              isDone: true,
             },
           });
-        });
 
-        await pubsub.publish('MESSAGE_CHUNK_ADDED', {
-          messageChunkAdded: {
-            chatId,
-            delta: '',
-            fullContent: aiResponse,
-            isDone: true,
-          },
-        });
-
-         usedGemini = true; // Mark that we hit the API
+           usedGemini = true; // Mark that we hit the API
+         } catch (providerError: any) {
+           console.error("LLM generation failed:", providerError);
+           aiResponse = "I am having trouble reaching the AI provider right now due to high demand. Please retry in a few moments.";
+         }
       }
 
       // 8. Save AI Response

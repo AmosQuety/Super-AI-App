@@ -77,9 +77,9 @@ export const typeDefs = gql`
     id: ID!
     user: User!
     userId: String!
-    title: String
-    content: String!
-    summary: String
+    filename: String!
+    fileType: String!
+    fileUrl: String!
     status: String!
     createdAt: DateTime!
     updatedAt: DateTime!
@@ -235,6 +235,8 @@ export const typeDefs = gql`
   type GenericResponse {
     success: Boolean!
     message: String!
+    fileUrl: String
+    documentId: ID
   }
   
   type FaceAuthPayload {

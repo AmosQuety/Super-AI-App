@@ -9,12 +9,14 @@ export interface SentimentResult {
   export class SentimentService {
     private worker: Worker | null = null;
     private isReady: boolean = false;
+    private isDisabled: boolean = false;
   
     constructor() {
       // Initialize later
     }
   
     public init() {
+      if (this.isDisabled) return;
       if (this.worker) return;
   
       // Vite syntax for web workers
@@ -30,6 +32,8 @@ export interface SentimentResult {
         }
         if (status === 'error') {
             logger.error("Sentiment Worker Error:", error);
+          this.isDisabled = true;
+          this.terminate();
         }
       };
       
@@ -37,6 +41,7 @@ export interface SentimentResult {
     }
   
     public async analyze(text: string): Promise<SentimentResult | null> {
+      if (this.isDisabled) return null;
       if (!this.worker || !this.isReady) {
           // If not ready, try init? Or just return null for now to avoid blocking.
           if(!this.worker) this.init();

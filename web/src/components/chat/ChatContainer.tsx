@@ -13,7 +13,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
 import DocumentUploader from "./DocumentUploader";
-import { uploadToCloudinary } from "../../services/cloudinary";
+import { UPLOAD_DOCUMENT } from "../../graphql/chats";
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
 
@@ -57,6 +57,15 @@ interface SendMessageData {
       content: string;
       createdAt: string;
     };
+  };
+}
+
+interface UploadDocumentData {
+  uploadDocument: {
+    success: boolean;
+    message: string;
+    fileUrl?: string | null;
+    documentId?: string | null;
   };
 }
 
@@ -218,6 +227,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
         toast.error("Failed to create chat.", { theme: "dark" });
     }
   });
+
+  const [uploadDocument] = useMutation<UploadDocumentData>(UPLOAD_DOCUMENT);
   
   const [sendMessage] = useMutation<SendMessageData>(SEND_MESSAGE_WITH_RESPONSE, {
     onCompleted: () => refetchChats(),
@@ -337,8 +348,14 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           error: "Uploading attachment...",
         });
 
-        const uploadResult = await uploadToCloudinary(attachment);
-        uploadedAttachmentUrl = uploadResult.url;
+        const { data: uploadData } = await uploadDocument({ variables: { file: attachment } });
+        const uploadResult = uploadData?.uploadDocument;
+
+        if (!uploadResult?.success || !uploadResult.fileUrl) {
+          throw new Error(uploadResult?.message || "Attachment upload failed.");
+        }
+
+        uploadedAttachmentUrl = uploadResult.fileUrl;
       }
 
       if (!currentConversationId) {

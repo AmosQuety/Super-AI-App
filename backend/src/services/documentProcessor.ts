@@ -112,7 +112,7 @@ export class DocumentProcessor {
       return await this.extractText(fileBuffer, mimeType);
     } catch (error: any) {
       console.error('Error downloading file:', error.message);
-      return `[Unable to process file: ${error.message}]`;
+      throw new Error(`Unable to download file for extraction: ${error.message}`);
     }
   }
 

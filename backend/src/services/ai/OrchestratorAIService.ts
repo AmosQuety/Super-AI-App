@@ -138,7 +138,7 @@ export class OrchestratorAIService {
    * Generates a vector embedding for `text`.
    *
    * Delegated directly to `GeminiProvider.getEmbedding()` because the
-   * embedding model (`text-embedding-004`) sits outside the chat-completion
+  * embedding model (`gemini-embedding-001`) sits outside the chat-completion
    * orchestration path.
    */
   async getEmbedding(text: string): Promise<number[]> {

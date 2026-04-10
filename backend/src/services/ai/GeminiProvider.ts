@@ -146,13 +146,46 @@ export class GeminiProvider implements IProvider {
   // ── Embeddings (outside orchestrator scope) ────────────────────────────────
 
   async getEmbedding(text: string): Promise<number[]> {
+    const embeddingModels = ["gemini-embedding-001", "text-embedding-004"];
+    const targetDimensions = 768;
+
     for (let attempt = 0; attempt < Math.max(ALL_KEYS.length, 1); attempt++) {
       const key = nextKey();
       try {
         const genAI = new GoogleGenerativeAI(key);
-        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-        const result = await model.embedContent(text.replace(/\n/g, " "));
-        return result.embedding.values;
+
+        for (const embeddingModel of embeddingModels) {
+          try {
+            const model = genAI.getGenerativeModel({ model: embeddingModel });
+            const result = await model.embedContent(text.replace(/\n/g, " "));
+            const values = result.embedding.values;
+
+            if (!Array.isArray(values) || values.length === 0) {
+              throw new Error("Embedding response was empty");
+            }
+
+            if (values.length >= targetDimensions) {
+              return values.slice(0, targetDimensions);
+            }
+
+            // Right-pad if provider returns fewer dimensions than expected by DB schema.
+            return [...values, ...new Array(targetDimensions - values.length).fill(0)];
+          } catch (innerError: unknown) {
+            const innerMsg = (innerError as Error).message ?? "";
+            const modelUnavailable =
+              innerMsg.includes("404") ||
+              innerMsg.includes("not found") ||
+              innerMsg.includes("not supported for embedContent");
+
+            if (modelUnavailable) {
+              continue;
+            }
+
+            throw innerError;
+          }
+        }
+
+        throw new Error("No supported Gemini embedding model available for this API key");
       } catch (error: unknown) {
         const msg = (error as Error).message ?? "";
         const isRateLimited =

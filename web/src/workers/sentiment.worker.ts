@@ -20,8 +20,9 @@ self.addEventListener('message', async (event: MessageEvent) => {
     try {
         await initialize();
         self.postMessage({ status: 'ready' });
-    } catch (err) {
-        self.postMessage({ status: 'error', error: err });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      self.postMessage({ status: 'error', error: message });
     }
     return;
   }
@@ -34,8 +35,9 @@ self.addEventListener('message', async (event: MessageEvent) => {
       const output = await classifier(text);
       // output is like [{ label: 'POSITIVE', score: 0.99 }]
       self.postMessage({ status: 'result', output });
-    } catch (err) {
-      self.postMessage({ status: 'error', error: err });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      self.postMessage({ status: 'error', error: message });
     }
   }
 });
