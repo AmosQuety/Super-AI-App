@@ -21,7 +21,19 @@ root.render(
 // Register Service Worker for PWA (Phase 4)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+       reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                 console.log("New content available; reloading...");
+                 window.location.reload();
+              }
+            };
+          }
+       };
+    }).catch(err => {
       console.log('SW registration failed: ', err);
     });
   });

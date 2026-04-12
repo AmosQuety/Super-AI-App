@@ -66,6 +66,7 @@ export const SEND_MESSAGE_WITH_RESPONSE = gql`
     $fileName: String
     $fileUri: String
     $fileMimeType: String
+    $activeDocumentIds: [ID!]
   ) {
     sendMessageWithResponse(
       chatId: $chatId
@@ -74,6 +75,7 @@ export const SEND_MESSAGE_WITH_RESPONSE = gql`
       fileName: $fileName
       fileUri: $fileUri
       fileMimeType: $fileMimeType
+      activeDocumentIds: $activeDocumentIds
     ) {
       userMessage {
         id

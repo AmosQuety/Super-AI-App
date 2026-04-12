@@ -108,7 +108,11 @@ const retryLink = new RetryLink({
     jitter: true,
   },
   attempts: {
-    max: 3,
+    max: (() => {
+       const conn = (navigator as any).connection;
+       const isSlow = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
+       return isSlow ? 1 : 3;
+    })(),
     retryIf: (error, operation: Operation) => {
       // Explicitly mark operation parameter to avoid unused warning
       logger.log('Retry attempt for operation:', operation.operationName);
@@ -224,11 +228,12 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 const trackingLink = new ApolloLink((operation, forward) => {
   incrementRequest();
 
-  logger.log('🚀 GraphQL Operation:', {
-    name: operation.operationName,
-    // Only log variables in development to avoid leaking PII/secrets in production
-    variables: import.meta.env.DEV ? operation.variables : '[HIDDEN IN PROD]',
-  });
+  if (import.meta.env.DEV) {
+    logger.log('🚀 GraphQL Operation:', {
+      name: operation.operationName,
+      variables: operation.variables,
+    });
+  }
 
   const observable = forward(operation);
 
@@ -259,11 +264,11 @@ const client = new ApolloClient({
   defaultOptions: {
     watchQuery: {
       errorPolicy: "all",
-      fetchPolicy: "cache-and-network",
+      fetchPolicy: "cache-first",
     },
     query: {
       errorPolicy: "all",
-      fetchPolicy: "network-only",
+      fetchPolicy: "cache-first",
     },
   },
 });

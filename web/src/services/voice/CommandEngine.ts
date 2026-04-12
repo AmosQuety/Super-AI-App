@@ -17,7 +17,9 @@ export const DEFAULT_COMMANDS: VoiceCommand[] = [
   { id: "nav_image", phrase: "(go to|open) (image|generation|art)", action: "NAVIGATE", payload: "/image" },
   { id: "nav_voice", phrase: "(go to|open) (voice|tools)", action: "NAVIGATE", payload: "/voice" },
   { id: "nav_playground", phrase: "(go to|open) (playground|face|biometrics)", action: "NAVIGATE", payload: "/playground" },
-  { id: "nav_settings", phrase: "(open) (settings|profile|account)", action: "NAVIGATE", payload: "/profile" },
+  { id: "nav_settings", phrase: "(go to|open) (app)? (settings|configuration)", action: "NAVIGATE", payload: "/settings" },
+  { id: "nav_profile", phrase: "(go to|open) (profile|account)", action: "NAVIGATE", payload: "/profile" },
+  { id: "nav_blaze", phrase: "(go to|open) (blaze|intelligence settings|persona)", action: "NAVIGATE", payload: "/blaze-settings" },
   
   // Actions
   { id: "act_logout", phrase: "(log out|sign out)", action: "ACTION", payload: "LOGOUT" },

@@ -1,16 +1,24 @@
 // src/services/faceRecognitionService.ts
 import axios from "axios";
 import FormData from "form-data";
+import http from "http";
+import https from "https";
 import { Upload } from "../resolvers/types/upload"; 
 import { logger } from "../utils/logger";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
+const aiEngineClient = axios.create({
+  baseURL: PYTHON_SERVICE_URL,
+  httpAgent: new http.Agent({ keepAlive: true, keepAliveMsecs: 30000 }),
+  httpsAgent: new https.Agent({ keepAlive: true, keepAliveMsecs: 30000 }),
+});
+
 export class FaceRecognitionService {
   
   async checkHealth() {
     try {
-      const response = await axios.get(`${PYTHON_SERVICE_URL}/`, { timeout: 2000 });
+      const response = await aiEngineClient.get(`/`, { timeout: 2000 });
       return { 
         isOnline: response.status === 200, 
         message: response.data.system || "Python Service Online",
@@ -44,8 +52,8 @@ export class FaceRecognitionService {
       formData.append("name", characterName);
       formData.append("file", stream, { filename, contentType: mimetype });
 
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/register`,
+      const response = await aiEngineClient.post(
+        `/register`,
         formData,
         {
           headers: { ...formData.getHeaders() },
@@ -90,8 +98,8 @@ export class FaceRecognitionService {
       formData.append("workspace_id", workspaceId);
       formData.append("file", stream, { filename, contentType: mimetype });
 
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/verify`,
+      const response = await aiEngineClient.post(
+        `/verify`,
         formData,
         {
           headers: { ...formData.getHeaders() },
@@ -145,8 +153,8 @@ export class FaceRecognitionService {
       const formData = new FormData();
       formData.append("file", stream, { filename, contentType: mimetype });
 
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/analyze`,
+      const response = await aiEngineClient.post(
+        `/analyze`,
         formData,
         {
           headers: { ...formData.getHeaders() },
@@ -193,8 +201,8 @@ export class FaceRecognitionService {
       formData.append("file1", file1.createReadStream(), { filename: file1.filename, contentType: file1.mimetype });
       formData.append("file2", file2.createReadStream(), { filename: file2.filename, contentType: file2.mimetype });
 
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/compare`,
+      const response = await aiEngineClient.post(
+        `/compare`,
         formData,
         {
          headers: { ...formData.getHeaders()  },
@@ -223,8 +231,8 @@ export class FaceRecognitionService {
       formData.append("target", file1.createReadStream(), { filename: file1.filename, contentType: file1.mimetype });
       formData.append("crowd", file2.createReadStream(), { filename: file2.filename, contentType: file2.mimetype });
 
-      const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/find-face`,
+      const response = await aiEngineClient.post(
+        `/find-face`,
         formData,
         {
           headers: { ...formData.getHeaders() },

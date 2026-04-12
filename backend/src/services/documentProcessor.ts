@@ -1,5 +1,6 @@
 // src/services/documentProcessor.ts
 import axios from 'axios';
+import mammoth from 'mammoth';
 
 // 1. Use the new library
 const pdf = require('pdf-extraction');
@@ -130,7 +131,25 @@ export class DocumentProcessor {
             
         console.log(`✅ PDF Extracted: ${cleanText.length} characters`);
         return cleanText;
-      } 
+      }
+      // DOCX — Office Open XML (most common modern Word format)
+      else if (
+        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ) {
+        console.log("📄 Processing DOCX with mammoth...");
+        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        const cleanText = result.value.replace(/\n\s*\n/g, '\n').trim();
+        console.log(`✅ DOCX Extracted: ${cleanText.length} characters`);
+        return cleanText;
+      }
+      // DOC — Legacy binary Word format (mammoth handles this too)
+      else if (mimeType === 'application/msword') {
+        console.log("📄 Processing DOC (legacy) with mammoth...");
+        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        const cleanText = result.value.replace(/\n\s*\n/g, '\n').trim();
+        console.log(`✅ DOC Extracted: ${cleanText.length} characters`);
+        return cleanText;
+      }
       else if (mimeType.startsWith('text/')) {
         return fileBuffer.toString('utf-8');
       }

@@ -6,7 +6,15 @@ export class ChatService {
   async getUserChats(userId: string): Promise<Chat[]> {
     return this.prisma.chat.findMany({
       where: { userId },
-    });
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    }) as unknown as Promise<Chat[]>;
   }
 
   async getChatHistory(chatId: string, limit: number = 20, offset: number = 0) {
@@ -15,6 +23,18 @@ export class ChatService {
       orderBy: { createdAt: "desc" },
       take: limit,
       skip: offset,
+      select: {
+        id: true,
+        chatId: true,
+        role: true,
+        content: true,
+        imageUrl: true,
+        fileName: true,
+        fileUri: true,
+        fileMimeType: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
 
     const totalMessages = await this.prisma.message.count({

@@ -12,6 +12,7 @@ import { imageGenerationResolvers } from "./imageGenerationResolvers";
 import { workspaceResolvers } from "./workspaceResolvers";
 
 import { voiceCloningResolvers } from "./mutations/voiceCloning";
+import { voiceTaskResolvers } from "./voiceTaskResolvers";
 
 export const resolvers: IResolvers = {
   ...scalarResolvers,
@@ -30,7 +31,8 @@ export const resolvers: IResolvers = {
     ...sendMessageWithResponse,
     ...imageGenerationResolvers.Mutation,
      ...workspaceResolvers.Mutation,
-     ...voiceCloningResolvers.Mutation
+     ...voiceCloningResolvers.Mutation,
+     ...voiceTaskResolvers.Mutation
   },
   
   User: { 

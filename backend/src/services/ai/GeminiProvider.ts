@@ -71,6 +71,8 @@ function isQuotaWallError(err: unknown): boolean {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
+let embeddingCooldownUntil = 0;
+
 export class GeminiProvider implements IProvider {
   readonly id = "gemini";
 
@@ -146,6 +148,10 @@ export class GeminiProvider implements IProvider {
   // ── Embeddings (outside orchestrator scope) ────────────────────────────────
 
   async getEmbedding(text: string): Promise<number[]> {
+    if (Date.now() < embeddingCooldownUntil) {
+      throw new Error(`[GeminiProvider] Embeddings temporarily blocked due to successive provider failures. Try again in ${Math.ceil((embeddingCooldownUntil - Date.now())/1000)}s.`);
+    }
+
     const embeddingModels = ["gemini-embedding-001", "text-embedding-004"];
     const targetDimensions = 768;
 
@@ -190,7 +196,17 @@ export class GeminiProvider implements IProvider {
         const msg = (error as Error).message ?? "";
         const isRateLimited =
           msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
+        const isUnavailable =
+          msg.includes("503") || msg.includes("500") || msg.includes("502");
+
         if (isRateLimited && attempt < ALL_KEYS.length - 1) continue;
+        
+        // If ALL keys exhausted on rate limit or 503, set a cooldown of 2 minutes site-wide
+        if (isUnavailable || (isRateLimited && attempt === ALL_KEYS.length - 1)) {
+           console.warn(`[GeminiProvider] Embedding API severely degraded/exhausted. Initiating 2 minute cooldown. (${msg.slice(0, 100)})`);
+           embeddingCooldownUntil = Date.now() + 2 * 60 * 1000;
+        }
+
         throw new Error(`Embedding failed: ${msg}`);
       }
     }

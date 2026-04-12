@@ -7,8 +7,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';
-import { FaceCapture } from "./FaceCapture"; 
-import { useMutation } from '@apollo/client/react'; 
+import { FaceCapture } from "./FaceCapture";
+import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 
 const REGISTER_USER_FACE = gql`
@@ -33,7 +33,7 @@ export default function RegisterScreen() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // VIEW CONTROL
   const [showFaceEnroll, setShowFaceEnroll] = useState(false);
   const [faceLoading, setFaceLoading] = useState(false);
@@ -55,14 +55,14 @@ export default function RegisterScreen() {
     try {
       setIsLoading(true);
       await signUp(data);
-      
+
       // SUCCESS! Now switch to Face Enrollment View
       showSuccess('Account Created!', 'One last step: Secure your account.');
       setShowFaceEnroll(true);
-      
+
     } catch (error: unknown) {
-       let errorMessage = "An unexpected error occurred";
-      
+      let errorMessage = "An unexpected error occurred";
+
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === "string") {
@@ -81,7 +81,7 @@ export default function RegisterScreen() {
       setFaceLoading(true);
       // We rely on the token already being in localStorage from the signUp() step
       const { data } = await registerFace({ variables: { image: file } });
-      
+
       if (data?.registerUserFace.success) {
         showSuccess('Biometrics Enabled', 'You can now use Face ID to login.');
         navigate('/chat');
@@ -90,8 +90,8 @@ export default function RegisterScreen() {
         showError('Enrollment Failed', msg);
       }
     } catch (err: unknown) {
-       let errorMessage = "An unexpected error occurred";
-      
+      let errorMessage = "An unexpected error occurred";
+
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (typeof err === "string") {
@@ -117,22 +117,22 @@ export default function RegisterScreen() {
         <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-slate-700/50 text-center">
           <div className="mb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-               <User className="text-white w-8 h-8" />
+              <User className="text-white w-8 h-8" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Secure Your Account 📸</h2>
             <p className="text-gray-400 text-sm">
               Register your face now to enable instant login next time.
             </p>
           </div>
-          
-          <FaceCapture 
+
+          <FaceCapture
             onCapture={handleFaceEnroll}
-            onCancel={skipEnrollment} 
+            onCancel={skipEnrollment}
             loading={faceLoading}
             mode="register"
           />
-          
-          <button 
+
+          <button
             onClick={skipEnrollment}
             className="mt-8 text-gray-500 hover:text-gray-300 text-xs uppercase tracking-widest hover:underline transition-all"
           >
@@ -167,7 +167,7 @@ export default function RegisterScreen() {
         {/* Form Card */}
         <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-slate-700/50">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            
+
             {/* Name Field */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -237,19 +237,21 @@ export default function RegisterScreen() {
         </div>
 
         {/* Sign In Link */}
-        <p className="text-center text-gray-400 mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-purple-400 hover:text-purple-300 font-medium transition">
+        <p className="mt-8 text-center text-slate-400">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
+          >
             Sign In
           </Link>
         </p>
 
-        {/* Trust Footer */}
-        <div className="mt-8 flex justify-center gap-4 text-xs text-gray-500 border-t border-slate-800 pt-6">
-          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Privacy Policy</Link>
-          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Terms of Service</Link>
-          <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Security Center</Link>
-        </div>
+        <footer className="mt-12 pt-8 border-t border-slate-800/50 flex items-center justify-center gap-6 text-[11px] text-slate-500 font-medium">
+          <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+
+        </footer>
       </div>
     </div>
   );

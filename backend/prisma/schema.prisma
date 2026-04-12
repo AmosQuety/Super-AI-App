@@ -16,6 +16,7 @@ model User {
   password  String
   role      String            @default("USER")
   avatarUrl String?
+  preferences String?  // JSON: tone, techDepth, role, domain, goals, language, responseFormat
   lastLoginAt DateTime?
   isActive  Boolean           @default(true)
   chats     Chat[]
@@ -51,6 +52,7 @@ model Chat {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([userId, updatedAt(sort: Desc)])
   @@map("chats")
 }
 
@@ -121,6 +123,7 @@ model Document {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([userId, status, createdAt(sort: Desc)])
   @@map("documents")
 }
 
@@ -137,6 +140,8 @@ model DocumentChunk {
   embedding  Unsupported("vector(768)")?
 
   createdAt  DateTime @default(now())
+
+  @@index([documentId, chunkIndex])
 }
 
 model Workspace {
@@ -156,6 +161,8 @@ model Workspace {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId, isDefault])
 }
 
 model Face {
@@ -168,6 +175,8 @@ model Face {
   
   // We track when this face was enrolled
   createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt(sort: Desc)])
 }
 
 model FaceEmbedding {

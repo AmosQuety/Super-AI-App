@@ -17,5 +17,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ["@apollo/client"],
   },
-  
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-apollo': ['@apollo/client', 'graphql'],
+          'vendor-ui': ['framer-motion', 'lucide-react', 'react-toastify']
+        }
+      }
+    }
+  }
 });

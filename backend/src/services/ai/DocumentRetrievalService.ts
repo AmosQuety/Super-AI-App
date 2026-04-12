@@ -1,5 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import type { DocumentChunk } from '@super-ai/ai-orchestrator';
+import { redisClient } from '../../lib/redis';
+import crypto from 'crypto';
+import { recordLatency, getP95Latency } from '../../utils/logger';
 
 export interface EmbeddingProvider {
   getEmbedding(text: string): Promise<number[]>;
@@ -8,6 +11,7 @@ export interface EmbeddingProvider {
 export interface RetrieveRelevantChunksOptions {
   topK?: number;
   similarityThreshold?: number;
+  documentIds?: string[];
 }
 
 const DEFAULT_TOP_K = 3;
@@ -25,6 +29,7 @@ export class DocumentRetrievalService {
     query: string,
     options: RetrieveRelevantChunksOptions = {},
   ): Promise<DocumentChunk[]> {
+    const t0 = performance.now();
     const normalizedQuery = query.trim();
     if (!userId || !normalizedQuery) return [];
 
@@ -32,11 +37,42 @@ export class DocumentRetrievalService {
     const topK = Math.min(MAX_TOP_K, Math.max(1, requestedTopK));
     const similarityThreshold = options.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
 
+    const queryHash = crypto.createHash('sha256').update(normalizedQuery).digest('hex');
+    const docsHash = options.documentIds?.length 
+      ? crypto.createHash('sha256').update([...options.documentIds].sort().join(',')).digest('hex').slice(0, 10) 
+      : 'all';
+      
+    const resultCacheKey = `RAG:userId:${userId}:hash:${queryHash}:docs:${docsHash}:topK:${topK}`;
+
+    // ── Check global Result Cache ─────────────────────────────────────────────
+    if (redisClient) {
+      const cachedResponse = await redisClient.get(resultCacheKey);
+      if (cachedResponse) {
+        console.info('[rag] Cache HIT for RAG result', { userId, queryHash });
+        return JSON.parse(cachedResponse);
+      }
+    }
+
+    let finalResults: DocumentChunk[] | null = null;
+
     // ── Path A: Vector (cosine) search ────────────────────────────────────────
     // Only attempted if embedding succeeds.  A failure drops us straight into
     // the full-text fallback so the user always gets *something*.
     try {
-      const queryEmbedding = await this.embeddingProvider.getEmbedding(normalizedQuery);
+      let queryEmbedding: number[];
+      const embedCacheKey = `embedding:${queryHash}`;
+      
+      if (redisClient) {
+        const cachedEmbed = await redisClient.get(embedCacheKey);
+        if (cachedEmbed) {
+           queryEmbedding = JSON.parse(cachedEmbed);
+        } else {
+           queryEmbedding = await this.embeddingProvider.getEmbedding(normalizedQuery);
+           await redisClient.set(embedCacheKey, JSON.stringify(queryEmbedding), 'EX', 86400); // 24 hours
+        }
+      } else {
+        queryEmbedding = await this.embeddingProvider.getEmbedding(normalizedQuery);
+      }
       const vectorString = `[${queryEmbedding.join(',')}]`;
 
       const vectorResults = await this.prisma.$queryRaw<
@@ -49,6 +85,9 @@ export class DocumentRetrievalService {
         INNER JOIN "documents" d ON d.id = dc."documentId"
         WHERE d."userId"  = ${userId}
           AND d.status    = 'ready'
+          ${options.documentIds && options.documentIds.length > 0 
+            ? Prisma.sql`AND d.id IN (${Prisma.join(options.documentIds)})` 
+            : Prisma.empty}
           AND dc.embedding IS NOT NULL
           AND (1 - (dc.embedding <=> ${vectorString}::vector)) >= ${similarityThreshold}
         ORDER BY dc.embedding <=> ${vectorString}::vector ASC
@@ -64,17 +103,17 @@ export class DocumentRetrievalService {
       });
 
       if (vectorResults.length > 0) {
-        return vectorResults
+        finalResults = vectorResults
           .map((chunk) => ({
             content: chunk.content,
             score: chunk.similarity === null ? undefined : Number(chunk.similarity),
           }))
           .filter((c) => c.content.trim().length > 0)
           .slice(0, topK);
+      } else {
+        // Vector search found nothing — fall through to full-text fallback.
+        console.info('[rag] vector search returned 0 results, trying full-text fallback', { userId });
       }
-
-      // Vector search found nothing — fall through to full-text fallback.
-      console.info('[rag] vector search returned 0 results, trying full-text fallback', { userId });
     } catch (embeddingError: unknown) {
       const msg = embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
       console.warn('[rag] embedding failed, falling back to full-text search', {
@@ -84,16 +123,20 @@ export class DocumentRetrievalService {
     }
 
     // ── Path B: Full-text / keyword search fallback ───────────────────────────
-    // Used when:
-    //   • The embedding API is unavailable (403, rate-limit, etc.)
-    //   • Vector search returned zero results
-    //
-    // Strategy:
-    //   1. Try PostgreSQL full-text search (fast, ranked).
-    //   2. If that returns nothing, fall back to ILIKE on individual keywords.
-    //   3. Last resort: return the first N chunks of every ready document owned
-    //      by the user so the AI always has *some* document context.
-    return this.fullTextSearch(userId, normalizedQuery, topK);
+    if (!finalResults) {
+      finalResults = await this.fullTextSearch(userId, normalizedQuery, topK, options.documentIds);
+    }
+
+    if (redisClient && finalResults) {
+      await redisClient.set(resultCacheKey, JSON.stringify(finalResults), 'EX', 180); // 3 minutes TTL
+    }
+
+    const t1 = performance.now();
+    const duration = t1 - t0;
+    recordLatency('RAG_Duration', duration);
+    console.info(`[rag] Total retrieval time: ${duration.toFixed(2)}ms (p95: ${getP95Latency('RAG_Duration')?.toFixed(2)}ms)`);
+
+    return finalResults || [];
   }
 
   // ── Full-text search ──────────────────────────────────────────────────────
@@ -102,6 +145,7 @@ export class DocumentRetrievalService {
     userId: string,
     query: string,
     topK: number,
+    documentIds?: string[],
   ): Promise<DocumentChunk[]> {
     // Build a tsquery from the first 10 meaningful words in the query.
     const tsQueryTerms = query
@@ -121,6 +165,9 @@ export class DocumentRetrievalService {
           INNER JOIN "documents" d ON d.id = dc."documentId"
           WHERE d."userId" = ${userId}
             AND d.status   = 'ready'
+            ${documentIds && documentIds.length > 0 
+              ? Prisma.sql`AND d.id IN (${Prisma.join(documentIds)})` 
+              : Prisma.empty}
             AND to_tsvector('english', dc.content) @@ to_tsquery('english', ${tsQueryTerms})
           ORDER BY rank DESC
           LIMIT ${topK}

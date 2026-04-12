@@ -15,6 +15,7 @@ import { graphqlUploadExpress } from "graphql-upload-minimal";
 import { typeDefs } from "./schema/schema";
 import { resolvers } from "./resolvers/index";
 import cors from "cors";
+import compression from "compression";
 import { createContext, disconnectPrisma } from "./resolvers/types/context";
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -91,21 +92,33 @@ const corsOptions: cors.CorsOptions = {
     app.use(cors(corsOptions));
     app.options("*", cors(corsOptions)); // Handle preflight for all routes
 
-    // 3. RATE LIMITING (Now safe because CORS headers are already set)
+    // 3. COMPRESSION
+    // Add Brotli/Gzip response compression with threshold tuning for bandwidth constraints
+    app.use(compression({
+      threshold: 512, // Compress payloads larger than 512 bytes
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) {
+          return false;
+        }
+        return compression.filter(req, res);
+      }
+    }));
+
+    // 4. RATE LIMITING (Now safe because CORS headers are already set)
     RateLimitService.initializeRedis();
     app.use('/graphql', RateLimitService.getGraphQLLimiter());
     app.use('/auth/*', RateLimitService.getAuthLimiter());
+    app.use('/health', RateLimitService.getGeneralLimiter());
     
-    // 4. LOGGING & PARSING & WEBHOOKS
+    // 5. LOGGING & WEBHOOKS
     app.use(loggingMiddleware);
+    app.use(graphQLLoggingMiddleware);
+    app.use(securityLoggingMiddleware);
+    app.use(performanceMiddleware);
     
     // Attach Webhooks early before generic GraphQL body parsing
     const { webhookRouter } = require('./services/webhooks');
     app.use('/api/webhooks', webhookRouter);
-
-    app.use(express.json());
-
-      
 
     // Validate security configuration on startup
     try {
@@ -118,28 +131,12 @@ const corsOptions: cors.CorsOptions = {
       }
     }
 
-
     // Helper to decide if error is safe to show
     const isExposedError = (code: string) => {
       return ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN', 'GRAPHQL_VALIDATION_FAILED', 'BAD_REQUEST'].includes(code);
     };
 
-    app.options("*", cors(corsOptions));
-    app.use(cors(corsOptions));
-
-    // Initialize and apply rate limiting
-    RateLimitService.initializeRedis();
-    app.use('/graphql', RateLimitService.getGraphQLLimiter());
-    app.use('/auth/*', RateLimitService.getAuthLimiter());
-    app.use('/health', RateLimitService.getGeneralLimiter());
-
-    // Apply logging middleware
-    app.use(loggingMiddleware);
-    app.use(graphQLLoggingMiddleware);
-    app.use(securityLoggingMiddleware);
-    app.use(performanceMiddleware);
-
-    // JSON body parser
+    // 6. JSON BODY PARSER
     app.use(express.json());
 
     // 5. AI ORCHESTRATOR BOOTSTRAP

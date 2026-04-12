@@ -69,7 +69,7 @@ export default function TwinOMeter() {
 
   // --- REUSABLE UPLOAD BOX ---
   const UploadBox = ({ slot, preview }: { slot: 1 | 2, preview: string | null, file: File | null }) => (
-    <div className="relative group w-full aspect-square bg-slate-800 rounded-2xl border-2 border-dashed border-slate-600 hover:border-purple-500 transition-colors flex flex-col items-center justify-center overflow-hidden">
+    <div className="relative group w-full aspect-square bg-theme-tertiary/20 rounded-2xl border-2 border-dashed border-theme-medium hover:border-violet-500 transition-all flex flex-col items-center justify-center overflow-hidden shadow-inner">
       {preview ? (
         <>
           <img src={preview} alt="Upload" className="w-full h-full object-cover" />
@@ -86,8 +86,8 @@ export default function TwinOMeter() {
         </>
       ) : (
         <>
-          <Upload className="w-8 h-8 text-slate-400 mb-2 group-hover:text-purple-400 transition" />
-          <span className="text-sm text-slate-400 font-medium">Upload Photo {slot === 1 ? "A" : "B"}</span>
+          <Upload className="w-8 h-8 text-theme-tertiary mb-2 group-hover:text-violet-500 transition" />
+          <span className="text-sm text-theme-tertiary font-bold tracking-tight uppercase">Upload Photo {slot === 1 ? "A" : "B"}</span>
           <input 
             type="file" 
             accept="image/*"
@@ -102,10 +102,10 @@ export default function TwinOMeter() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold text-theme-primary mb-2 bg-gradient-to-r from-orange-500 to-red-600 dark:from-orange-400 dark:to-red-500 bg-clip-text text-transparent">
           Twin-O-Meter 👯‍♂️
         </h2>
-        <p className="text-slate-400">Compare two faces to see if they match.</p>
+        <p className="text-theme-secondary font-medium">Compare two faces to see if they match.</p>
       </div>
 
       {/* --- COMPARISON AREA --- */}
@@ -113,7 +113,7 @@ export default function TwinOMeter() {
         <UploadBox slot={1} preview={preview1} file={file1} />
         
         {/* VS Badge */}
-        <div className="shrink-0 w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center border border-slate-700 font-black text-slate-500 z-10 shadow-xl">
+        <div className="shrink-0 w-12 h-12 bg-theme-primary rounded-full flex items-center justify-center border border-theme-light font-black text-theme-tertiary z-10 shadow-theme-lg">
           VS
         </div>
         
@@ -137,20 +137,20 @@ export default function TwinOMeter() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`rounded-3xl p-6 border ${result.verified ? "bg-green-900/20 border-green-500/50" : "bg-red-900/20 border-red-500/50"}`}
+          className={`rounded-3xl p-6 border shadow-theme-xl ${result.verified ? "bg-green-500/10 border-green-500/50" : "bg-red-500/10 border-red-500/50"}`}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              {result.verified ? <CheckCircle2 className="text-green-400" /> : <XCircle className="text-red-400" />}
+            <h3 className="text-xl font-bold text-theme-primary flex items-center gap-2">
+              {result.verified ? <CheckCircle2 className="text-green-600 dark:text-green-400" /> : <XCircle className="text-red-600 dark:text-red-400" />}
               {result.verified ? "It's a Match!" : "Different People"}
             </h3>
-            <span className="text-2xl font-mono font-bold text-white">
+            <span className="text-2xl font-mono font-bold text-theme-primary">
               {result.similarity_score}%
             </span>
           </div>
 
           {/* Progress Bar */}
-          <div className="h-4 bg-slate-800 rounded-full overflow-hidden mb-2">
+          <div className="h-4 bg-theme-tertiary rounded-full overflow-hidden mb-2 shadow-inner">
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${result.similarity_score}%` }}
@@ -158,7 +158,7 @@ export default function TwinOMeter() {
               className={`h-full ${result.verified ? "bg-green-500" : "bg-red-500"}`}
             />
           </div>
-          <p className="text-xs text-slate-400 text-right">
+          <p className="text-[10px] text-theme-tertiary font-bold uppercase tracking-widest text-right">
             Threshold: 60% similarity needed
           </p>
         </motion.div>

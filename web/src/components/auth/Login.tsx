@@ -190,19 +190,22 @@ export default function LoginScreen() {
             </div>
 
             {/* Sign Up Link */}
-            <p className="text-center text-gray-400 mt-6">
+            <p className="mt-8 text-center text-slate-400">
               Don't have an account?{' '}
-              <Link to="/register" className="text-purple-400 hover:text-purple-300 font-medium transition">
+              <Link
+                to="/register"
+                className="text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
+              >
                 Sign Up
               </Link>
             </p>
 
-            {/* Trust Footer */}
-            <div className="mt-8 flex justify-center gap-4 text-xs text-gray-500 border-t border-slate-800 pt-6">
-              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Privacy Policy</Link>
-              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Terms of Service</Link>
-              <Link to="#" className="hover:text-gray-400 underline decoration-slate-700">Security Center</Link>
-            </div>
+            {/* Footer Links */}
+            <footer className="mt-12 pt-8 border-t border-slate-800/50 flex items-center justify-center gap-6 text-[11px] text-slate-500 font-medium">
+              <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+              
+            </footer>
           </>
         )}
       </div>

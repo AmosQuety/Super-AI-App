@@ -3,6 +3,26 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 export const asyncContext = new AsyncLocalStorage<Map<string, string>>();
 
+const latencyWindow: Record<string, number[]> = {};
+
+export const recordLatency = (operationName: string, durationMs: number) => {
+  if (!latencyWindow[operationName]) latencyWindow[operationName] = [];
+  latencyWindow[operationName].push(durationMs);
+  
+  if (latencyWindow[operationName].length > 100) {
+     latencyWindow[operationName].shift();
+  }
+};
+
+export const getP95Latency = (operationName: string): number | null => {
+   const samples = latencyWindow[operationName];
+   if (!samples || samples.length === 0) return null;
+   
+   const sorted = [...samples].sort((a, b) => a - b);
+   const index = Math.floor(sorted.length * 0.95);
+   return sorted[index];
+};
+
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),

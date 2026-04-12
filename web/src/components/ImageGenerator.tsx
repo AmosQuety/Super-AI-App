@@ -69,8 +69,16 @@ export default function ImageGenerator() {
     requestPermission();
 
     try {
+      const conn = (navigator as any).connection;
+      const isSlowNetwork = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
+      const safePrompt = isSlowNetwork ? `${prompt.trim()} --ar 1:1 --v 5.0 --stop 80 --quality 0.5` : prompt.trim(); // Add midjourney/dalle style quality flags for low bandwidth routing
+      
+      if (isSlowNetwork) {
+         addToast({ type: 'success', title: 'Data Saver', message: 'Generating highly compressed previews to save data.' });
+      }
+
       const { data } = await generateImagesMutation({
-        variables: { prompt: prompt.trim() },
+        variables: { prompt: safePrompt },
       });
 
       if (data?.generateAIImageVariants.success && data.generateAIImageVariants.images) {

@@ -22,6 +22,10 @@ const SecurityPage = lazy(() => import("./src/pages/SecurityPage"));
 const LoginScreen = lazy(() => import("./src/components/auth/Login"));
 const RegisterScreen = lazy(() => import("./src/components/auth/Register"));
 const LandingPage = lazy(() => import("./src/pages/LandingPage"));
+const PrivacyPolicy = lazy(() => import("./src/pages/legal/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./src/pages/legal/TermsOfService"));
+const BlazeSettingsPage = lazy(() => import("./src/pages/BlazeSettingsPage.tsx"));
+const SettingsPage = lazy(() => import("./src/pages/SettingsPage.tsx"));
 
 // ==============================
 // 🔹 PRODUCT CONFIG (single source of truth)
@@ -94,10 +98,9 @@ const HomeContent = () => (
 const AppRoutes = () => {
   const { user: authUser, token: authToken } = useAuth();
 
-  const defaultUser = {
-    id: authUser?.id || "user-123",
-    username: authUser?.name || authUser?.email || "User",
-  };
+  const userInfo = authUser
+    ? { id: authUser.id, username: authUser.name || authUser.email || "User" }
+    : null;
 
   return (
     <Suspense fallback={<LoadingSpinner />}>
@@ -114,6 +117,10 @@ const AppRoutes = () => {
             </AuthOnlyRoute>
           }
         />
+
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/security-center" element={<SecurityPage />} />
 
         <Route
           path="/register"
@@ -137,10 +144,14 @@ const AppRoutes = () => {
           <Route
             path="chat"
             element={
-              <ChatContainer
-                token={authToken || ""}
-                userInfo={defaultUser}
-              />
+              userInfo ? (
+                <ChatContainer
+                  token={authToken || ""}
+                  userInfo={userInfo}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
 
@@ -148,6 +159,8 @@ const AppRoutes = () => {
           <Route path="image" element={<ImageGenerator />} />
           <Route path="voice" element={<VoiceTools/>} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="blaze-settings" element={<BlazeSettingsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="document-uploader" element={<DocumentUploader />} />
           <Route path="security" element={<SecurityPage />} />
         </Route>

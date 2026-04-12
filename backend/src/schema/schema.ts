@@ -12,6 +12,7 @@ export const typeDefs = gql`
     name: String
     role: String!
     avatarUrl: String
+    preferences: UserPreferences
     lastLoginAt: DateTime
     isActive: Boolean!
     chats: [Chat!]
@@ -22,6 +23,32 @@ export const typeDefs = gql`
     updatedAt: DateTime!
     hasFaceRegistered: Boolean
     hasVoiceRegistered: Boolean
+    totalChats: Int
+    totalMessages: Int
+    totalVoiceJobs: Int
+    totalDocuments: Int
+  }
+
+  type UserPreferences {
+    tone: String           # "casual" | "formal"
+    detail: String         # "concise" | "detailed"
+    techDepth: String      # "beginner" | "intermediate" | "expert"
+    responseFormat: String # "prose" | "bullets" | "mixed"
+    role: String           # e.g. "Software Developer"
+    domain: String         # e.g. "React, TypeScript"
+    goals: String          # e.g. "Building a SaaS product"
+    language: String       # e.g. "English"
+  }
+
+  input PreferencesInput {
+    tone: String
+    detail: String
+    techDepth: String
+    responseFormat: String
+    role: String
+    domain: String
+    goals: String
+    language: String
   }
 
   type Chat {
@@ -213,6 +240,7 @@ export const typeDefs = gql`
     deleteWorkspace(id: ID!): Boolean!
 
     uploadDocument(file: Upload!): GenericResponse!
+    updatePreferences(preferences: PreferencesInput!): User!
     
     registerVoice(referenceAudio: Upload!): VoiceCloneResponse!
     
@@ -220,7 +248,21 @@ export const typeDefs = gql`
     
     cloneVoice(text: String!, referenceAudio: Upload): VoiceCloneResponse!
     
-    sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String): SendMessageResponse!
+    sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String, activeDocumentIds: [ID!]): SendMessageResponse!
+
+    processVoiceTask(input: ProcessVoiceTaskInput!): ProcessVoiceTaskResponse!
+  }
+
+  input ProcessVoiceTaskInput {
+    text: String!
+    action: String! # TRANSLATE | SUMMARIZE
+    targetLanguage: String
+  }
+
+  type ProcessVoiceTaskResponse {
+    success: Boolean!
+    result: String
+    error: String
   }
 
   input MessageInput {

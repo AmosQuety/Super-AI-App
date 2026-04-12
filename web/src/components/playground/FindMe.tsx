@@ -88,10 +88,10 @@ export default function FindMe() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold text-theme-primary mb-2 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-400 dark:to-emerald-500 bg-clip-text text-transparent">
           Crowd Scanner 🕵️‍♂️
         </h2>
-        <p className="text-slate-400">Upload a target face and find them inside a group photo.</p>
+        <p className="text-theme-secondary font-medium">Upload a target face and find them inside a group photo.</p>
       </div>
 
       {/* --- UPLOAD SECTION --- */}
@@ -99,24 +99,24 @@ export default function FindMe() {
         
         {/* TARGET (1 Column) */}
         <div className="md:col-span-1 space-y-2">
-          <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
-            <User size={16} className="text-blue-400"/> The Target (You)
+          <label className="text-sm font-bold text-theme-secondary flex items-center gap-2 uppercase tracking-tight">
+            <User size={16} className="text-blue-500 dark:text-blue-400"/> The Target (You)
           </label>
-          <div className="relative group w-full aspect-[3/4] bg-slate-800 rounded-2xl border-2 border-dashed border-slate-600 hover:border-blue-500 transition-colors flex flex-col items-center justify-center overflow-hidden">
+          <div className="relative group w-full aspect-[3/4] bg-theme-tertiary/20 rounded-2xl border-2 border-dashed border-theme-medium hover:border-violet-500 transition-all flex flex-col items-center justify-center overflow-hidden shadow-inner">
             {targetPreview ? (
               <>
                 <img src={targetPreview} alt="Target" className="w-full h-full object-cover" />
                 <button 
                   onClick={() => { setTargetFile(null); setTargetPreview(null); setResult(null); }}
-                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-red-500 transition"
+                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-red-500 transition shadow-lg"
                 >
                   <X size={16} />
                 </button>
               </>
             ) : (
               <>
-                <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                <span className="text-xs text-slate-500 text-center px-4">Upload a clear selfie</span>
+                <Upload className="w-8 h-8 text-theme-tertiary mb-2 group-hover:text-violet-500 transition-all" />
+                <span className="text-xs text-theme-tertiary font-bold uppercase tracking-widest text-center px-4">Upload Target Face</span>
                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileChange(e, 'target')} />
               </>
             )}
@@ -125,24 +125,24 @@ export default function FindMe() {
 
         {/* CROWD (2 Columns) */}
         <div className="md:col-span-2 space-y-2">
-          <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
-            <Users size={16} className="text-green-400"/> The Crowd (Group Photo)
+          <label className="text-sm font-bold text-theme-secondary flex items-center gap-2 uppercase tracking-tight">
+            <Users size={16} className="text-emerald-500 dark:text-green-400"/> The Crowd (Group Photo)
           </label>
-          <div className="relative group w-full aspect-video bg-slate-800 rounded-2xl border-2 border-dashed border-slate-600 hover:border-green-500 transition-colors flex flex-col items-center justify-center overflow-hidden">
+          <div className="relative group w-full aspect-video bg-theme-tertiary/20 rounded-2xl border-2 border-dashed border-theme-medium hover:border-emerald-500 transition-all flex flex-col items-center justify-center overflow-hidden shadow-inner">
             {crowdPreview ? (
               <>
                 <img src={crowdPreview} alt="Crowd" className="w-full h-full object-cover" />
                 <button 
                   onClick={() => { setCrowdFile(null); setCrowdPreview(null); setResult(null); }}
-                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-red-500 transition"
+                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-red-500 transition shadow-lg"
                 >
                   <X size={16} />
                 </button>
               </>
             ) : (
               <>
-                <Upload className="w-10 h-10 text-slate-400 mb-2" />
-                <span className="text-xs text-slate-500 text-center px-4">Upload the group photo to search</span>
+                <Upload className="w-10 h-10 text-theme-tertiary mb-2 group-hover:text-emerald-500 transition-all" />
+                <span className="text-xs text-theme-tertiary font-bold uppercase tracking-widest text-center px-4">Upload Crowd Image</span>
                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileChange(e, 'crowd')} />
               </>
             )}
@@ -167,7 +167,7 @@ export default function FindMe() {
             </>
           )}
         </button>
-        <p className="text-xs text-slate-500 mt-2">Note: Large photos may take 10-20 seconds to process.</p>
+        <p className="text-[10px] text-theme-tertiary font-bold uppercase tracking-widest mt-4">Note: Large photos may take 10-20 seconds for deep neural analysis.</p>
       </div>
 
       {/* --- RESULTS SECTION --- */}
@@ -175,17 +175,17 @@ export default function FindMe() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl"
+          className="bg-theme-secondary rounded-3xl overflow-hidden border border-theme-light shadow-theme-xl"
         >
-          <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <div className="p-4 bg-theme-tertiary/20 border-b border-theme-light flex justify-between items-center">
+            <h3 className="text-lg font-bold text-theme-primary flex items-center gap-2">
               Results Found: <span className="text-green-400 text-xl">{result.matches}</span>
             </h3>
             <button 
               onClick={downloadResult}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm flex items-center gap-2 transition"
+              className="px-4 py-2 bg-theme-tertiary hover:bg-theme-secondary text-theme-primary rounded-lg text-sm font-bold flex items-center gap-2 transition border border-theme-light"
             >
-              <Download size={16} /> Download Image
+              <Download size={16} /> Download Result
             </button>
           </div>
           

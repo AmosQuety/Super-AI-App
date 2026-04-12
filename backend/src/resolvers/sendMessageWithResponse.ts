@@ -11,13 +11,73 @@ import { DocumentRetrievalService } from "../services/ai/DocumentRetrievalServic
 
 const MAX_HISTORY_TURNS = 20; // cap to avoid blowing context window
 
-const SYSTEM_PROMPT = `
-You are Blaze, a helpful, intelligent, and conversational assistant.
-- Be clear, concise, and natural.
-- Maintain context across the conversation.
-- Be friendly but professional.
-- If external context (documents) is provided, use it when relevant.
-`;
+// Dynamic system prompt builder — injects user identity + preferences into Blaze's context
+interface UserPrefs {
+  tone?: string;           // 'casual' | 'formal'
+  detail?: string;         // 'concise' | 'detailed'
+  techDepth?: string;      // 'beginner' | 'intermediate' | 'expert'
+  responseFormat?: string; // 'prose' | 'bullets' | 'mixed'
+  role?: string;
+  domain?: string;
+  goals?: string;
+  language?: string;
+}
+
+const buildSystemPrompt = (user: { name?: string | null; email: string }, prefs?: UserPrefs | null) => {
+  const firstName = (user.name || user.email).split(' ')[0].split('@')[0];
+
+  const toneInstruction = (() => {
+    if (prefs?.tone === 'formal') return 'Use a formal, professional tone at all times.';
+    if (prefs?.tone === 'casual') return 'Use a friendly, casual tone — feel free to be conversational.';
+    return 'Match the tone of the conversation naturally.';
+  })();
+
+  const detailInstruction = (() => {
+    if (prefs?.detail === 'concise') return 'Keep responses short and to the point. Avoid over-explaining.';
+    if (prefs?.detail === 'detailed') return 'Provide thorough, in-depth answers with context and examples.';
+    return 'Calibrate response length to the complexity of the question.';
+  })();
+
+  const techInstruction = (() => {
+    if (prefs?.techDepth === 'beginner') return 'Explain concepts from scratch. Avoid jargon. Use analogies.';
+    if (prefs?.techDepth === 'intermediate') return 'Assume basic familiarity. Define specialized terms briefly.';
+    if (prefs?.techDepth === 'expert') return 'Skip fundamentals. Use precise technical language. Be direct.';
+    return 'Gauge the user\'s level from their messages and adjust accordingly.';
+  })();
+
+  const formatInstruction = (() => {
+    if (prefs?.responseFormat === 'bullets') return 'Prefer bullet points and structured lists where possible.';
+    if (prefs?.responseFormat === 'prose') return 'Write in flowing prose paragraphs, not bullet lists.';
+    if (prefs?.responseFormat === 'mixed') return 'Use a mix of prose and bullets depending on what fits best.';
+    return 'Choose the most appropriate format for each response.';
+  })();
+
+  const contextLines = [
+    prefs?.role ? `- Their professional role is: ${prefs.role}` : '',
+    prefs?.domain ? `- Their primary domain/tech stack is: ${prefs.domain}` : '',
+    prefs?.goals ? `- What they're currently working toward: ${prefs.goals}` : '',
+    prefs?.language && prefs.language.toLowerCase() !== 'english'
+      ? `- Respond in ${prefs.language} unless they write in a different language.`
+      : '',
+  ].filter(Boolean).join('\n');
+
+  return `
+You are Blaze, a helpful, intelligent, and conversational AI assistant built into Xemora.
+
+The user logged in is ${user.name ? `"${user.name}" (${user.email})` : user.email}. Address them by first name ("${firstName}") where natural.
+
+${contextLines}
+
+Instructions:
+- ${toneInstruction}
+- ${detailInstruction}
+- ${techInstruction}
+- ${formatInstruction}
+- Maintain context across the entire conversation.
+- If external documents are provided, use them to answer the user's question directly.
+- If you don't know something, say so honestly.
+`.trim();
+};
 
 const summarizeHistory = (messages: Array<{ role: string; content: string }>): string => {
   return messages
@@ -28,7 +88,8 @@ const summarizeHistory = (messages: Array<{ role: string; content: string }>): s
 
 const buildContents = (
   history: Array<{ role: string; content: string }>,
-  currentUserMessage: string
+  currentUserMessage: string,
+  systemPrompt: string,
 ): Array<{ role: string; parts: Array<{ text: string }> }> => {
   const recent = history.slice(-MAX_HISTORY_TURNS);
   const older = history.slice(0, -MAX_HISTORY_TURNS);
@@ -64,7 +125,7 @@ const buildContents = (
 
   contents.unshift({
     role: 'user', // Gemini-compatible system instruction workaround
-    parts: [{ text: SYSTEM_PROMPT.trim() }],
+    parts: [{ text: systemPrompt.trim() }],
   });
 
   contents.push({
@@ -91,16 +152,32 @@ const documentProcessor = new DocumentProcessor();
 export const sendMessageWithResponse = {
   sendMessageWithResponse: async (
     _: any,
-    { chatId, content, imageUrl, fileName, fileUri, fileMimeType }: any,
+    { chatId, content, imageUrl, fileName, fileUri, fileMimeType, activeDocumentIds }: any,
     context: AppContext
   ) => {
     // 1. Auth & Identification
     const userId = context.user?.userId || (context.user as any)?.id;
     if (!userId) throw new AuthenticationError("Login required");
 
-    // 2. Verify Chat Ownership
-    const chat = await context.prisma.chat.findUnique({ where: { id: chatId } });
+    // 2. Verify Chat Ownership + Fetch User Profile (with preferences)
+    const [chat, userProfile] = await Promise.all([
+      context.prisma.chat.findUnique({ where: { id: chatId } }),
+      context.prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { name: true, email: true, preferences: true },
+      }),
+    ]);
     if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
+
+    let userPrefs = null;
+    if (userProfile?.preferences) {
+      try { userPrefs = JSON.parse(userProfile.preferences); } catch {}
+    }
+
+    const systemPrompt = buildSystemPrompt(
+      { name: userProfile?.name, email: userProfile?.email || '' },
+      userPrefs,
+    );
 
     try {
       const originalUserMessage = content?.trim() || '';
@@ -126,17 +203,27 @@ export const sendMessageWithResponse = {
       }
 
       // Build native Gemini multi-turn contents
-      const contents = buildContents(priorMessages, modelUserMessage);
+      const contents = buildContents(priorMessages, modelUserMessage, systemPrompt);
 
       // 5. RAG SEARCH (Long Term Memory)
       if (!hasFileAttachment && originalUserMessage.length > 5) {
         try {
+          const hasActiveDocs = activeDocumentIds && activeDocumentIds.length > 0;
+          const dynamicTopK = hasActiveDocs ? 8 : 3;
+
           const retrievalService = new DocumentRetrievalService(context.prisma, context.geminiAIService);
-          const relatedChunks = await retrievalService.retrieveRelevantChunks(userId, originalUserMessage, { topK: 3 });
+          const relatedChunks = await retrievalService.retrieveRelevantChunks(
+            userId, 
+            originalUserMessage, 
+            { 
+              topK: dynamicTopK,
+              documentIds: activeDocumentIds 
+            }
+          );
 
           if (relatedChunks.length > 0) {
             const knowledgeContext = relatedChunks
-              .slice(0, 3)
+              .slice(0, dynamicTopK)
               .map((c) => c.content)
               .join('\n---\n');
 

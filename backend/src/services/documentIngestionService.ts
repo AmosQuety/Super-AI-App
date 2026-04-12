@@ -75,52 +75,73 @@ export async function processDocument(
     let embeddedCount = 0;
     let skippedCount = 0;
 
-    for (let i = 0; i < textChunks.length; i++) {
-      const content = textChunks[i].trim();
-      if (!content) continue;
+    const MAX_CONCURRENT_CHUNKS = parseInt(process.env.EMBEDDING_CONCURRENCY ?? '5', 10);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-      console.info('[ingestion] processing chunk', {
-        documentId,
-        chunkIndex: i,
-        totalChunks: textChunks.length,
-      });
+    for (let batchStart = 0; batchStart < textChunks.length; batchStart += MAX_CONCURRENT_CHUNKS) {
+      const batch = textChunks.slice(batchStart, batchStart + MAX_CONCURRENT_CHUNKS);
+      
+      await Promise.all(batch.map(async (rawContent, batchOffset) => {
+        const i = batchStart + batchOffset;
+        const content = rawContent.trim();
+        if (!content) return;
 
-      // Always create the chunk row first — ensures full-text fallback works
-      // even when embedding is unavailable.
-      const chunk = await prisma.documentChunk.create({
-        data: {
-          content,
-          chunkIndex: i,
-          embeddingModel: EMBEDDING_MODEL,
-          embeddingVersion: EMBEDDING_VERSION,
-          documentId,
-        },
-      });
-
-      // Attempt embedding — failure is non-fatal.
-      try {
-        const vector = await embeddingService.getEmbedding(content);
-        const vectorString = `[${vector.join(',')}]`;
-
-        await prisma.$executeRaw`
-          UPDATE "DocumentChunk"
-          SET embedding = ${vectorString}::vector
-          WHERE id = ${chunk.id}
-        `;
-
-        embeddedCount += 1;
-        console.info('[ingestion] chunk embedded', { documentId, chunkIndex: i });
-      } catch (embeddingError: unknown) {
-        skippedCount += 1;
-        const msg = embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
-        console.warn('[ingestion] embedding skipped (non-fatal) — will use text search fallback', {
+        console.info('[ingestion] processing chunk', {
           documentId,
           chunkIndex: i,
-          reason: msg.slice(0, 200),
+          totalChunks: textChunks.length,
         });
-        // Chunk is still saved without an embedding vector — the retrieval
-        // service will fall back to ILIKE / full-text search for this document.
-      }
+
+        // Always create the chunk row first — ensures full-text fallback works
+        // even when embedding is unavailable.
+        const chunk = await prisma.documentChunk.create({
+          data: {
+            content,
+            chunkIndex: i,
+            embeddingModel: EMBEDDING_MODEL,
+            embeddingVersion: EMBEDDING_VERSION,
+            documentId,
+          },
+        });
+
+        const retryEmbedding = async (attempt = 1): Promise<number[]> => {
+          try {
+            return await embeddingService.getEmbedding(content);
+          } catch (err: any) {
+            const is429 = err.status === 429 || (err.message && err.message.includes('429'));
+            if (is429 && attempt <= 3) {
+              console.warn(`[ingestion] 429 Rate limit hit on chunk ${i}. Retrying in ${attempt * 2000}ms...`);
+              await sleep(2000 * attempt);
+              return retryEmbedding(attempt + 1);
+            }
+            throw err;
+          }
+        };
+
+        // Attempt embedding — failure is non-fatal.
+        try {
+          const vector = await retryEmbedding();
+          const vectorString = `[${vector.join(',')}]`;
+
+          await prisma.$executeRaw`
+            UPDATE "DocumentChunk"
+            SET embedding = ${vectorString}::vector
+            WHERE id = ${chunk.id}
+          `;
+
+          embeddedCount += 1;
+          console.info('[ingestion] chunk embedded', { documentId, chunkIndex: i });
+        } catch (embeddingError: unknown) {
+          skippedCount += 1;
+          const msg = embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+          console.warn('[ingestion] embedding skipped (non-fatal) — will use text search fallback', {
+            documentId,
+            chunkIndex: i,
+            reason: msg.slice(0, 200),
+          });
+          // Chunk is still saved without an embedding vector
+        }
+      }));
     }
 
     console.info('[ingestion] embeddings complete', { documentId, embeddedCount, skippedCount });

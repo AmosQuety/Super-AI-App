@@ -1,62 +1,80 @@
-import React, { useState, useRef, useCallback } from "react";
+// src/components/chat/InputArea.tsx
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
-import { Send, Paperclip, X, Image, FileText, AlertCircle } from "lucide-react";
+import { Send, Paperclip, X, Image, FileText, AlertCircle, BookOpen, Zap } from "lucide-react";
 import { useToast } from "../ui/toastContext";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
   disabled?: boolean;
   isOnline?: boolean;
+  onToggleContext?: () => void;
+  contextOpen?: boolean;
+  activeDocs?: number;
 }
 
 const InputArea: React.FC<InputAreaProps> = ({
   onSendMessage,
   disabled = false,
   isOnline = true,
+  onToggleContext,
+  contextOpen = false,
+  activeDocs = 0,
 }) => {
   const { showWarning } = useToast();
   const [text, setText] = useState("");
-  // ... rest of state
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSlowNetwork, setIsSlowNetwork] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // REFACTOR: Memoized text change handler with auto-resize
+  // ── Network detection ────────────────────────────────────────────────────
+  useEffect(() => {
+    const checkNetwork = () => {
+      const conn = (navigator as any).connection;
+      if (conn) {
+        setIsSlowNetwork(
+          conn.effectiveType === "2g" ||
+          conn.effectiveType === "slow-2g" ||
+          conn.saveData ||
+          conn.rtt > 500
+        );
+      }
+    };
+    checkNetwork();
+    const conn = (navigator as any).connection;
+    conn?.addEventListener("change", checkNetwork);
+    return () => conn?.removeEventListener("change", checkNetwork);
+  }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleTextChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
     }
   }, []);
 
-  // REFACTOR: Enhanced file handling with drag & drop
   const handleAttachmentChange = useCallback((file: File | null) => {
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        showWarning("Attachment Rejected", "Files must be smaller than 10MB to be processed by the neural engine.");
-        return;
-      }
-      setAttachment(file);
-    } else {
-      setAttachment(null);
+    if (!file) { setAttachment(null); return; }
+    if (file.size > 10 * 1024 * 1024) {
+      showWarning("Attachment Rejected", "Files must be smaller than 10MB.");
+      return;
     }
+    setAttachment(file);
   }, [showWarning]);
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    handleAttachmentChange(file);
+    handleAttachmentChange(e.target.files?.[0] || null);
     if (e.target) e.target.value = "";
   };
 
-  // REFACTOR: Drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!disabled && isOnline) {
-      setIsDragging(true);
-    }
+    if (!disabled && isOnline) setIsDragging(true);
   }, [disabled, isOnline]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -67,29 +85,19 @@ const InputArea: React.FC<InputAreaProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
     if (disabled || !isOnline) return;
-
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleAttachmentChange(files[0]);
-    }
+    if (files.length > 0) handleAttachmentChange(files[0]);
   }, [disabled, isOnline, handleAttachmentChange]);
 
-  // REFACTOR: Enhanced send message with validation
   const handleSendMessage = useCallback(() => {
     if (disabled || !isOnline) return;
-    
-    const trimmedText = text.trim();
-    if (trimmedText === "" && !attachment) return;
-
-    onSendMessage(trimmedText, attachment || undefined);
+    const trimmed = text.trim();
+    if (!trimmed && !attachment) return;
+    onSendMessage(trimmed, attachment || undefined);
     setText("");
     setAttachment(null);
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [disabled, isOnline, text, attachment, onSendMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -99,121 +107,152 @@ const InputArea: React.FC<InputAreaProps> = ({
     }
   };
 
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) {
-      return <Image className="h-4 w-4 text-purple-400 flex-shrink-0" />;
-    }
-    return <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />;
-  };
+  const isSendDisabled = disabled || !isOnline || (!text.trim() && !attachment);
 
-  const isSendDisabled = disabled || !isOnline || (text.trim() === "" && !attachment);
+  const getFileIcon = (file: File) =>
+    file.type.startsWith("image/")
+      ? <Image className="h-4 w-4 text-violet-400 flex-shrink-0" />
+      : <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />;
 
   return (
-    <div 
-      className="w-full bg-transparent"
+    <div
+      className="w-full"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Offline Warning */}
-      {!isOnline && (
-        <div className="mb-3 p-3 bg-yellow-500/20 backdrop-blur rounded-xl border border-yellow-500/30 flex items-center space-x-2 animate-slide-in">
-          <AlertCircle className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-          <span className="text-sm text-yellow-200">
-            You are offline. Messages will be sent when connection is restored.
-          </span>
+      {/* ── Network banners ─────────────────────────────────────────────── */}
+      {!isOnline ? (
+        <div className="mb-3 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0" />
+          <span className="text-xs text-amber-300">Offline — messages will queue and send when reconnected.</span>
         </div>
-      )}
+      ) : isSlowNetwork ? (
+        <div className="mb-3 px-4 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center gap-2">
+          <Zap className="h-4 w-4 text-orange-400 flex-shrink-0" />
+          <span className="text-xs text-orange-300">Slow network detected — requests may take longer.</span>
+        </div>
+      ) : null}
 
-      {/* Attachment Preview */}
+      {/* ── Attachment preview ───────────────────────────────────────────── */}
       {attachment && (
-        <div className={`mb-3 p-3 backdrop-blur rounded-xl border flex items-center justify-between animate-slide-in bg-theme-tertiary border-theme-light`}>
-          <div className="flex items-center space-x-3 text-sm min-w-0 flex-1">
+        <div className="mb-3 px-4 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
             {getFileIcon(attachment)}
-            <div className="min-w-0 flex-1">
-              <span className="text-theme-primary font-medium truncate block">
-                {attachment.name}
-              </span>
-              <span className="text-theme-tertiary text-xs">
-                {(attachment.size / 1024).toFixed(1)} KB
-              </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white truncate">{attachment.name}</p>
+              <p className="text-[10px] text-slate-500">{(attachment.size / 1024).toFixed(1)} KB</p>
             </div>
           </div>
-          <button 
-            onClick={() => setAttachment(null)} 
-            className="p-1.5 rounded-full text-purple-200 hover:bg-white/20 hover:text-red-300 transition-all duration-200 flex-shrink-0 ml-2 backdrop-blur"
-            title="Remove attachment"
-            disabled={disabled}
+          <button
+            onClick={() => setAttachment(null)}
+            className="p-1.5 ml-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
-      {/* Drag & Drop Overlay */}
+      {/* ── Drag overlay ────────────────────────────────────────────────── */}
       {isDragging && (
-        <div className="fixed inset-0 bg-purple-500/20 backdrop-blur flex items-center justify-center z-50">
-          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 border-2 border-dashed border-purple-400 text-center">
-            <Paperclip className="h-12 w-12 text-purple-300 mx-auto mb-4" />
-            <div className="text-white text-lg font-medium">Drop your file here</div>
-            <div className="text-purple-200 text-sm">Attach files to your message</div>
+        <div className="fixed inset-0 bg-blue-950/60 backdrop-blur z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-[#1C2128] border-2 border-dashed border-blue-500/60 rounded-2xl p-10 text-center">
+            <Paperclip className="h-10 w-10 text-blue-400 mx-auto mb-3" />
+            <p className="text-white font-medium">Drop your file here</p>
+            <p className="text-slate-400 text-sm mt-1">PDF, DOCX, TXT, images supported</p>
           </div>
         </div>
       )}
 
-      {/* Main Input Container */}
-       <div className={`
-        relative backdrop-blur-xl border rounded-2xl transition-all duration-300
-        ${isFocused 
-          ? 'border-purple-500/60 shadow-theme-lg bg-theme-input' 
-          : 'border-theme-light hover:border-theme-medium bg-theme-input'
+      {/* ── Main input container ─────────────────────────────────────────── */}
+      <div className={`
+        relative rounded-2xl transition-all duration-300 overflow-hidden
+        bg-[#161B22]/60 backdrop-blur-xl
+        ${isFocused
+          ? "ring-1 ring-blue-500/50 shadow-lg shadow-blue-900/20"
+          : "ring-1 ring-white/[0.07] hover:ring-white/10"
         }
-        ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
-        ${isDragging ? 'border-purple-400 shadow-theme-xl' : ''}
+        ${disabled ? "opacity-60" : ""}
+        ${isDragging ? "ring-blue-500/50" : ""}
       `}>
 
+        {/* Knowledge indicator strip */}
+        {activeDocs > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.06] bg-blue-600/5">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] text-slate-400">
+              <span className="text-emerald-400 font-semibold">{activeDocs} doc{activeDocs > 1 ? "s" : ""}</span> active in knowledge base
+            </span>
+          </div>
+        )}
 
-        <div className="flex items-end p-3 space-x-3">
-          {/* Attachment Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || !isOnline}
-            className={`
-              p-2.5 rounded-xl transition-all duration-300 flex-shrink-0
-              ${disabled || !isOnline
-                ? 'opacity-40 cursor-not-allowed' 
-                : 'bg-white/10 hover:bg-white/20 text-purple-300 hover:text-purple-200 hover:scale-105'
-              }
-              backdrop-blur border border-white/10
-            `}
-            aria-label="Attach file"
-            title="Attach file"
-          >
-            <Paperclip className="h-5 w-5" />
-            <input 
-              ref={fileInputRef} 
-              type="file" 
-              className="hidden" 
-              onChange={handleFileInputChange} 
+        <div className="flex items-end gap-2 p-3">
+          {/* Left action buttons */}
+          <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
+            {/* File attach */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
               disabled={disabled || !isOnline}
-              accept="image/*,.pdf,.doc,.docx,.txt" 
-            />
-          </button>
-          
-          {/* Text Input */}
+              className={`
+                p-2 rounded-xl transition-all duration-200
+                ${disabled || !isOnline
+                  ? "opacity-40 cursor-not-allowed text-slate-600"
+                  : "text-slate-500 hover:text-white hover:bg-white/[0.06]"
+                }
+              `}
+              title="Attach file"
+            >
+              <Paperclip className="h-4 w-4" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileInputChange}
+                disabled={disabled || !isOnline}
+                accept="image/*,.pdf,.doc,.docx,.txt,.md"
+              />
+            </button>
+
+            {/* Knowledge base toggle */}
+            {onToggleContext && (
+              <button
+                onClick={onToggleContext}
+                disabled={disabled}
+                className={`
+                  p-2 rounded-xl transition-all duration-200 relative
+                  ${contextOpen
+                    ? "text-blue-400 bg-blue-500/10"
+                    : "text-slate-500 hover:text-white hover:bg-white/[0.06]"
+                  }
+                `}
+                title="Knowledge base"
+              >
+                <BookOpen className="h-4 w-4" />
+                {activeDocs > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-[#161B22]" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Textarea */}
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
               placeholder={
-                !isOnline ? "Offline - waiting for connection..." :
-                disabled ? "AI is thinking..." : 
-                "Type your message... "
+                !isOnline
+                  ? "Offline — reconnecting…"
+                  : disabled
+                    ? "Blaze is thinking…"
+                    : "Ask anything "
               }
               className={`
-                w-full p-3 bg-transparent text-theme-primary placeholder-theme-tertiary 
-                focus:outline-none resize-none scrollbar-thin scrollbar-thumb-theme-tertiary scrollbar-track-transparent
-                text-base leading-relaxed transition-all duration-300
-                ${disabled || !isOnline ? 'cursor-not-allowed' : ''}
+                w-full bg-transparent text-white placeholder-slate-600
+                focus:outline-none resize-none
+                text-sm sm:text-[15px] leading-relaxed
+                scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent
+                py-2 px-1
+                ${disabled || !isOnline ? "cursor-not-allowed" : ""}
               `}
               rows={1}
               value={text}
@@ -222,51 +261,34 @@ const InputArea: React.FC<InputAreaProps> = ({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               disabled={disabled || !isOnline}
-              style={{ minHeight: "48px" }}
+              style={{ minHeight: "40px", maxHeight: "180px" }}
             />
-            
-            {/* Focus indicator */}
-            {isFocused && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
-            )}
           </div>
 
-          {/* Send Button */}
-           <button
+          {/* Send button */}
+          <button
             onClick={handleSendMessage}
             disabled={isSendDisabled}
             className={`
-              p-3 rounded-xl focus:outline-none transition-all duration-300 transform 
-              flex-shrink-0 backdrop-blur border
+              p-2.5 rounded-xl flex-shrink-0 transition-all duration-200
               ${isSendDisabled
-                ? 'bg-theme-tertiary border-theme-light text-theme-tertiary cursor-not-allowed scale-100' 
-                : `
-                  bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/50 
-                  text-white shadow-theme-lg hover:shadow-theme-xl 
-                  hover:scale-105 active:scale-95
-                  hover:from-purple-700 hover:to-blue-700
-                `
+                ? "bg-white/5 text-slate-600 cursor-not-allowed"
+                : "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50 hover:scale-105 active:scale-95"
               }
             `}
-            title={!isOnline ? "Offline - cannot send messages" : "Send message"}
-            aria-label="Send message"
+            title={!isOnline ? "Offline" : "Send message (Enter)"}
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           </button>
         </div>
-
-        {/* Subtle glow effect when focused */}
-        {isFocused && (
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 -z-10 blur-sm"></div>
-        )}
       </div>
 
-       {/* Helper text */}
-       <div className="mt-2 text-center">
-         <p className="text-xs text-theme-tertiary">
-           {!isOnline ? "🔴 Offline - Reconnect to send messages" : "Press Enter to send, Shift+Enter for new line"}
-         </p>
-       </div>
+      {/* Footer hint */}
+      <p className="mt-2 text-center text-[11px] text-slate-600">
+        {!isOnline
+          ? "🔴 Offline"
+          : "Enter to send  ·  Shift+Enter for new line"}
+      </p>
     </div>
   );
 };

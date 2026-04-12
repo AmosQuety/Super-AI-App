@@ -1,13 +1,30 @@
 import { AppContext } from "./types/context";
 import { AuthenticationError } from "apollo-server-express";
+import { redisClient } from "../lib/redis";
 
 export const workspaceResolvers = {
   Query: {
     myWorkspaces: async (_: any, __: any, context: AppContext) => {
       if (!context.user) throw new AuthenticationError("Login required");
-      
+
+      const userId = context.user.userId;
+
+      if (redisClient) {
+        const cacheKey = `user:${userId}:workspaces`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+
+        const data = await context.prisma.workspace.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'asc' }, // Default first
+          include: { _count: { select: { faces: true } } }
+        });
+        await redisClient.set(cacheKey, JSON.stringify(data), 'EX', 60);
+        return data;
+      }
+
       return await context.prisma.workspace.findMany({
-        where: { userId: context.user.userId },
+        where: { userId },
         orderBy: { createdAt: 'asc' }, // Default first
         include: { _count: { select: { faces: true } } }
       });
@@ -18,7 +35,7 @@ export const workspaceResolvers = {
     createWorkspace: async (_: any, { name, description }: any, context: AppContext) => {
       if (!context.user) throw new AuthenticationError("Login required");
 
-      return await context.prisma.workspace.create({
+      const workspace = await context.prisma.workspace.create({
         data: {
           name,
           description,
@@ -26,6 +43,8 @@ export const workspaceResolvers = {
           isDefault: false
         }
       });
+      if (redisClient) await redisClient.del(`user:${context.user.userId}:workspaces`);
+      return workspace;
     },
 
     deleteWorkspace: async (_: any, { id }: any, context: AppContext) => {
@@ -42,6 +61,8 @@ export const workspaceResolvers = {
       // 2. Delete workspace
       await context.prisma.workspace.delete({ where: { id } });
       
+      if (redisClient) await redisClient.del(`user:${context.user.userId}:workspaces`);
+
       // Note: We leave the Python folder. It's safer not to recursively delete files from Node.
       return true;
     }

@@ -1,5 +1,5 @@
 // src/components/VoiceTools.tsx
-import  { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { 
   Mic, 
   Square, 
@@ -14,10 +14,15 @@ import {
   Loader2,
   CheckCircle2,
   FlaskConical,
-  AlertCircle
+  AlertCircle,
+  Languages,
+  ListRestart
 } from "lucide-react";
+import { useMutation } from "@apollo/client/react";
+import { PROCESS_VOICE_TASK } from "../graphql/voice";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
-import VoiceLab from "./VoiceLab";
+import { useToast } from "./ui/toastContext";
+const VoiceLab = lazy(() => import('./VoiceLab'));
 import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
@@ -44,6 +49,17 @@ export default function VoiceTools() {
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'done' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('Initializing Engine...');
   const [finalAudioUrl, setFinalAudioUrl] = useState<string | null>(null);
+
+  const [isProcessingIntelligence, setIsProcessingIntelligence] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState("Spanish");
+  const [processTask] = useMutation<{ processVoiceTask: { success: boolean, result: string, error: string } }>(PROCESS_VOICE_TASK);
+  const { showSuccess, showError } = useToast();
+
+  const [isSlowNetwork, setIsSlowNetwork] = useState(false);
+  useEffect(() => {
+     const conn = (navigator as any).connection;
+     if (conn) setIsSlowNetwork(conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData || conn.rtt > 500);
+  }, []);
 
 
   const workerRef = useRef<Worker | null>(null);
@@ -104,13 +120,63 @@ export default function VoiceTools() {
     setTtsStatus('generating');
     requestPermission();
     audioChunksBuffer.current = [];
-    workerRef.current.postMessage({ type: 'generate', text: ttsText });
+    
+    // Emotion-Responsive Synthesis Logic
+    let emotionalPrompt = ttsText;
+    if (sentiment?.label === 'POSITIVE') {
+        // Embed emotional stage directions for the TTS engine
+        emotionalPrompt = `[Tone: Enthusiastic, Vibrant] ${ttsText}`;
+    } else if (sentiment?.label === 'NEGATIVE') {
+        emotionalPrompt = `[Tone: Calm, Empathetic] ${ttsText}`;
+    }
+
+    workerRef.current.postMessage({ type: 'generate', text: emotionalPrompt });
   };
 
 
   const handleResetTTS = () => {
     setFinalAudioUrl(null);
     setTtsStatus('ready');
+  };
+
+  const handleSummarize = async () => {
+    if (!fullDisplay) return;
+    setIsProcessingIntelligence(true);
+    try {
+        const { data } = await processTask({
+            variables: { input: { text: fullDisplay, action: "SUMMARIZE" } }
+        });
+        if (data?.processVoiceTask?.success) {
+            setTtsText(data.processVoiceTask.result);
+            showSuccess("Intelligence Layer", "Transcription synthesized into organized notes. Ready for text-to-speech transfer.");
+        } else {
+            showError("Intelligence Layer", data?.processVoiceTask?.error || "Failed to summarize thought.");
+        }
+    } catch (e) {
+        showError("Intelligence Layer", "Network constraint prevented synthesis.");
+    } finally {
+        setIsProcessingIntelligence(false);
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (!fullDisplay) return;
+    setIsProcessingIntelligence(true);
+    try {
+        const { data } = await processTask({
+            variables: { input: { text: fullDisplay, action: "TRANSLATE", targetLanguage } }
+        });
+        if (data?.processVoiceTask?.success) {
+            setTtsText(data.processVoiceTask.result);
+            showSuccess("Babel Fish Active", `Translation to ${targetLanguage} complete. Context transferred to Neural Voice.`);
+        } else {
+            showError("Translation Error", data?.processVoiceTask?.error || "Failed to translate context.");
+        }
+    } catch (e) {
+        showError("Translation Error", "Network constraint prevented translation.");
+    } finally {
+        setIsProcessingIntelligence(false);
+    }
   };
 
 
@@ -183,9 +249,20 @@ export default function VoiceTools() {
           </button>
         </div>
       </div>
+      
+      {isSlowNetwork && (
+        <div className="flex justify-center mb-6">
+           <div className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 rounded-lg">
+             <AlertCircle className="w-4 h-4 mr-2" />
+             <span className="text-sm font-medium">Slow Connection: Synthesis may take longer than usual.</span>
+           </div>
+        </div>
+      )}
 
       {activeTab === 'lab' ? (
-        <VoiceLab />
+        <Suspense fallback={<div className="h-96 w-full flex items-center justify-center bg-theme-secondary rounded-xl animate-pulse text-slate-500 border border-theme-light shadow-theme-xl">Loading Voice Lab Interface...</div>}>
+          <VoiceLab />
+        </Suspense>
       ) : (
         <div className="grid lg:grid-cols-2 gap-8">
 
@@ -278,6 +355,42 @@ export default function VoiceTools() {
                   <Download className="w-6 h-6" />
                 </button>
               </div>
+            </div>
+
+            {/* AI Intelligence Action Bar (Babel Fish & Brain Dump) */}
+            <div className="mt-6 p-4 rounded-2xl bg-theme-input border border-theme-light flex flex-col sm:flex-row gap-4 items-center justify-between">
+               <div className="flex items-center gap-2 w-full sm:w-auto">
+                 <select 
+                   value={targetLanguage}
+                   onChange={(e) => setTargetLanguage(e.target.value)}
+                   className="bg-theme-tertiary text-theme-primary border border-theme-light rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none flex-1 sm:flex-none"
+                 >
+                   <option value="Spanish">🇪🇸 Spanish</option>
+                   <option value="French">🇫🇷 French</option>
+                   <option value="Japanese">🇯🇵 Japanese</option>
+                   <option value="Luganda">🇺🇬 Luganda</option>
+                   <option value="Chinese">🇨🇳 Chinese</option>
+                 </select>
+                 <button 
+                   onClick={handleTranslate}
+                   disabled={!fullDisplay || isProcessingIntelligence}
+                   className="flex items-center gap-2 px-4 py-2 bg-theme-tertiary hover:bg-blue-500/20 text-blue-500 hover:text-blue-400 rounded-lg text-sm font-bold transition-all border border-theme-light disabled:opacity-50 disabled:hover:bg-theme-tertiary disabled:hover:text-blue-500"
+                   title="Babel Fish Translation"
+                 >
+                   {isProcessingIntelligence ? <Loader2 className="w-4 h-4 animate-spin" /> : <Languages className="w-4 h-4" />}
+                   Translate
+                 </button>
+               </div>
+               
+               <button 
+                 onClick={handleSummarize}
+                 disabled={!fullDisplay || isProcessingIntelligence}
+                 className="flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg text-sm font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50"
+                 title="Brain Dump Condenser"
+               >
+                 {isProcessingIntelligence ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListRestart className="w-4 h-4" />}
+                 Condense Notes
+               </button>
             </div>
           </div>
 

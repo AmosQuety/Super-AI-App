@@ -141,11 +141,26 @@ export const imageGenerationResolvers = {
           // Cache the first image of the result for future identical prompts
           await AIManager.cacheImage(prompt, result.images[0]);
 
+          // --- 7. PERSIST TO DB (for profile activity counter) ---
+          try {
+            await context.prisma.imageGeneration.create({
+              data: {
+                userId,
+                prompt: prompt.trim(),
+                imageUrl: result.images[0],
+                status: 'COMPLETED',
+              },
+            });
+          } catch (dbErr: any) {
+            // Non-fatal: don't block the user if DB write fails
+            logger.warn('⚠️ Failed to persist image generation record', { error: dbErr.message, userId });
+          }
+
           logger.info('✅ AI Image generation completed', {
             userId,
             numImages: result.images.length,
             duration: `${duration}ms`,
-            service: 'Pollinations.ai' // ✅ CHANGED: Added service identifier
+            service: 'Pollinations.ai'
           });
         }
 
@@ -203,10 +218,27 @@ export const imageGenerationResolvers = {
         
         if (result.success) {
             await AIManager.incrementUsage(userId, 'image');
+
+            // Persist to DB for profile activity counter
+            try {
+              if (result.images?.length > 0) {
+                await context.prisma.imageGeneration.create({
+                  data: {
+                    userId,
+                    prompt: prompt.trim(),
+                    imageUrl: result.images[0],
+                    status: 'COMPLETED',
+                  },
+                });
+              }
+            } catch (dbErr: any) {
+              logger.warn('⚠️ Failed to persist variants record', { error: dbErr.message, userId });
+            }
+
             logger.info('✅ AI Variants completed', { 
               userId, 
               duration: `${duration}ms`,
-              service: 'Pollinations.ai' // ✅ CHANGED: Added service identifier
+              service: 'Pollinations.ai'
             });
         }
 

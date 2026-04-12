@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
-import { 
-  ScanFace, 
-  ImageIcon, 
-  Mic, 
-  MessageSquare, 
+import {
+  ScanFace,
+  ImageIcon,
+  Mic,
+  MessageSquare,
 
-  ShieldCheck, 
-  Zap, 
+  ShieldCheck,
+  Zap,
   ArrowRight,
   ChevronRight,
   CheckCircle2,
@@ -68,7 +68,7 @@ const testimonials = [
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
-  
+
   // Define link destinations based on authentication status
   const authLink = isAuthenticated ? "/dashboard" : "/login";
   const registerLink = isAuthenticated ? "/dashboard" : "/register";
@@ -83,13 +83,13 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-3 group transition-transform hover:scale-[1.02]">
             <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              
+
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               Xemora
             </span>
           </Link>
-          
+
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#about" className="hover:text-white transition-colors">About</a>
@@ -98,8 +98,8 @@ export default function LandingPage() {
             </Link>
           </nav>
 
-          <Link 
-            to={registerLink} 
+          <Link
+            to={registerLink}
             className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 transition-all text-sm"
           >
             {isAuthenticated ? "Go to App" : "Get Started Free"}
@@ -133,18 +133,20 @@ export default function LandingPage() {
               Seamlessly integrate biometric security, powerful computer vision, document intelligence, and generative AI art tools into your workspace.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link 
-                to={registerLink} 
+              <Link
+                to={registerLink}
                 className="w-full sm:w-auto px-8 py-4 bg-white text-slate-950 rounded-2xl font-bold text-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
               >
                 {isAuthenticated ? "Enter Workspace" : "Sign Up for Xemora"} <ArrowRight size={20} />
               </Link>
-              <Link 
-                to={authLink} 
-                className="w-full sm:w-auto px-8 py-4 bg-slate-800/50 backdrop-blur-md border border-slate-700 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-colors"
+              <a
+                href="https://youtu.be/E5pNRct9X4Q"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-8 py-4 bg-slate-800/50 backdrop-blur-md border border-slate-700 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
               >
-                {isAuthenticated ? "View Dashboard" : "View Demo"}
-              </Link>
+                Watch Video Demo
+              </a>
             </div>
           </motion.div>
         </div>
@@ -160,7 +162,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, idx) => (
-              <motion.div 
+              <motion.div
                 key={feature.title}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
@@ -272,7 +274,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-3 mb-6">
-                
+
                 <span className="text-2xl font-bold text-white tracking-tight">Xemora</span>
               </div>
               <p className="text-slate-500 max-w-sm mb-8 leading-relaxed">
@@ -304,9 +306,21 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="pt-8 border-t border-white/5 text-center text-slate-600 text-xs font-bold uppercase tracking-widest">
-            &copy; {new Date().getFullYear()} Xemora AI Ecosystem. All rights reserved.
+            <span>&copy; {new Date().getFullYear()} Xemora AI Ecosystem. All rights reserved.</span>
+            <span>
+
+              Crafted by
+              <a
+                href="https://nabasa-amos.netlify.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-white transition-colors duration-200"
+              >
+                Nabasa Amos
+              </a>
+            </span>
           </div>
-        </div>
+          </div>
       </footer>
     </div>
   );

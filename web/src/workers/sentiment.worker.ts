@@ -1,5 +1,10 @@
 // src/workers/sentiment.worker.ts
-import { pipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
+
+// Configuration to prevent trying to load models from the local server
+// which results in index.html being served and causing JSON parsing errors.
+env.allowLocalModels = false;
+env.useBrowserCache = true;
 
 // Singleton to hold the model pipeline
 let classifier: any = null;

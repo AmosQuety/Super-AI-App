@@ -60,7 +60,10 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
     const isProcessing = localStatus === 'processing' || latestStatus === 'processing';
 
     if (isProcessing) {
-      startPolling(8000);
+      const conn = (navigator as any).connection;
+      const isSlowNetwork = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
+      // Reduce polling frequency on slow/saving data connections to conserve battery & bandwidth
+      startPolling(isSlowNetwork ? 15000 : 8000);
     } else {
       stopPolling();
     }

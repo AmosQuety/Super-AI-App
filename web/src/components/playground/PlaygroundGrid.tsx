@@ -51,7 +51,7 @@ export default function PlaygroundGrid() {
             key={feature.id}
             layoutId={`card-${feature.id}`} // <--- The Magic ID
             onClick={() => setSelectedId(feature.id)}
-            className={`${feature.colSpan} relative group cursor-pointer overflow-hidden rounded-3xl bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl hover:shadow-violet-500/10 hover:border-white/20 transition-all duration-500`}
+            className={`${feature.colSpan} relative group cursor-pointer overflow-hidden rounded-3xl bg-theme-secondary border border-theme-light shadow-theme-xl hover:shadow-violet-500/10 hover:border-violet-500/30 transition-all duration-500`}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -63,12 +63,12 @@ export default function PlaygroundGrid() {
                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center text-white shadow-lg mb-6`}>
                   <feature.icon size={24} />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">{feature.title}</h3>
-                <p className="text-slate-400 font-medium">{feature.subtitle}</p>
-                <p className="text-slate-500 text-sm mt-4 leading-relaxed">{feature.description}</p>
+                <h3 className="text-2xl font-bold text-theme-primary mb-2">{feature.title}</h3>
+                <p className="text-theme-secondary font-medium">{feature.subtitle}</p>
+                <p className="text-theme-tertiary text-sm mt-4 leading-relaxed">{feature.description}</p>
               </div>
               
-              <div className="mt-8 flex items-center text-sm font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-[-10px] group-hover:translate-x-0 duration-300">
+              <div className="mt-8 flex items-center text-sm font-bold text-theme-primary opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-[-10px] group-hover:translate-x-0 duration-300">
                 Launch Experiment <ArrowRight size={16} className="ml-2" />
               </div>
             </div>
@@ -97,29 +97,29 @@ export default function PlaygroundGrid() {
                   <motion.div
                     key={feature.id}
                     layoutId={`card-${feature.id}`} // <--- Connecting the magic
-                    className="w-full max-w-5xl max-h-[90vh] bg-slate-900/90 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col pointer-events-auto"
+                    className="w-full max-w-5xl max-h-[90vh] bg-theme-overlay backdrop-blur-2xl rounded-3xl overflow-hidden shadow-theme-xl border border-theme-light flex flex-col pointer-events-auto transition-colors"
                   >
                     {/* Header */}
-                    <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <div className="p-6 border-b border-theme-light flex justify-between items-center bg-theme-secondary/50">
                         <div className="flex items-center gap-4">
                             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center text-white shadow-md`}>
                                 <feature.icon size={20} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white">{feature.title}</h2>
-                                <p className="text-slate-400 text-sm">{feature.subtitle}</p>
+                                <h2 className="text-xl font-bold text-theme-primary">{feature.title}</h2>
+                                <p className="text-theme-secondary text-sm">{feature.subtitle}</p>
                             </div>
                         </div>
                         <button 
                             onClick={() => setSelectedId(null)}
-                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors"
+                            className="p-2 bg-theme-tertiary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary rounded-full transition-colors border border-theme-light"
                         >
                             <X size={24} />
                         </button>
                     </div>
 
                     {/* The Actual Component */}
-                    <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#0B0F19]">
+                    <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-theme-primary">
                         {feature.component}
                     </div>
                   </motion.div>

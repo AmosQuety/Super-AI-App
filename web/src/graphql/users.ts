@@ -14,6 +14,20 @@ export const GET_ME = gql`
       createdAt
       hasFaceRegistered
       hasVoiceRegistered
+      totalChats
+      totalMessages
+      totalVoiceJobs
+      totalDocuments
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
     }
   }
 `;
@@ -71,6 +85,34 @@ export const UPDATE_PROFILE = gql`
       role
       avatarUrl
       createdAt
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
+    }
+  }
+`;
+
+export const UPDATE_PREFERENCES = gql`
+  mutation UpdatePreferences($preferences: PreferencesInput!) {
+    updatePreferences(preferences: $preferences) {
+      id
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
     }
   }
 `;

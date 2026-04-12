@@ -1,11 +1,20 @@
 import axios from 'axios';
 import FormData from 'form-data';
+import http from 'http';
+import https from 'https';
 import { Readable } from 'stream';
 import { logger } from '../utils/logger';
 import { Upload } from '../resolvers/types/upload';
 import { redisClient } from '../lib/redis';
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
+
+const aiEngineClient = axios.create({
+  baseURL: PYTHON_SERVICE_URL,
+  httpAgent: new http.Agent({ keepAlive: true, keepAliveMsecs: 30000 }),
+  httpsAgent: new https.Agent({ keepAlive: true, keepAliveMsecs: 30000 }),
+});
+
 const POLL_INTERVAL_MS = 4000;    // Check every 4 seconds
 const POLL_TIMEOUT_MS  = 360000;  // Give up after 6 minutes
 
@@ -27,7 +36,7 @@ async function pollJobStatus(jobId: string): Promise<any> {
   while (Date.now() < deadline) {
     await new Promise(res => setTimeout(res, POLL_INTERVAL_MS));
     try {
-      const { data } = await axios.get(`${PYTHON_SERVICE_URL}/audio/status/${jobId}`, { timeout: 10000 });
+      const { data } = await aiEngineClient.get(`/audio/status/${jobId}`, { timeout: 10000 });
       if (data.status === 'COMPLETED' || data.status === 'FAILED') {
         return data;
       }
@@ -64,8 +73,8 @@ export class VoiceCloningService {
       formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
 
       // Enqueue — returns instantly with a jobId
-      const { data: queued } = await axios.post(
-        `${PYTHON_SERVICE_URL}/audio/register`,
+      const { data: queued } = await aiEngineClient.post(
+        `/audio/register`,
         formData,
         { headers: { ...formData.getHeaders() }, timeout: 30000 }
       );
@@ -125,8 +134,8 @@ export class VoiceCloningService {
       logger.info(`🎙️ Requesting voice clone job from AI Engine`);
 
       // Enqueue — returns instantly
-      const { data: queued } = await axios.post(
-        `${PYTHON_SERVICE_URL}/audio/clone`,
+      const { data: queued } = await aiEngineClient.post(
+        `/audio/clone`,
         formData,
         { headers: { ...formData.getHeaders() }, timeout: 30000 }
       );
@@ -164,8 +173,8 @@ export class VoiceCloningService {
       }
 
       // 2. SLOW PATH: Fallback to directly asking Python (if webhook missed or still processing)
-      const { data } = await axios.get(
-        `${PYTHON_SERVICE_URL}/audio/status/${jobId}`,
+      const { data } = await aiEngineClient.get(
+        `/audio/status/${jobId}`,
         { timeout: 10000 }
       );
       return data;
@@ -198,8 +207,8 @@ export class VoiceCloningService {
       formData.append('challenge_code', challengeCode);
       formData.append('file', audioBuffer, { filename, contentType: mimetype });
 
-      const { data } = await axios.post(
-        `${PYTHON_SERVICE_URL}/audio/verify`,
+      const { data } = await aiEngineClient.post(
+        `/audio/verify`,
         formData,
         { 
             headers: { ...formData.getHeaders() }, 

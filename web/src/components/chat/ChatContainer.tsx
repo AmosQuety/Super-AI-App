@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffe
 import Message from "./Message";
 import InputArea from "./InputArea";
 import Sidebar from "./Sidebar";
-import { Bot, RefreshCw, WifiOff, Menu, ArrowDown, Sparkles, Zap, MessageSquare } from "lucide-react";
+import ContextPanel from "./ContextPanel";
+import { Bot, WifiOff, Menu, ArrowDown, Sparkles, Zap, MessageSquare, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion"; 
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
 import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
@@ -12,8 +13,7 @@ import type { ToastOptions } from 'react-toastify';
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
-import DocumentUploader from "./DocumentUploader";
-import { UPLOAD_DOCUMENT } from "../../graphql/chats";
+import { UPLOAD_DOCUMENT, GET_DOCUMENT_LIFECYCLE } from "../../graphql/chats";
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
 
@@ -179,8 +179,18 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   const { user: authUser } = useAuth();
   
   const [aiState, setAiState] = useState<"idle" | "thinking" | "responding">("idle");
+  const [showContextPanel, setShowContextPanel] = useState(false);
+  // Track uploaded docs for context panel
+  const [activeDocs, setActiveDocs] = useState<Array<{id: string; filename: string; status: 'ready'|'processing'|'failed'; selected: boolean}>>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   
-  const currentUser = authUser || userInfo;
+  // Always prefer the authenticated user from context over the prop to avoid placeholder IDs
+  const currentUser = {
+    id: authUser?.id || userInfo.id,
+    username: authUser?.name || authUser?.email || userInfo.username,
+  };
+
+  const isValidUserId = !!currentUser.id && currentUser.id !== 'user-123';
 
   // 1. Get Chats List
   const {
@@ -190,8 +200,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     refetch: refetchChats,
   } = useQuery<ChatData>(GET_CHATS, {
     variables: { userId: currentUser.id },
-    skip: !currentUser.id,
-    fetchPolicy: "cache-and-network" // Ensure freshness
+    skip: !isValidUserId,
+    fetchPolicy: "cache-first" // Smart cache-first, refetched manually on mutation
   });
   
   useEffect(() => {
@@ -229,6 +239,58 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   });
 
   const [uploadDocument] = useMutation<UploadDocumentData>(UPLOAD_DOCUMENT);
+
+  // ── Sync Active Context documents ───────────────────────────────────────
+  const { data: docLifecycleData } = useQuery<{ me: { documents: any[] } }>(GET_DOCUMENT_LIFECYCLE, {
+    variables: { userId: currentUser.id },
+    skip: !isValidUserId,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10000, 
+  });
+
+  useEffect(() => {
+    if (docLifecycleData?.me?.documents) {
+      setActiveDocs(prev => {
+        const prevIds = new Set(prev.map(d => d.id));
+        const incoming = docLifecycleData.me.documents.map((d: any) => ({
+          id: d.id,
+          filename: d.filename || "Untitled",
+          status: (d.status.toLowerCase() as any) || "ready",
+          selected: true, // always default new docs to selected
+        }));
+
+        // Auto-select any newly arrived docs
+        const newlyReadyIds = incoming
+          .filter((d: any) => d.status === 'ready' && !prevIds.has(d.id))
+          .map((d: any) => d.id);
+
+        if (newlyReadyIds.length > 0) {
+          setSelectedDocIds(prev => {
+            const next = new Set(prev);
+            newlyReadyIds.forEach((id: string) => next.add(id));
+            return next;
+          });
+        }
+
+        // Merge: preserve existing selection state
+        return incoming.map((d: any) => ({
+          ...d,
+          selected: selectedDocIds.has(d.id) || newlyReadyIds.includes(d.id),
+        }));
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docLifecycleData]);
+
+  const handleToggleDoc = useCallback((id: string) => {
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setActiveDocs(prev => prev.map(d => d.id === id ? { ...d, selected: !d.selected } : d));
+  }, []);
   
   const [sendMessage] = useMutation<SendMessageData>(SEND_MESSAGE_WITH_RESPONSE, {
     onCompleted: () => refetchChats(),
@@ -398,6 +460,9 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
           fileName: attachment?.name,
           fileUri: uploadedAttachmentUrl,
           fileMimeType: attachment?.type,
+          activeDocumentIds: [...selectedDocIds].filter(id =>
+            activeDocs.find(d => d.id === id && d.status === 'ready')
+          ),
         },
       });
 
@@ -558,20 +623,20 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
         <main className="flex-1 flex flex-col min-w-0 h-full relative transition-all duration-300">
           {/* Mobile Header */}
-          <div className="lg:hidden flex items-center justify-between p-4 bg-theme-secondary/80 backdrop-blur border-b border-theme-light z-20">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-700 dark:text-gray-200">
-              <Menu className="w-6 h-6" />
+          <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#0D1117]/95 backdrop-blur border-b border-white/[0.07] z-20">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+              <Menu className="w-5 h-5" />
             </button>
-            <span className="font-semibold text-lg">Xemora AI</span>
-            <div className="w-10"></div>
+            <span className="font-semibold text-sm text-white tracking-wide">Xemora AI</span>
+            <div className="w-9" />
           </div>
 
           <div 
              ref={chatContainerRef} 
              onScroll={handleScroll} 
-             className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-theme-tertiary"
+             className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20"
           >
-            <div className="max-w-5xl mx-auto w-full min-h-full flex flex-col pt-4 md:pt-8 pb-32 px-4 md:px-8">
+            <div className="max-w-3xl mx-auto w-full min-h-full flex flex-col pt-2 md:pt-4 pb-44 px-4 md:px-6">
               {historyLoading ? (
                 <MessageSkeleton />
               ) : messages.length === 0 ? (
@@ -631,6 +696,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                           message={message}
                           onDelete={handleDeleteMessage}
                           onRetry={handleRetryMessage}
+                          onSuggestionClick={(suggestion) => handleSendMessage(suggestion)}
                         />
                       </motion.div>
                     ))}
@@ -669,41 +735,47 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     onClick={scrollToBottomManual}
-                    className="absolute bottom-32 left-1/2 -translate-x-1/2 p-3 bg-theme-secondary border border-theme-light text-theme-primary rounded-full shadow-theme-xl hover:shadow-theme-2xl z-30 transition-all hover:-translate-y-1"
+                    className="absolute bottom-36 left-1/2 -translate-x-1/2 p-2.5 bg-[#1C2128] border border-white/10 text-white rounded-full shadow-xl z-30 hover:-translate-y-1 transition-all"
                 >
-                    <ArrowDown size={20} />
+                    <ArrowDown size={18} />
                 </motion.button>
             )}
           </AnimatePresence>
 
-          {/* Floating Input Area Wrapper */}
-          <div className="fixed bottom-0 left-0 w-full lg:pl-80 z-20 pointer-events-none">
-             {/* Gradient fade overlay for smooth content disappear behind input */}
-             <div className="h-24 bg-gradient-to-t from-theme-primary via-theme-primary/80 to-transparent pointer-events-none" />
-             
-             <div className="bg-theme-primary p-4 md:p-6 pb-6 pointer-events-auto">
-                <div className="max-w-4xl mx-auto shadow-theme-xl rounded-2xl ring-1 ring-theme-light">
-                  <div className="px-3 pt-3">
-                    <DocumentUploader
-                      disabled={historyLoading}
-                      onStatus={(type, message) => {
-                        if (type === 'success') {
-                          toast.success(message, { theme: 'dark' });
-                        } else {
-                          toast.error(message, { theme: 'dark' });
-                        }
-                      }}
-                    />
-                  </div>
-                  <InputArea
-                    onSendMessage={handleSendMessage}
-                    disabled={historyLoading || aiState !== "idle"}
-                    isOnline={isOnline}
-                  />
-                </div>
-             </div>
+          {/* ── Floating input — no solid shelf, pure gradient fade ── */}
+          <div className="fixed bottom-0 left-0 w-full lg:pl-72 z-20 pointer-events-none">
+            {/* Soft gradient so content fades smoothly into the bar */}
+            <div className="pointer-events-none h-24 bg-gradient-to-t from-[#0D1117]/90 to-transparent" />
+            {/* Input sits in a transparent strip — backdrop-blur provides depth */}
+            <div className="backdrop-blur-md px-4 md:px-8 pb-1 pt-1 pointer-events-auto bg-transparent">
+              <div className="max-w-3xl mx-auto">
+                <InputArea
+                  onSendMessage={handleSendMessage}
+                  disabled={historyLoading || aiState !== "idle"}
+                  isOnline={isOnline}
+                  onToggleContext={() => setShowContextPanel(p => !p)}
+                  contextOpen={showContextPanel}
+                  activeDocs={activeDocs.filter(d => d.status === 'ready').length}
+                />
+              </div>
+            </div>
           </div>
         </main>
+
+        {/* ── Right Context Panel ── */}
+        <ContextPanel
+          isOpen={showContextPanel}
+          onClose={() => setShowContextPanel(false)}
+          activeDocs={activeDocs}
+          historyLoading={historyLoading}
+          onToggleDoc={handleToggleDoc}
+          onUploadSuccess={(msg) => {
+            toast.success(msg, { theme: 'dark' });
+          }}
+          onUploadError={(msg) => {
+            toast.error(msg, { theme: 'dark' });
+          }}
+        />
       </div>
     </div>
   );

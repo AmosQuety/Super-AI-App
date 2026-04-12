@@ -83,10 +83,10 @@ export default function MagicMirror() {
   return (
     <div className="max-w-md mx-auto perspective-1000"> {/* 3D Perspective Container */}
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold text-theme-primary mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
           Magic Mirror 🪞
         </h2>
-        <p className="text-slate-400">Let the AI read your face.</p>
+        <p className="text-theme-secondary font-medium">Let the AI read your face.</p>
       </div>
 
       {/* Display Error Message nicely if it exists */}
@@ -112,10 +112,10 @@ export default function MagicMirror() {
           
           {/* === FRONT SIDE (CAMERA) === */}
           <div 
-            className="absolute inset-0 backface-hidden bg-slate-800 rounded-3xl p-4 border border-slate-700 shadow-2xl flex flex-col"
+            className="absolute inset-0 backface-hidden bg-theme-secondary rounded-3xl p-4 border border-theme-light shadow-theme-xl flex flex-col transition-colors"
             style={{ backfaceVisibility: "hidden" }}
           >
-            <div className="flex-1 flex flex-col items-center justify-center bg-black/20 rounded-2xl p-4">
+            <div className="flex-1 flex flex-col items-center justify-center bg-theme-tertiary/20 rounded-2xl p-4 border border-theme-light/30">
               {/* Pass isFlipped so camera stops when hidden to save performance */}
               {!isFlipped && (
                 <FaceCapture 
@@ -135,7 +135,7 @@ export default function MagicMirror() {
               )}
             </div>
             <div className="mt-4 text-center">
-              <p className="text-xs text-slate-500">Align your face within the frame</p>
+              <p className="text-xs text-theme-tertiary font-bold tracking-wider uppercase">Align your face within the frame</p>
             </div>
           </div>
 
@@ -160,30 +160,30 @@ export default function MagicMirror() {
             {analysis && (
               <div className="space-y-4 relative z-10 flex-1">
                 {/* Result Items */}
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-center justify-between">
+                <div className="bg-white/10 dark:bg-white/5 p-4 rounded-xl border border-white/20 dark:border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <User className="text-blue-400 w-5 h-5" />
-                    <span className="text-slate-300">Age</span>
+                    <User className="text-blue-300 dark:text-blue-400 w-5 h-5" />
+                    <span className="text-white/80 dark:text-slate-300 font-medium">Age</span>
                   </div>
                   <span className="text-2xl font-bold text-white">{analysis.age}</span>
                 </div>
 
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-center justify-between">
+                <div className="bg-white/10 dark:bg-white/5 p-4 rounded-xl border border-white/20 dark:border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Activity className="text-pink-400 w-5 h-5" />
-                    <span className="text-slate-300">Gender</span>
+                    <Activity className="text-pink-300 dark:text-pink-400 w-5 h-5" />
+                    <span className="text-white/80 dark:text-slate-300 font-medium">Gender</span>
                   </div>
                   <span className="text-xl font-bold text-white capitalize">{analysis.gender}</span>
                 </div>
 
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-center justify-between">
+                <div className="bg-white/10 dark:bg-white/5 p-4 rounded-xl border border-white/20 dark:border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Smile className="text-yellow-400 w-5 h-5" />
-                    <span className="text-slate-300">Emotion</span>
+                    <Smile className="text-yellow-300 dark:text-yellow-400 w-5 h-5" />
+                    <span className="text-white/80 dark:text-slate-300 font-medium">Emotion</span>
                   </div>
                   <div className="text-right">
                     <span className="block text-xl font-bold text-white capitalize">{analysis.emotion}</span>
-                    <span className="text-xs text-green-400">{analysis.emotion_score?.toFixed(0)}% Match</span>
+                    <span className="text-xs text-green-300 dark:text-green-400 font-bold">{analysis.emotion_score?.toFixed(0)}% Match</span>
                   </div>
                 </div>
               </div>

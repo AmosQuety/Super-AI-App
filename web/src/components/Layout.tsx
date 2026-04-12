@@ -1,22 +1,23 @@
 // src/components/Layout.tsx
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, NavLink, useNavigate } from "react-router-dom";
-import { 
-  MessageSquare, 
-  ImageIcon, 
-  Mic, 
+import {
+  MessageSquare,
+  ImageIcon,
+  Mic,
   Menu,
   X,
   LogOut,
   User,
   Home,
   ScanFace,
-  Shield,
   ChevronRight,
   Sun,
-  Moon
+  Moon,
+  Brain,
+  Settings
 } from "lucide-react";
-import { useAuth } from "../hooks/useAuth"; 
+import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../contexts/useTheme";
 import { VoiceIntelligenceProvider } from "../contexts/VoiceIntelligenceContext"; // Import Provider
 
@@ -24,20 +25,20 @@ import { VoiceIntelligenceProvider } from "../contexts/VoiceIntelligenceContext"
 const PRODUCT_NAME = "Xemora";
 
 const navigation = [
-  { 
-    name: "Chat", 
+  {
+    name: "Chat",
     href: "/chat",
     icon: MessageSquare,
     description: "Intelligent conversations."
   },
-  { 
-    name: "Image Generation", 
+  {
+    name: "Image Generation",
     href: "/image",
     icon: ImageIcon,
     description: "Create stunning visuals."
   },
-  { 
-    name: "Voice Tools", 
+  {
+    name: "Voice Tools",
     href: "/voice",
     icon: Mic,
     description: "Interact with voice."
@@ -48,12 +49,6 @@ const navigation = [
     icon: ScanFace,
     description: "Biometric experiments."
   },
-  {
-    name: "Security SOC",
-    href: "/security",
-    icon: Shield,
-    description: "Audit & identity logs."
-  }
 ];
 
 // 👇 THIS WAS MISSING
@@ -82,6 +77,16 @@ const Layout = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handleClick = () => setUserMenuOpen(false);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [userMenuOpen]);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -96,14 +101,13 @@ const Layout = () => {
   return (
     <VoiceIntelligenceProvider>
       <div className="min-h-screen bg-theme-primary text-theme-primary transition-colors duration-300 selection:bg-indigo-500/30">
-        
+
         {/* --- NAVBAR --- */}
-        <nav 
-          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-            scrolled 
-              ? 'bg-theme-secondary/90 backdrop-blur-xl shadow-lg border-b border-theme-light' 
-              : 'bg-transparent border-b border-transparent'
-          }`}
+        <nav
+          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
+            ? 'bg-theme-secondary/90 backdrop-blur-xl shadow-lg border-b border-theme-light'
+            : 'bg-transparent border-b border-transparent'
+            }`}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16 lg:h-20">
@@ -127,8 +131,8 @@ const Layout = () => {
               {/* Desktop Navigation */}
               <div className="hidden lg:flex items-center space-x-2">
                 <NavLink to="/dashboard" className={({ isActive }) => `flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm ${isActive ? "bg-theme-tertiary text-theme-primary" : "text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary"}`} end>
-                    <Home className="w-4 h-4" />
-                    <span>Home</span>
+                  <Home className="w-4 h-4" />
+                  <span>Home</span>
                 </NavLink>
                 {navigation.map((item) => {
                   const Icon = item.icon;
@@ -144,7 +148,7 @@ const Layout = () => {
               {/* User Menu & Theme Toggle */}
               <div className="flex items-center space-x-2 lg:space-x-3">
                 {/* Theme Toggle */}
-                <button 
+                <button
                   onClick={toggleTheme}
                   className="p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-theme-tertiary transition-colors border border-theme-light"
                   title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
@@ -152,21 +156,56 @@ const Layout = () => {
                   {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
 
+                {/* Blaze Intelligence shortcut */}
+                <button
+                  onClick={() => navigate('/blaze-settings')}
+                  className="hidden lg:block p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-violet-500/20 hover:text-violet-400 transition-colors border border-theme-light"
+                  title="Blaze Intelligence — Personalize your AI"
+                >
+                  <Brain className="w-4 h-4" />
+                </button>
+
                 {user && (
-                  <div className="hidden md:flex items-center space-x-3">
-                    <button onClick={() => navigate("/profile")}>
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-theme-secondary border border-theme-light hover:bg-theme-tertiary transition-colors cursor-pointer">
-                          <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center ring-2 ring-violet-500/20">
-                              <User className="w-4 h-4 text-theme-primary" />
-                          </div>
-                          <span className="text-sm font-medium text-theme-secondary">
-                              {user.name || user.email}
-                          </span>
+                  <div className="hidden md:flex items-center space-x-3 relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUserMenuOpen(!userMenuOpen);
+                      }}
+                      className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-theme-secondary border border-theme-light hover:bg-theme-tertiary transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center ring-2 ring-violet-500/20">
+                        <User className="w-4 h-4 text-theme-primary" />
                       </div>
+                      <span className="text-sm font-medium text-theme-secondary">
+                        {user.name || user.email}
+                      </span>
                     </button>
-                    <button onClick={handleSignOut} className="p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-red-500/20 hover:text-red-400 transition-colors border border-theme-light">
-                        <LogOut className="w-4 h-4" />
-                    </button>
+
+                    {/* Desktop Dropdown */}
+                    {userMenuOpen && (
+                      <div className="absolute top-full right-0 mt-2 w-56 bg-theme-secondary border border-theme-light rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in duration-200">
+                        <button
+                          onClick={() => navigate("/profile")}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-theme-tertiary text-theme-secondary text-sm font-medium transition-colors"
+                        >
+                          <User size={16} className="text-blue-400" /> View Profile
+                        </button>
+                        <button
+                          onClick={() => navigate("/settings")}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-theme-tertiary text-theme-secondary text-sm font-medium transition-colors"
+                        >
+                          <Settings size={16} className="text-purple-400" /> Settings
+                        </button>
+                        <div className="my-2 border-t border-theme-light" />
+                        <button
+                          onClick={handleSignOut}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-red-500/10 text-red-500 text-sm font-medium transition-colors"
+                        >
+                          <LogOut size={16} /> Sign Out
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2.5 rounded-xl bg-theme-secondary text-theme-secondary hover:bg-theme-tertiary transition-colors border border-theme-light">
@@ -179,8 +218,8 @@ const Layout = () => {
             {mobileMenuOpen && (
               <div className="lg:hidden border-t border-white/10 py-4 space-y-2">
                 <NavLink to="/dashboard" className={({ isActive }) => `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive ? "bg-white/10 text-white" : "text-slate-400"}`} end>
-                    <Home className="w-5 h-5" />
-                    <span className="font-medium">Home</span>
+                  <Home className="w-5 h-5" />
+                  <span className="font-medium">Home</span>
                 </NavLink>
                 {navigation.map((item) => {
                   const Icon = item.icon;
@@ -193,17 +232,25 @@ const Layout = () => {
                 })}
                 {user && (
                   <div className="border-t border-theme-light pt-4 mt-2 px-2">
-                      <button onClick={() => navigate("/profile")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-theme-secondary text-left mb-2 text-theme-secondary">
-                          <User className="w-5 h-5" />
-                          <span className="font-medium">{user.name || user.email}</span>
-                      </button>
-                      <button onClick={handleSignOut} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10">
-                          <LogOut className="w-5 h-5" /> 
-                          <span className="font-medium">Sign Out</span>
-                      </button>
-                  </div> 
+                    <button onClick={() => navigate("/blaze-settings")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-violet-500/10 text-left mb-2 text-theme-secondary">
+                      <Brain className="w-5 h-5 text-violet-400" />
+                      <span className="font-medium">Blaze Intelligence</span>
+                    </button>
+                    <button onClick={() => navigate("/profile")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-theme-secondary text-left mb-2 text-theme-secondary">
+                      <User className="w-5 h-5" />
+                      <span className="font-medium">{user.name || user.email}</span>
+                    </button>
+                    <button onClick={() => navigate("/settings")} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-theme-secondary text-left mb-2 text-theme-secondary">
+                      <Settings className="w-5 h-5" />
+                      <span className="font-medium">Settings</span>
+                    </button>
+                    <button onClick={handleSignOut} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10">
+                      <LogOut className="w-5 h-5" />
+                      <span className="font-medium">Sign Out</span>
+                    </button>
+                  </div>
                 )}
-              </div> 
+              </div>
             )}
           </div>
         </nav>
@@ -212,7 +259,7 @@ const Layout = () => {
         <main className="pt-24 lg:pt-32 pb-12">
           {isHomePage ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              
+
               {/* 1. HERO SECTION */}
               <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-theme-secondary border border-theme-light text-xs font-medium text-theme-tertiary mb-6">
@@ -222,7 +269,7 @@ const Layout = () => {
                   </span>
                   System Operational
                 </div>
-                
+
                 <h1 className="text-5xl md:text-7xl font-bold text-theme-primary mb-4 tracking-tight">
                   Hello, <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">{user?.name?.split(' ')[0] || 'Creator'}</span>.
                 </h1>
@@ -253,22 +300,22 @@ const Layout = () => {
               <div className="relative group/grid">
                 {/* Connective Tissue: Grid Effect */}
                 <div className="absolute inset-0 -m-8 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.15] pointer-events-none" />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-                  
+
                   {/* LARGE CARD: Knowledge Brain (coming soon) */}
-                  <div 
+                  <div
                     className="md:col-span-2 relative overflow-hidden bg-theme-secondary border border-theme-light rounded-3xl p-8 cursor-default transition-all duration-500 group/card"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-blue-500/40 uppercase">Intelligence</span>
                     </div>
-                  {/* Coming Soon Badge */}
-                  <div className="absolute top-6 right-6 z-20">
-                    <span className="px-3 py-1 bg-theme-tertiary text-theme-tertiary text-xs font-bold rounded-full border border-theme-light tracking-wider">
-                      COMING SOON
-                    </span>
-                  </div>
+                    {/* Coming Soon Badge */}
+                    <div className="absolute top-6 right-6 z-20">
+                      <span className="px-3 py-1 bg-theme-tertiary text-theme-tertiary text-xs font-bold rounded-full border border-theme-light tracking-wider">
+                        COMING SOON
+                      </span>
+                    </div>
 
                     <div className="relative z-10 opacity-40 grayscale transition-all duration-500 group-hover/card:opacity-60 group-hover/card:grayscale-0">
                       <div className="w-12 h-12 rounded-2xl bg-theme-tertiary flex items-center justify-center mb-4 border border-theme-light">
@@ -279,83 +326,83 @@ const Layout = () => {
                         Chat with your documents using RAG technology. Upload PDFs, ask questions, and get cited answers instantly.
                       </p>
                     </div>
-                  
-                  {/* Subtle, non-interactive decoration */}
-                  <div className="absolute -bottom-4 -right-4 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
-                </div>
 
-                {/* TALL CARD: Biometrics */}
-                  <div 
+                    {/* Subtle, non-interactive decoration */}
+                    <div className="absolute -bottom-4 -right-4 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
+                  </div>
+
+                  {/* TALL CARD: Biometrics */}
+                  <div
                     onClick={() => navigate('/playground')}
                     className="md:row-span-2 group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-violet-500/50 rounded-3xl p-8 transition-all cursor-pointer flex flex-col justify-between"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-violet-500/40 uppercase">Security</span>
                     </div>
-                  <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight className="text-violet-500" />
-                  </div>
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
-                      <ScanFace className="w-6 h-6 text-violet-400" />
+                    <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="text-violet-500" />
                     </div>
-                    <h3 className="text-2xl font-bold text-theme-primary mb-2">Biometric Lab</h3>
-                    <p className="text-theme-secondary">
-                      Access advanced computer vision tools:
-                    </p>
-                    <ul className="mt-4 space-y-2 text-sm text-theme-tertiary">
-                      <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Magic Mirror Analysis</li>
-                      <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> 1:N Identification</li>
-                      <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Liveness Detection</li>
-                    </ul>
-                  </div>
-                  <div className="mt-8 relative h-32 w-full bg-theme-tertiary rounded-xl border border-theme-light overflow-hidden group-hover:border-violet-500/30 transition-colors">
+                    <div>
+                      <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
+                        <ScanFace className="w-6 h-6 text-violet-400" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-theme-primary mb-2">Biometric Lab</h3>
+                      <p className="text-theme-secondary">
+                        Access advanced computer vision tools:
+                      </p>
+                      <ul className="mt-4 space-y-2 text-sm text-theme-tertiary">
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Magic Mirror Analysis</li>
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> 1:N Identification</li>
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Liveness Detection</li>
+                      </ul>
+                    </div>
+                    <div className="mt-8 relative h-32 w-full bg-theme-tertiary rounded-xl border border-theme-light overflow-hidden group-hover:border-violet-500/30 transition-colors">
                       <div className="absolute inset-0 flex items-center justify-center">
-                          <ScanFace className="w-12 h-12 text-theme-tertiary group-hover:text-violet-500/50 transition-colors" />
+                        <ScanFace className="w-12 h-12 text-theme-tertiary group-hover:text-violet-500/50 transition-colors" />
                       </div>
                       <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-violet-500/50 animate-scan" />
+                    </div>
                   </div>
-                </div>
 
-                {/* MEDIUM CARD: Image Gen */}
-                  <div 
+                  {/* MEDIUM CARD: Image Gen */}
+                  <div
                     onClick={() => navigate('/image')}
                     className="group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-pink-500/50 rounded-3xl p-8 transition-all cursor-pointer"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-pink-500/40 uppercase">Creative</span>
                     </div>
-                  <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight className="text-pink-500" />
+                    <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="text-pink-500" />
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center mb-4">
+                      <ImageIcon className="w-6 h-6 text-pink-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-theme-primary mb-2">Imagine Anything</h3>
+                    <p className="text-theme-secondary text-sm">
+                      Generate stunning visuals with Flux & Stable Diffusion models.
+                    </p>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center mb-4">
-                    <ImageIcon className="w-6 h-6 text-pink-400" />
-                  </div>
-                  <h3 className="text-xl font-bold text-theme-primary mb-2">Imagine Anything</h3>
-                  <p className="text-theme-secondary text-sm">
-                    Generate stunning visuals with Flux & Stable Diffusion models.
-                  </p>
-                </div>
 
-                {/* MEDIUM CARD: Voice */}
-                  <div 
+                  {/* MEDIUM CARD: Voice */}
+                  <div
                     onClick={() => navigate('/voice')}
                     className="group relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-amber-500/50 rounded-3xl p-8 transition-all cursor-pointer"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-amber-500/40 uppercase">Creative</span>
                     </div>
-                  <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight className="text-amber-500" />
+                    <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="text-amber-500" />
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+                      <Mic className="w-6 h-6 text-amber-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-theme-primary mb-2">Voice Command</h3>
+                    <p className="text-theme-secondary text-sm">
+                      Speak naturally to the AI. Hands-free interaction.
+                    </p>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                    <Mic className="w-6 h-6 text-amber-400" />
-                  </div>
-                  <h3 className="text-xl font-bold text-theme-primary mb-2">Voice Command</h3>
-                  <p className="text-theme-secondary text-sm">
-                    Speak naturally to the AI. Hands-free interaction.
-                  </p>
-                </div>
 
                 </div>
               </div>
