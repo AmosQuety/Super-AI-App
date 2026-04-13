@@ -87,7 +87,7 @@ export default function ProcessingState({ operationLabel = "Synthesizing", progr
               <div className="text-left">
                 <p className="text-sm font-medium text-slate-200">Cloud Processing Active</p>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  You can safely navigate away. We'll send a <span className="text-slate-300 font-medium">browser notification</span> when your results are ready.
+                  You can safely switch tabs or close this window. We’ll keep working and send a <span className="text-slate-300 font-medium">browser notification</span> when your results are ready.
                 </p>
               </div>
             </div>

@@ -1,7 +1,5 @@
-import { AppContext } from "../types/context";
-import { Upload } from "../types/upload";
-import { CloudinaryService } from "../../services/cloudinaryService";
 import { processDocument } from "../../services/documentIngestionService";
+import { logger } from "../../utils/logger";
 
 export const documentMutations = {
   uploadDocument: async (
@@ -44,7 +42,7 @@ export const documentMutations = {
         sourceBuffer: buffer,        // reuse the already-downloaded buffer
         sourceMimeType: mimetype,
       }).catch((error) => {
-        console.error(`Document ingestion failed for ${document.id}:`, error);
+        logger.error(`Document ingestion failed for ${document.id}:`, error);
       });
 
       return {
@@ -54,7 +52,7 @@ export const documentMutations = {
         documentId: document.id,
       };
     } catch (error: any) {
-      console.error("Upload Error:", error);
+      logger.error("Upload Error:", error);
       return { success: false, message: error.message };
     }
   },

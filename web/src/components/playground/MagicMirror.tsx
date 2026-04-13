@@ -6,6 +6,7 @@ import { Loader2, Sparkles, RefreshCcw, User, Smile, Activity, AlertTriangle } f
 import { motion } from "framer-motion"; 
 import { useDelight } from "../../hooks/useDelight";
 import { useToast } from "../ui/toastContext";
+import logger from "../../utils/logger";
 
 // --- TYPE DEFINITIONS ---
 interface AnalysisData {
@@ -53,7 +54,7 @@ export default function MagicMirror() {
         throw new Error(data?.analyzeFaceAttribute.error || "Analysis failed.");
       }
     } catch (error) {
-      console.error("Magic Mirror Error:", error);
+      logger.error("Magic Mirror Error", error);
       
       // Friendly Error Mapping
       let friendlyMsg = "Something went wrong.";

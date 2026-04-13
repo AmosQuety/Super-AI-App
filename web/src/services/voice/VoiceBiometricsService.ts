@@ -1,4 +1,5 @@
 // src/services/voice/VoiceBiometricsService.ts
+import { logger } from "../../utils/logger";
 
 export interface AudioMetrics {
     vol: number;      // Volume/Amplitude
@@ -37,7 +38,7 @@ export interface AudioMetrics {
         this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
         this.isActive = true;
       } catch (error) {
-        console.error("Failed to initialize VoiceBiometrics:", error);
+        logger.error("Failed to initialize VoiceBiometrics:", error);
       }
     }
   

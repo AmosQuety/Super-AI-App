@@ -48,12 +48,11 @@ class ErrorMonitor {
     const errorId = `err_${Date.now().toString(36)}`;
 
     // 1. Log to Console (Dev)
-    const isDev = env.MODE === 'development';
-    if (isDev) {
-      console.group(`🚨 Error Captured [${errorId}]`);
-      console.error(error);
-      console.info('Context:', context);
-      console.groupEnd();
+    if (env.MODE === 'development') {
+      logger.group(`🚨 Error Captured [${errorId}]`);
+      logger.error(error);
+      logger.info('Context:', context);
+      logger.groupEnd();
     }
 
     // 2. Send to Sentry (Prod)

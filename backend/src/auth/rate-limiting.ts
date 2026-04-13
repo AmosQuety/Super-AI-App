@@ -1,5 +1,6 @@
 // src/auth/rate-limiting.ts - PROPERLY FIXED VERSION
 import rateLimit from 'express-rate-limit';
+import { logger } from '../utils/logger';
 
 // Import the ipKeyGenerator helper to properly handle IPv6 addresses
 const { ipKeyGenerator } = require('express-rate-limit');
@@ -46,10 +47,10 @@ export class RateLimitService {
 
   // Remove Redis-related methods if not using Redis
   static initializeRedis() {
-    console.log('Using memory store for rate limiting');
+    logger.debug('[rate-limit] using memory store');
   }
 
   static async shutdown() {
-    console.log('Rate limiting service shut down');
+    logger.debug('[rate-limit] shut down');
   }
 }

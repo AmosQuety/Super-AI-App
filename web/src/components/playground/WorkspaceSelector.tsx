@@ -6,6 +6,7 @@ import {  gql } from '@apollo/client';
 import { Plus,  Check, ChevronDown, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../ui/toastContext';
+import logger from '../../utils/logger';
 
 const CREATE_WORKSPACE = gql`
   mutation CreateWorkspace($name: String!) {
@@ -34,7 +35,7 @@ export default function WorkspaceSelector() {
       setIsCreating(false);
       refreshWorkspaces();
     } catch (e) {
-      console.error(e);
+      logger.error('Workspace creation failed', e);
     }
   };
 

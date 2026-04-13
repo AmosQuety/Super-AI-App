@@ -2,6 +2,7 @@
 import  { Component,  type ReactNode } from "react";
 import ErrorMonitor from "../../../lib/ErrorMonitor";
 import ErrorDisplay from "./ErrorDisplay";
+import logger from "../../../utils/logger";
 
 interface Props {
   children: ReactNode;
@@ -39,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     if (isChunkLoadError) {
       // Auto-recover: hard reload once to pick up the fresh build
-      console.warn("🔄 Stale chunk detected — reloading to fetch fresh build...");
+      logger.warn("Stale chunk detected; reloading to fetch fresh build.");
       window.location.reload();
       return;
     }

@@ -11,10 +11,8 @@ let classifier: any = null;
 
 const initialize = async () => {
   if (!classifier) {
-    console.log("Loading sentiment model...");
     // Using a quantized model for browser performance
     classifier = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
-    console.log("Sentiment model loaded.");
   }
 };
 

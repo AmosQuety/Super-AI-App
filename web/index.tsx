@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./src/utils/quietConsole";
 import App from "./App";
 import client from "./src/lib/apolloClient";
 import "./index.css";
@@ -27,14 +28,11 @@ if ('serviceWorker' in navigator) {
           if (installingWorker) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                 console.log("New content available; reloading...");
                  window.location.reload();
               }
             };
           }
        };
-    }).catch(err => {
-      console.log('SW registration failed: ', err);
-    });
+    }).catch(() => {});
   });
 }

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { DocumentProcessor } from './documentProcessor';
+import { logger } from '../utils/logger';
 
 type EmbeddingService = {
   getEmbedding(text: string): Promise<number[]>;
@@ -35,7 +36,7 @@ export async function processDocument(
   documentId: string,
   { prisma, embeddingService, sourceBuffer, sourceMimeType }: DocumentIngestionDeps,
 ): Promise<void> {
-  console.info('[ingestion] starting', { documentId });
+  logger.info('[ingestion] starting', { documentId });
 
   const document = await prisma.document.findUnique({ where: { id: documentId } });
   if (!document) throw new Error(`Document not found: ${documentId}`);
@@ -44,7 +45,7 @@ export async function processDocument(
     where: { id: documentId },
     data: { status: 'processing' },
   });
-  console.info('[ingestion] status updated', { documentId, status: 'processing' });
+  logger.info('[ingestion] status updated', { documentId, status: 'processing' });
 
   try {
     // ── 1. Text extraction ────────────────────────────────────────────────────
@@ -52,13 +53,13 @@ export async function processDocument(
       ? await processor.extractText(sourceBuffer, sourceMimeType || document.fileType)
       : await processor.extractTextFromUrl(document.fileUrl, document.fileType);
 
-    console.info('[ingestion] text extracted', { documentId, characterCount: fullText.length });
+    logger.info('[ingestion] text extracted', { documentId, characterCount: fullText.length });
 
     if (!fullText.trim()) throw new Error('Could not extract text from document');
 
     // ── 2. Chunking ───────────────────────────────────────────────────────────
     const textChunks = processor.chunkText(fullText, CHUNK_SIZE_CHARS, CHUNK_OVERLAP_CHARS);
-    console.info('[ingestion] chunking complete', {
+    logger.info('[ingestion] chunking complete', {
       documentId,
       chunkCount: textChunks.length,
       chunkSizeChars: CHUNK_SIZE_CHARS,
@@ -69,7 +70,7 @@ export async function processDocument(
 
     // Idempotent: clear any previous partial run.
     await prisma.documentChunk.deleteMany({ where: { documentId } });
-    console.info('[ingestion] cleared existing chunks', { documentId });
+    logger.info('[ingestion] cleared existing chunks', { documentId });
 
     // ── 3. Embed each chunk (non-fatal) ───────────────────────────────────────
     let embeddedCount = 0;
@@ -86,7 +87,7 @@ export async function processDocument(
         const content = rawContent.trim();
         if (!content) return;
 
-        console.info('[ingestion] processing chunk', {
+        logger.info('[ingestion] processing chunk', {
           documentId,
           chunkIndex: i,
           totalChunks: textChunks.length,
@@ -110,7 +111,7 @@ export async function processDocument(
           } catch (err: any) {
             const is429 = err.status === 429 || (err.message && err.message.includes('429'));
             if (is429 && attempt <= 3) {
-              console.warn(`[ingestion] 429 Rate limit hit on chunk ${i}. Retrying in ${attempt * 2000}ms...`);
+              logger.warn(`[ingestion] 429 Rate limit hit on chunk ${i}. Retrying in ${attempt * 2000}ms...`);
               await sleep(2000 * attempt);
               return retryEmbedding(attempt + 1);
             }
@@ -130,11 +131,11 @@ export async function processDocument(
           `;
 
           embeddedCount += 1;
-          console.info('[ingestion] chunk embedded', { documentId, chunkIndex: i });
+          logger.info('[ingestion] chunk embedded', { documentId, chunkIndex: i });
         } catch (embeddingError: unknown) {
           skippedCount += 1;
           const msg = embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
-          console.warn('[ingestion] embedding skipped (non-fatal) — will use text search fallback', {
+          logger.warn('[ingestion] embedding skipped (non-fatal) — will use text search fallback', {
             documentId,
             chunkIndex: i,
             reason: msg.slice(0, 200),
@@ -144,7 +145,7 @@ export async function processDocument(
       }));
     }
 
-    console.info('[ingestion] embeddings complete', { documentId, embeddedCount, skippedCount });
+    logger.info('[ingestion] embeddings complete', { documentId, embeddedCount, skippedCount });
 
     // ── 4. Mark ready ─────────────────────────────────────────────────────────
     // Always mark ready as long as text and chunks are available.
@@ -152,7 +153,7 @@ export async function processDocument(
       where: { id: documentId },
       data: { status: 'ready' },
     });
-    console.info('[ingestion] status updated', { documentId, status: 'ready' });
+    logger.info('[ingestion] status updated', { documentId, status: 'ready' });
 
   } catch (error) {
     // A truly fatal error (e.g. text extraction failed, no text at all).
@@ -163,7 +164,7 @@ export async function processDocument(
       data: { status: 'failed' },
     });
 
-    console.error('[ingestion] failed', {
+    logger.error('[ingestion] failed', {
       documentId,
       error: error instanceof Error ? error.message : String(error),
     });

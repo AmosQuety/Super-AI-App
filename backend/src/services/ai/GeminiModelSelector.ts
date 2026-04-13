@@ -16,6 +16,7 @@
  */
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+import { logger } from '../../utils/logger';
 const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
 
 /**
@@ -78,7 +79,7 @@ export async function discoverBestModel(apiKey: string): Promise<string> {
     });
 
     if (!res.ok) {
-      console.warn(
+      logger.warn(
         `[GeminiModelSelector] models.list returned ${res.status} — using fallback model`
       );
       return cacheAndReturn('gemini-1.5-flash-latest');
@@ -94,7 +95,7 @@ export async function discoverBestModel(apiKey: string): Promise<string> {
     // Walk ranked list and return the first one present in the API response
     for (const candidate of RANKED_FLASH_MODELS) {
       if (available.has(candidate)) {
-        console.info(
+        logger.info(
           `[GeminiModelSelector] Discovered best model: ${candidate} (from ${available.size} available)`
         );
         return cacheAndReturn(candidate);
@@ -104,12 +105,12 @@ export async function discoverBestModel(apiKey: string): Promise<string> {
     // None of our preferred models are listed — take any flash model
     const anyFlash = [...available].find((n) => n.includes('flash'));
     const chosen = anyFlash ?? 'gemini-1.5-flash-latest';
-    console.warn(
+    logger.warn(
       `[GeminiModelSelector] No preferred model found — chose: ${chosen}`
     );
     return cacheAndReturn(chosen);
   } catch (err) {
-    console.warn(
+    logger.warn(
       `[GeminiModelSelector] Discovery failed (${(err as Error).message}) — using fallback model`
     );
     return cacheAndReturn('gemini-1.5-flash-latest');

@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import type { DocumentChunk } from '@super-ai/ai-orchestrator';
 import { redisClient } from '../../lib/redis';
 import crypto from 'crypto';
-import { recordLatency, getP95Latency } from '../../utils/logger';
+import { recordLatency, getP95Latency, logger } from '../../utils/logger';
 
 export interface EmbeddingProvider {
   getEmbedding(text: string): Promise<number[]>;
@@ -48,7 +48,7 @@ export class DocumentRetrievalService {
     if (redisClient) {
       const cachedResponse = await redisClient.get(resultCacheKey);
       if (cachedResponse) {
-        console.info('[rag] Cache HIT for RAG result', { userId, queryHash });
+        logger.info('[rag] Cache HIT for RAG result', { userId, queryHash });
         return JSON.parse(cachedResponse);
       }
     }
@@ -94,7 +94,7 @@ export class DocumentRetrievalService {
         LIMIT ${topK}
       `;
 
-      console.info('[rag] vector retrieval complete', {
+      logger.info('[rag] vector retrieval complete', {
         userId,
         queryLength: normalizedQuery.length,
         requestedTopK,
@@ -112,11 +112,11 @@ export class DocumentRetrievalService {
           .slice(0, topK);
       } else {
         // Vector search found nothing — fall through to full-text fallback.
-        console.info('[rag] vector search returned 0 results, trying full-text fallback', { userId });
+        logger.info('[rag] vector search returned 0 results, trying full-text fallback', { userId });
       }
     } catch (embeddingError: unknown) {
       const msg = embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
-      console.warn('[rag] embedding failed, falling back to full-text search', {
+      logger.warn('[rag] embedding failed, falling back to full-text search', {
         userId,
         reason: msg.slice(0, 200),
       });
@@ -134,7 +134,7 @@ export class DocumentRetrievalService {
     const t1 = performance.now();
     const duration = t1 - t0;
     recordLatency('RAG_Duration', duration);
-    console.info(`[rag] Total retrieval time: ${duration.toFixed(2)}ms (p95: ${getP95Latency('RAG_Duration')?.toFixed(2)}ms)`);
+    logger.info(`[rag] Total retrieval time: ${duration.toFixed(2)}ms (p95: ${getP95Latency('RAG_Duration')?.toFixed(2)}ms)`);
 
     return finalResults || [];
   }
@@ -174,7 +174,7 @@ export class DocumentRetrievalService {
         `;
 
         if (ftResults.length > 0) {
-          console.info('[rag] full-text search succeeded', {
+          logger.info('[rag] full-text search succeeded', {
             userId,
             retrievedCount: ftResults.length,
           });
@@ -183,7 +183,7 @@ export class DocumentRetrievalService {
             .filter((c) => c.content.trim().length > 0);
         }
       } catch (ftError) {
-        console.warn('[rag] full-text search failed, trying ILIKE', {
+        logger.warn('[rag] full-text search failed, trying ILIKE', {
           reason: ftError instanceof Error ? ftError.message : String(ftError),
         });
       }
@@ -213,7 +213,7 @@ export class DocumentRetrievalService {
         `;
 
         if (ilikeResults.length > 0) {
-          console.info('[rag] ILIKE search succeeded', {
+          logger.info('[rag] ILIKE search succeeded', {
             userId,
             keyword: keywords[0],
             retrievedCount: ilikeResults.length,
@@ -223,14 +223,14 @@ export class DocumentRetrievalService {
             .filter((c) => c.content.trim().length > 0);
         }
       } catch (ilikeError) {
-        console.warn('[rag] ILIKE search failed', {
+        logger.warn('[rag] ILIKE search failed', {
           reason: ilikeError instanceof Error ? ilikeError.message : String(ilikeError),
         });
       }
     }
 
     // ── Last resort: first N chunks of user's ready documents ─────────────────
-    console.info('[rag] using first-chunks fallback', { userId });
+    logger.info('[rag] using first-chunks fallback', { userId });
     const fallbackChunks = await this.prisma.documentChunk.findMany({
       where: {
         document: {
@@ -243,7 +243,7 @@ export class DocumentRetrievalService {
       select: { content: true },
     });
 
-    console.info('[rag] fallback retrieval complete', {
+    logger.info('[rag] fallback retrieval complete', {
       userId,
       retrievedCount: fallbackChunks.length,
     });

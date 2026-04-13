@@ -1,6 +1,7 @@
 import { AppContext } from "./types/context";
 import { AuthenticationError } from "apollo-server-express";
 import { redisClient } from "../lib/redis";
+import { logger } from "../utils/logger";
 
 export const workspaceResolvers = {
   Query: {
@@ -89,13 +90,13 @@ export const workspaceResolvers = {
       
       // 1. Check if Env Var exists
       if (!SUPABASE_URL) {
-          console.error("❌ ERROR: SUPABASE_URL is missing in Node .env file!");
+          logger.error("❌ ERROR: SUPABASE_URL is missing in Node .env file!");
           return null; 
       }
 
       
       if (!dbPath) {
-          console.error("❌ ERROR: No image path found in database for face:", parent.name);
+          logger.error("❌ ERROR: No image path found in database for face:", parent.name);
           return null;
       }
 
@@ -108,8 +109,8 @@ export const workspaceResolvers = {
       
       const fullUrl = `${SUPABASE_URL}/storage/v1/object/public/biometric_faces/${dbPath}`;
       
-      // 4. Log it so you can click it in the terminal
-      console.log("🔗 Generated URL:", fullUrl);
+      // 4. Construction complete
+      logger.debug("🔗 Generated URL:", fullUrl);
       
       return fullUrl;
     }

@@ -1,16 +1,13 @@
 // src/config/huggingface.ts
 import * as dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 // Load environment variables
 dotenv.config();
 
 const apiKey = process.env.HUGGING_FACE_API_KEY;
 
-// Diagnostic Logging
-console.log('🔧 [HuggingFace Config] Initializing...');
-console.log('  - API Key present:', !!apiKey);
-console.log('  - API Key length:', apiKey?.length || 0);
-console.log('  - Starts with hf_:', apiKey?.startsWith('hf_') || false);
+logger.debug('[huggingface] initializing config');
 
 // WORKING MODEL CONFIGURATION
 // FLUX.1-schnell is:
@@ -36,11 +33,9 @@ export const IMAGE_GENERATION_CONFIG = {
 
 // Validation
 if (!HUGGING_FACE_CONFIG.API_KEY) {
-  console.error('❌ [HuggingFace Config] HUGGING_FACE_API_KEY is not set!');
-  console.error('   Get your free API key from: https://huggingface.co/settings/tokens');
+  logger.warn('[huggingface] API key is not configured');
 } else if (!HUGGING_FACE_CONFIG.API_KEY.startsWith('hf_')) {
-  console.warn('⚠️  [HuggingFace Config] API key format may be incorrect');
+  logger.warn('[huggingface] API key format may be incorrect');
 } else {
-  console.log('✅ [HuggingFace Config] Configuration loaded successfully');
-  console.log(`   Using model: ${HUGGING_FACE_CONFIG.MODEL}`);
+  logger.debug('[huggingface] configuration loaded');
 }

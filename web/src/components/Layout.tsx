@@ -20,6 +20,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../contexts/useTheme";
 import { VoiceIntelligenceProvider } from "../contexts/VoiceIntelligenceContext"; // Import Provider
+import logger from "../utils/logger";
 
 // --- CONFIGURATION ---
 const PRODUCT_NAME = "Xemora";
@@ -92,7 +93,7 @@ const Layout = () => {
       await signOut();
       navigate('/login');
     } catch (error) {
-      console.error('Sign out error:', error);
+      logger.error('Sign out error:', error);
     }
   };
 
@@ -303,23 +304,22 @@ const Layout = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
 
-                  {/* LARGE CARD: Knowledge Brain (coming soon) */}
+                  {/* LARGE CARD: Knowledge Brain */}
                   <div
-                    className="md:col-span-2 relative overflow-hidden bg-theme-secondary border border-theme-light rounded-3xl p-8 cursor-default transition-all duration-500 group/card"
+                    onClick={() => navigate('/chat')}
+                    className="md:col-span-2 relative overflow-hidden bg-theme-secondary hover:bg-theme-tertiary border border-theme-light hover:border-blue-500/50 rounded-3xl p-8 transition-all duration-500 cursor-pointer group/card"
                   >
                     <div className="absolute top-6 left-8">
                       <span className="text-[10px] font-black tracking-widest text-blue-500/40 uppercase">Intelligence</span>
                     </div>
-                    {/* Coming Soon Badge */}
-                    <div className="absolute top-6 right-6 z-20">
-                      <span className="px-3 py-1 bg-theme-tertiary text-theme-tertiary text-xs font-bold rounded-full border border-theme-light tracking-wider">
-                        COMING SOON
-                      </span>
+                    {/* Interaction Icon */}
+                    <div className="absolute top-0 right-0 p-8 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="text-blue-500" />
                     </div>
 
-                    <div className="relative z-10 opacity-40 grayscale transition-all duration-500 group-hover/card:opacity-60 group-hover/card:grayscale-0">
-                      <div className="w-12 h-12 rounded-2xl bg-theme-tertiary flex items-center justify-center mb-4 border border-theme-light">
-                        <MessageSquare className="w-6 h-6 text-theme-tertiary" />
+                    <div className="relative z-10 transition-all duration-500">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4 border border-blue-500/20">
+                        <MessageSquare className="w-6 h-6 text-blue-400" />
                       </div>
                       <h3 className="text-2xl font-bold text-theme-primary mb-2">Knowledge Brain</h3>
                       <p className="text-theme-secondary max-w-md">

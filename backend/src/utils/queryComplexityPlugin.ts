@@ -7,7 +7,7 @@ export const queryComplexityPlugin: ApolloServerPlugin = {
       async didResolveOperation() {
         // For now, we'll skip complexity checking until we implement it properly
         // This plugin structure is ready for when we implement the full complexity calculation
-        console.log('Query complexity check placeholder');
+        // Placeholder for future complexity checking
       },
     };
   },

@@ -9,6 +9,7 @@ import { MessageService } from "../../services/messageService";
 import { UserRole } from "../../auth/authorization";
 import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
+import { logger } from '../../utils/logger';
 
 // ✅ CHANGED: Import Pollinations instead of HuggingFace
 import { PollinationsService } from '../../services/pollinations.service'; 
@@ -91,9 +92,9 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   if (token) {
     try {
       user = SecurityConfig.verifyToken(token);
-      console.log('✅ User authenticated:', user.role);
+      logger.debug('[context] user authenticated');
     } catch (error) {
-      console.warn("Invalid or expired token");
+      logger.warn('[context] invalid or expired token');
     }
   }
 

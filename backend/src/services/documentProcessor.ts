@@ -1,6 +1,7 @@
 // src/services/documentProcessor.ts
 import axios from 'axios';
 import mammoth from 'mammoth';
+import { logger } from '../utils/logger';
 
 // 1. Use the new library
 const pdf = require('pdf-extraction');
@@ -106,13 +107,13 @@ export class DocumentProcessor {
 
   async extractTextFromUrl(fileUrl: string, mimeType: string): Promise<string> {
     try {
-      console.log(`📥 Downloading file for extraction: ${fileUrl}`);
+      logger.debug('[document] downloading file for extraction');
       const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
       const fileBuffer = Buffer.from(response.data);
 
       return await this.extractText(fileBuffer, mimeType);
     } catch (error: any) {
-      console.error('Error downloading file:', error.message);
+      logger.error('[document] download failed', { message: error.message });
       throw new Error(`Unable to download file for extraction: ${error.message}`);
     }
   }
@@ -120,7 +121,7 @@ export class DocumentProcessor {
   async extractText(fileBuffer: Buffer, mimeType: string): Promise<string> {
     try {
       if (mimeType === 'application/pdf') {
-        console.log("📄 Processing PDF with pdf-extraction...");
+        logger.debug('[document] processing pdf');
         
         // pdf-extraction takes the buffer directly
         const data = await pdf(fileBuffer);
@@ -129,36 +130,35 @@ export class DocumentProcessor {
             .replace(/\n\s*\n/g, '\n') // Remove multiple empty lines
             .trim();
             
-        console.log(`✅ PDF Extracted: ${cleanText.length} characters`);
+        logger.debug('[document] pdf extracted');
         return cleanText;
       }
       // DOCX — Office Open XML (most common modern Word format)
       else if (
         mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       ) {
-        console.log("📄 Processing DOCX with mammoth...");
+        logger.debug('[document] processing docx');
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
         const cleanText = result.value.replace(/\n\s*\n/g, '\n').trim();
-        console.log(`✅ DOCX Extracted: ${cleanText.length} characters`);
+        logger.debug('[document] docx extracted');
         return cleanText;
       }
       // DOC — Legacy binary Word format (mammoth handles this too)
       else if (mimeType === 'application/msword') {
-        console.log("📄 Processing DOC (legacy) with mammoth...");
+        logger.debug('[document] processing legacy doc');
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
         const cleanText = result.value.replace(/\n\s*\n/g, '\n').trim();
-        console.log(`✅ DOC Extracted: ${cleanText.length} characters`);
+        logger.debug('[document] doc extracted');
         return cleanText;
       }
       else if (mimeType.startsWith('text/')) {
         return fileBuffer.toString('utf-8');
       }
       
-      console.warn(`⚠️ Unsupported File Type: ${mimeType}`);
+      logger.warn('[document] unsupported file type', { mimeType });
       return "";
     } catch (error: any) {
-      console.error("Extraction Error:", error);
-      // Log the full error to help debug if it fails again
+      logger.error('[document] extraction failed', error);
       throw new Error(`Failed to extract text: ${error.message}`);
     }
   }

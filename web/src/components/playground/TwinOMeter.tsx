@@ -5,6 +5,7 @@ import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucid
 import { motion } from "framer-motion";
 import { compressImage } from "../../utils/imageUtils";
 import { useToast } from "../ui/toastContext";
+import logger from "../../utils/logger";
 
 // --- TYPE DEFINITIONS ---
 interface ComparisonResult {
@@ -62,7 +63,7 @@ export default function TwinOMeter() {
         showError("Comparison Aborted", data?.compareFaces.error || "Neural engine could not process these faces.");
       }
     } catch (error: any) {
-      console.error(error);
+      logger.error("Face comparison failed", error);
       showError("System Failure", error.message || "Connection to the biometric bridge was interrupted.");
     }
   };

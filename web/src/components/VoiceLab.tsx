@@ -10,6 +10,7 @@ import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
 import ProcessingState from './loading/ProcessingState';
 import { useToast } from './ui/toastContext';
 import { useBrowserNotification } from '../hooks/useBrowserNotification';
+import logger from '../utils/logger';
 
 interface RegisterVoiceData {
   registerVoice: { success: boolean; message: string };
@@ -31,7 +32,7 @@ interface VoiceJobStatusData {
 
 
 export default function VoiceLab() {
-  const { showWarning } = useToast();
+  const { showWarning, showInfo, showSuccess, showError } = useToast();
   const { requestPermission, notifyWhenReady } = useBrowserNotification();
   // TTS State (for synthesis input)
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution. By the time you finish hearing this sentence, the next one is already prepared and waiting for you. This isn't just a recording; it is a live synthesis of intelligence, running entirely within your local device");
@@ -103,7 +104,7 @@ export default function VoiceLab() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error("Error accessing microphone:", err);
+      logger.error("Error accessing microphone", err);
     }
   };
 
@@ -152,7 +153,7 @@ export default function VoiceLab() {
         setSpaceStatus(data?.registerVoice?.message || 'Registration failed');
       }
     } catch (err: any) {
-      console.error("Registration Error:", err);
+      logger.error("Registration Error", err);
       setCloningStatus('error');
 
       const errorMessage = err.graphQLErrors?.[0]?.message
@@ -179,11 +180,13 @@ export default function VoiceLab() {
       setCloningStatus('done');
       setSpaceStatus('Done');
       setCurrentJobId(null);
+      showSuccess("Synthesis Complete", "Your neural voice clone is ready to play.");
       notifyWhenReady("Synthesis Complete", { body: "Your neural voice clone is ready to play." });
     } else if (job.status === 'FAILED') {
       setCloningStatus('error');
       setSpaceStatus(job.error || 'Synthesis failed');
       setCurrentJobId(null);
+      showError("Synthesis Error", job.error || "Your voice cloning job failed.");
       notifyWhenReady("Synthesis Error", { body: "Your voice cloning job failed. Please check the logs." });
     } else {
       setSpaceStatus(job.message || 'Synthesizing Neural Speech...');
@@ -206,7 +209,8 @@ export default function VoiceLab() {
     setCloningStatus('processing');
     setSpaceStatus('Initiating Neural Synthesis...');
     setClonedAudioUrl(null);
-    requestPermission();
+    void requestPermission();
+    showInfo("Running in background", "You can leave this tab. We’ll notify you when the voice is ready.");
 
     try {
       const { data } = await cloneVoiceMutation({
@@ -224,7 +228,7 @@ export default function VoiceLab() {
         setSpaceStatus(data?.cloneVoice?.error || 'Synthesis initiation failed');
       }
     } catch (err: any) {
-      console.error("Local Clone Error:", err);
+      logger.error("Local Clone Error", err);
       setCloningStatus('error');
 
       const errorMessage = err.graphQLErrors?.[0]?.message

@@ -7,6 +7,7 @@ import { useToast } from "./ui/toastContext";
 import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
+import { logger } from "../utils/logger";
 
 
 // --- TYPE DEFINITIONS ---
@@ -46,7 +47,7 @@ export default function ImageGenerator() {
 
   // Debug logging
   useEffect(() => {
-    console.log('📊 Status Query Result:', {
+    logger.debug('📊 Status Query Result:', {
       loading: statusLoading,
       error: statusError,
       data: statusData,
@@ -55,7 +56,7 @@ export default function ImageGenerator() {
 
   const [generateImagesMutation] = useMutation<GenerateImagesData>(GENERATE_AI_IMAGE_VARIANTS, {
     onError: (err) => {
-      console.error("GraphQL error:", err);
+      logger.error("GraphQL error:", err);
       setError(err.message || "Failed to generate images");
     },
   });
@@ -66,7 +67,14 @@ export default function ImageGenerator() {
     setLoading(true);
     setError(null);
     setImages([]);
-    requestPermission();
+    const notificationsEnabled = await requestPermission();
+    addToast({
+      type: 'info',
+      title: 'Running in background',
+      message: notificationsEnabled
+        ? 'You can leave this tab. We’ll notify you when the images are ready.'
+        : 'You can leave this tab. Keep the page open if you want to see the result here.',
+    });
 
     try {
       const conn = (navigator as any).connection;
@@ -92,7 +100,7 @@ export default function ImageGenerator() {
         
         notifyWhenReady("Images Generated", { body: `Your AI images are ready.` });
 
-        console.log(`✅ Generated ${data.generateAIImageVariants.images.length} images in ${data.generateAIImageVariants.generationTime}`);
+        logger.info(`✅ Generated ${data.generateAIImageVariants.images.length} images in ${data.generateAIImageVariants.generationTime}`);
       } else {
         const errorMsg = data?.generateAIImageVariants.error || "Unknown error";
         setError(errorMsg);
@@ -105,7 +113,7 @@ export default function ImageGenerator() {
         
         notifyWhenReady("Generation Failed", { body: errorMsg });
       
-        console.error("Generation failed:", errorMsg);
+        logger.error("Generation failed:", errorMsg);
         
         // Fallback to Lorem Picsum for demo purposes
         if (import.meta.env.MODE === 'development') {
@@ -117,7 +125,7 @@ export default function ImageGenerator() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Network error. Please check your connection.";
-      console.error("Error generating images:", error);
+      logger.error("Error generating images:", error);
       setError(errorMessage);
       
       addToast({
@@ -172,9 +180,9 @@ export default function ImageGenerator() {
         message: `Image ${index + 1} downloaded successfully`,
       });
       
-      console.log(`Downloaded image ${index + 1}`);
+      logger.log(`Downloaded image ${index + 1}`);
     } catch (error) {
-      console.error("Download failed:", error);
+      logger.error("Download failed:", error);
       setError("Failed to download image");
     } finally {
       setDownloading(null);
@@ -193,12 +201,12 @@ export default function ImageGenerator() {
 
   // Show loading state while checking
   if (statusLoading) {
-    console.log('⏳ Still loading status...');
+    logger.debug('⏳ Still loading status...');
   }
 
   // Show error if query failed
   if (statusError) {
-    console.error('❌ Status query error:', statusError);
+    logger.error('❌ Status query error:', statusError);
   }
 
   return (

@@ -88,7 +88,7 @@ self.onmessage = async (event: MessageEvent) => {
 
         // Add a sanity check for extremely long text
         if (sentence.length > 500) {
-           console.warn("Sentence too long for browser-local synthesis, splitting further...");
+            // Keep silent in production.
         }
 
         const result = await tts.generate(sentence, {
@@ -128,7 +128,6 @@ self.onmessage = async (event: MessageEvent) => {
 
       ctx.postMessage({ type: 'status', status: 'done', message: 'Synchronization complete' });
     } catch (err: any) {
-      console.error("Worker Generation Error:", err);
       ctx.postMessage({ type: 'error', message: `Neural Synthesis Failed: ${err.message || 'Fatal Worker Error'}` });
     }
   }

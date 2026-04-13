@@ -14,6 +14,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
 import { UPLOAD_DOCUMENT, GET_DOCUMENT_LIFECYCLE } from "../../graphql/chats";
+import { useBrowserNotification } from "../../hooks/useBrowserNotification";
+import { logger } from "../../utils/logger";
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
 
@@ -160,6 +162,7 @@ const useOptimisticMessages = () => {
 const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   const { theme } = useTheme();
   const { showError } = useToast();
+  const { requestPermission, notifyWhenReady } = useBrowserNotification();
   
   const {
     messages,
@@ -206,7 +209,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   
   useEffect(() => {
     if (chatsError) {
-        console.error("Failed to load chats:", chatsError);
+        logger.error("Failed to load chats:", chatsError);
         toast.error("Failed to load conversations.", { theme: "dark" });
     }
   }, [chatsError]);
@@ -221,7 +224,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   // Handle History Error via Effect (Replacement for onError)
   useEffect(() => {
     if (historyError) {
-        console.error("History Error:", historyError);
+        logger.error("History Error:", historyError);
         let errorMessage = "An unexpected error occurred";
         if (historyError instanceof Error) {
             errorMessage = historyError.message;
@@ -233,7 +236,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
   const [createChat] = useMutation<CreateChatData>(CREATE_CHAT, {
     onError: (error) => {
-        console.error("Create Chat Error:", error);
+        logger.error("Create Chat Error:", error);
         toast.error("Failed to create chat.", { theme: "dark" });
     }
   });
@@ -399,6 +402,13 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     
     // Scroll to bottom immediately on send
     setIsAtBottom(true);
+    const notificationsEnabled = await requestPermission();
+    toast.info(
+      notificationsEnabled
+        ? 'Your request is running in the background. You can leave this tab and come back later.'
+        : 'Your request is running in the background. Keep this page open if you want an on-screen update.',
+      { theme: 'dark', autoClose: 5000 }
+    );
 
     try {
       let currentConversationId = conversationId;
@@ -497,12 +507,15 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
         };
 
         addMessage(aiMessage);
+        notifyWhenReady('Chat response ready', {
+          body: 'Your AI response is ready. You can come back whenever you want.',
+        });
       } else {
         throw new Error("Did not receive a valid AI response.");
       }
 
     } catch (error) {
-      console.error("Error sending message:", error);
+      logger.error("Error sending message:", error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const isRetryable = !errorMessage.includes("Authentication");
@@ -523,7 +536,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     } finally {
       setAiState("idle");
     }
-  }, [conversationId, currentUser.id, createChat, sendMessage, refetchChats, addOptimisticMessage, updateMessageStatus, replaceTempMessage, addMessage, showError]);
+  }, [conversationId, currentUser.id, createChat, sendMessage, refetchChats, addOptimisticMessage, updateMessageStatus, replaceTempMessage, addMessage, showError, requestPermission, notifyWhenReady]);
 
   const handleRetryMessage = useCallback((message: MessageType) => {
     if (message.status !== "error" && message.status !== "retrying") return;

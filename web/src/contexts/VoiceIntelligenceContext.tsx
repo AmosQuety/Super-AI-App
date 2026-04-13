@@ -7,6 +7,7 @@ import { useToast } from "../components/ui/toastContext";
 import { useTheme } from "./useTheme";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { logger } from "../utils/logger";
 
 // Types
 interface VoiceIntelligenceContextType {
@@ -93,7 +94,7 @@ export const VoiceIntelligenceProvider: React.FC<{ children: ReactNode }> = ({ c
     // Check for commands
     const match = commandEngine.current.match(transcript);
     if (match) {
-      console.log("Command Triggered:", match);
+      logger.info("Command Triggered:", match);
       
       // Execute Command
       if (match.action === "NAVIGATE") {
@@ -137,7 +138,7 @@ export const VoiceIntelligenceProvider: React.FC<{ children: ReactNode }> = ({ c
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       await biometrics.current.start(stream);
     } catch (e) {
-      console.error("Microphone permission denied or error:", e);
+      logger.error("Microphone permission denied or error:", e);
       return;
     }
 

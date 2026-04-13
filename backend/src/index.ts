@@ -1,5 +1,6 @@
 // src/index.ts
 
+import './utils/quietConsole';
 import "./utils/sentry"; 
 import * as Sentry from "@sentry/node";
 
@@ -34,7 +35,7 @@ import {
 } from './middleware/logging';
 import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
 
-console.log('DATABASE_URL:', process.env.DATABASE_URL);
+// Init complete - server start phase begins
 
 // Constants for configuration
 const UPLOAD_CONFIG = {
@@ -145,7 +146,7 @@ const corsOptions: cors.CorsOptions = {
     // Debug middleware to log upload requests
     app.use('/graphql', (req: Request, _res: Response, next: NextFunction) => {
       if (req.method === 'POST') {
-        console.log('📨 Incoming GraphQL request:', {
+        logger.debug('📨 Incoming GraphQL request:', {
           contentType: req.headers['content-type'],
           hasBody: !!req.body,
           isMultipart: req.headers['content-type']?.includes('multipart/form-data'),
@@ -169,14 +170,14 @@ const corsOptions: cors.CorsOptions = {
 
     // Add this validation before Apollo Server creation
     try {
-      console.log("🔍 Validating schema and resolvers...");
+      logger.info("🔍 Validating schema and resolvers...");
       makeExecutableSchema({ 
         typeDefs, 
         resolvers 
       });
-      console.log("✅ Schema validation passed");
+      logger.info("✅ Schema validation passed");
     } catch (schemaError) {
-      console.error("❌ SCHEMA VALIDATION ERROR:", schemaError);
+      logger.error("❌ SCHEMA VALIDATION ERROR:", schemaError);
       process.exit(1);
     }
 
@@ -355,18 +356,10 @@ const corsOptions: cors.CorsOptions = {
     return httpServerInstance;
   } catch (error) {
     Sentry.captureException(error);
-    console.error("❌ CRITICAL SERVER STARTUP ERROR:");
-    console.error("Full error:", error);
-    
-    if (error instanceof Error) {
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-    
-    logger.error("Error starting server:", { 
+    logger.error("❌ CRITICAL SERVER STARTUP ERROR:", {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
     });
     process.exit(1);
   }

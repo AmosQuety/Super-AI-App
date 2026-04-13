@@ -1,4 +1,5 @@
 // src/services/voice/CommandEngine.ts
+import { logger } from "../../utils/logger";
 
 export type CommandAction = "NAVIGATE" | "ACTION" | "QUERY";
 
@@ -46,7 +47,7 @@ export class CommandEngine {
           return cmd;
         }
       } catch (e) {
-        console.warn(`Invalid regex for command ${cmd.id}:`, e);
+        logger.warn(`Invalid regex for command ${cmd.id}:`, e);
       }
     }
     return null;

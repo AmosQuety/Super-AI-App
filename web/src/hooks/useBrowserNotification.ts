@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 /**
  * Hook to manage native browser notifications. Allows the app to notify
@@ -21,7 +22,7 @@ export function useBrowserNotification() {
    */
   const requestPermission = useCallback(async () => {
     if (!('Notification' in window)) {
-      console.warn('This browser does not support desktop notifications.');
+      logger.warn('This browser does not support desktop notifications.');
       return false;
     }
 
@@ -38,6 +39,10 @@ export function useBrowserNotification() {
     return false;
   }, []);
 
+  const isUserAway = useCallback(() => {
+    return document.hidden || !document.hasFocus();
+  }, []);
+
   /**
    * Send a notification ONLY if the user is currently looking at another tab
    * or the browser is minimized.
@@ -47,13 +52,14 @@ export function useBrowserNotification() {
       return;
     }
 
-    if (document.visibilityState !== 'visible') {
+    if (isUserAway()) {
       try {
         const notif = new Notification(title, {
           icon: '/favicon.ico', // Default icon, can be overridden via options
           badge: '/favicon.ico',
           vibrate: [200, 100, 200], // Haptic feedback for mobile
           requireInteraction: false, // Don't force them to explicitly dismiss it
+          tag: options?.tag ?? 'xemora-task-complete',
           ...options,
         } as any);
 
@@ -63,10 +69,10 @@ export function useBrowserNotification() {
           notif.close();
         };
       } catch (err) {
-        console.error('Failed to dispatch background notification', err);
+        logger.error('Failed to dispatch background notification', err);
       }
     }
-  }, []);
+  }, [isUserAway]);
 
   return { permission, requestPermission, notifyWhenReady };
 }

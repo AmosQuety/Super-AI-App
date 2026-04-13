@@ -39,6 +39,7 @@ import {
   invalidateCache,
   RANKED_FLASH_MODELS,
 } from "./GeminiModelSelector";
+import { logger } from "../../utils/logger";
 
 // ── Key pool ──────────────────────────────────────────────────────────────────
 
@@ -203,7 +204,7 @@ export class GeminiProvider implements IProvider {
         
         // If ALL keys exhausted on rate limit or 503, set a cooldown of 2 minutes site-wide
         if (isUnavailable || (isRateLimited && attempt === ALL_KEYS.length - 1)) {
-           console.warn(`[GeminiProvider] Embedding API severely degraded/exhausted. Initiating 2 minute cooldown. (${msg.slice(0, 100)})`);
+           logger.warn(`[GeminiProvider] Embedding API severely degraded/exhausted. Initiating 2 minute cooldown. (${msg.slice(0, 100)})`);
            embeddingCooldownUntil = Date.now() + 2 * 60 * 1000;
         }
 
@@ -242,7 +243,7 @@ export class GeminiProvider implements IProvider {
           );
         }
 
-        console.warn(
+        logger.warn(
           `[GeminiProvider] Model "${model}" quota wall (limit: 0) — switching to "${fallback}"`
         );
         this.activeModel = fallback;

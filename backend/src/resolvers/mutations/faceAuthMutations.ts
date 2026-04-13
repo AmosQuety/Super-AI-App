@@ -90,7 +90,7 @@ export const faceAuthMutations = {
         // If Python didn't return it (older version), we fallback to manual string.
         const finalPath = result.image_path || `${context.user.userId}/${workspaceId}/${name}.jpg`;
         
-        console.log("📝 Saving Face Path from Python:", finalPath); 
+        logger.debug("📝 Saving Face Path from Python:", finalPath); 
 
         await context.prisma.face.create({
             data: {

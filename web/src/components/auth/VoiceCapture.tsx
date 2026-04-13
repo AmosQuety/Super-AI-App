@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Mic, Square, RefreshCw, UploadCloud, Volume2 } from "lucide-react";
 import { useToast } from "../ui/toastContext";
+import logger from "../../utils/logger";
 
 interface VoiceCaptureProps {
   onCapture: (file: File) => void;
@@ -41,7 +42,7 @@ export const VoiceCapture: React.FC<VoiceCaptureProps> = ({
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error("Error accessing microphone:", err);
+      logger.error("Error accessing microphone", err);
       showError("Device Error", "Microphone access denied or not found. Please check your hardware settings.");
     }
   };

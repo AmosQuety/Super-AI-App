@@ -7,29 +7,30 @@
 
 
 
+const isDev = import.meta.env.MODE === 'development';
+
 export const logger = {
   log: (...args: any[]) => {
-    console.log(...args);
+    if (isDev) console.log(...args);
   },
   info: (...args: any[]) => {
-    console.info(...args);
+    if (isDev) console.info(...args);
   },
   warn: (...args: any[]) => {
-    console.warn(...args);
+    if (isDev) console.warn(...args);
   },
   error: (...args: any[]) => {
-    // We usually want to keep errors in production, but we can also use this 
-    // to pipe them to a reporting service like Sentry (which is handled in ErrorMonitor)
+    // Keep errors in production for debugging
     console.error(...args);
   },
   debug: (...args: any[]) => {
-    console.debug(...args);
+    if (isDev) console.debug(...args);
   },
   group: (label: string) => {
-    console.group(label);
+    if (isDev) console.group(label);
   },
   groupEnd: () => {
-    console.groupEnd();
+    if (isDev) console.groupEnd();
   }
 };
 

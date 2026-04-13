@@ -280,22 +280,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  {/* Future Notifications Card */}
-                  <div className="bg-slate-900/50 border border-slate-700 rounded-2xl p-6 opacity-50 cursor-not-allowed">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center border border-orange-500/20">
-                          <Bell className="text-orange-400" size={20} />
-                        </div>
-                        <h3 className="font-bold text-white">Notifications</h3>
-                      </div>
-                      <span className="px-2 py-0.5 bg-slate-800 text-slate-500 text-[8px] rounded font-bold uppercase tracking-widest">Coming Soon</span>
-                    </div>
-                    <p className="text-slate-400 text-sm mb-6">Control which system events trigger push notifications or email alerts.</p>
-                    <div className="w-full py-2.5 bg-slate-950/50 rounded-xl text-slate-600 text-center text-xs font-bold border border-slate-900">
-                      DISABLED
-                    </div>
-                  </div>
+
                 </div>
               </section>
 

@@ -5,6 +5,7 @@ import { Upload, Search, Download, X, User, Users, Loader2, AlertCircle } from "
 import { motion } from "framer-motion";
 import { useDelight } from "../../hooks/useDelight";
 import { useToast } from "../ui/toastContext";
+import logger from "../../utils/logger";
 
 // --- TYPE DEFINITIONS ---
 interface FindFaceResult {
@@ -70,7 +71,7 @@ export default function FindMe() {
         showError("Identification Failed", data?.findFaceInCrowd.error || "The AI could not identify a clear match.");
       }
     } catch (err: any) {
-      console.error(err);
+      logger.error("Crowd scan failed", err);
       showError("System Error", err.message || "Could not connect to the biometric engine.");
     }
   };

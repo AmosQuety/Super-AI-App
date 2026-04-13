@@ -28,6 +28,7 @@ import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
 import VoiceVisualizer from "./ui/VoiceVisualizer";
 import { useEffect, useRef } from "react";
+import logger from "../utils/logger";
 
 export default function VoiceTools() {
   const { requestPermission, notifyWhenReady } = useBrowserNotification();
@@ -53,7 +54,7 @@ export default function VoiceTools() {
   const [isProcessingIntelligence, setIsProcessingIntelligence] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState("Spanish");
   const [processTask] = useMutation<{ processVoiceTask: { success: boolean, result: string, error: string } }>(PROCESS_VOICE_TASK);
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
 
   const [isSlowNetwork, setIsSlowNetwork] = useState(false);
   useEffect(() => {
@@ -92,6 +93,7 @@ export default function VoiceTools() {
           setFinalAudioUrl(url);
           setTtsStatus('done');
           setStatusMessage('Synchronization Complete');
+          showSuccess("Local TTS Complete", "Your synthesized audio is ready.");
           notifyWhenReady("Local TTS Complete", { body: "Your synthesized audio is ready." });
           break;
         case 'error':
@@ -103,7 +105,7 @@ export default function VoiceTools() {
     };
 
     worker.onerror = (e) => {
-      console.error("Local TTS Worker failed to spawn:", e);
+      logger.error("Local TTS Worker failed to spawn:", e);
       setTtsStatus('error');
       setStatusMessage('Neural engine failed to initialize due to missing hardware acceleration or module error.');
     };
@@ -118,7 +120,8 @@ export default function VoiceTools() {
     if (!workerRef.current || !ttsText.trim()) return;
     setFinalAudioUrl(null);
     setTtsStatus('generating');
-    requestPermission();
+    void requestPermission();
+    showInfo("Running in background", "You can leave this tab. We’ll notify you when the audio is ready.");
     audioChunksBuffer.current = [];
     
     // Emotion-Responsive Synthesis Logic
@@ -191,10 +194,9 @@ export default function VoiceTools() {
     try {
       await navigator.clipboard.writeText(fullDisplay);
       setCopied(true);
-      console.log("word count:", wordCount);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy", error);
+      logger.error("Failed to copy transcript", error);
     }
   };
 

@@ -1,5 +1,5 @@
-// web/src/lib/uploadLink.ts
 import { ApolloLink, Observable } from "@apollo/client";
+import { logger } from "../utils/logger";
 import type { Operation } from "@apollo/client";
 import { print } from "graphql"; 
 import type { DocumentNode } from "graphql";
@@ -71,7 +71,7 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
       };
 
       // ✅ DEBUG: Log to verify token is present
-      console.log('🔐 Upload request headers:', {
+      logger.debug('🔐 Upload request headers:', {
         hasAuthorization: !!finalHeaders.authorization,
         headerKeys: Object.keys(finalHeaders)
       });
@@ -86,7 +86,7 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
           const text = await result.text();
           
           if (!result.ok) {
-            console.error("❌ Upload Error Body:", text);
+            logger.error("❌ Upload Error Body:", text);
             throw new Error(`HTTP ${result.status}: ${result.statusText}`);
           }
 
@@ -95,12 +95,12 @@ export function createUploadLink({ uri, headers = {} }: { uri: string; headers?:
             observer.next(json);
             observer.complete();
           } catch {
-            console.error("❌ Invalid JSON response:", text);
+            logger.error("❌ Invalid JSON response:", text);
             throw new Error("Invalid JSON response from server");
           }
         })
         .catch((error) => {
-          console.error("❌ Upload fetch error:", error);
+          logger.error("❌ Upload fetch error:", error);
           observer.error(error);
         });
     });

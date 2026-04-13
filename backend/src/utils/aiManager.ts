@@ -2,6 +2,7 @@ import prisma from "../lib/db";
 import { GraphQLError } from "graphql";
 import crypto from "crypto";
 import { redisClient } from "../lib/redis";
+import { logger } from "./logger";
 
 // Configuration
 const DAILY_IMAGE_LIMIT = 10;
@@ -77,7 +78,7 @@ export class AIManager {
         const cachedUrl = await redisClient.get(redisKey);
         if (cachedUrl) return cachedUrl;
       } catch (err) {
-        console.error("Redis Cache Read Error:", err);
+        logger.error("Redis Cache Read Error:", err);
       }
     }
 
@@ -98,7 +99,7 @@ export class AIManager {
 
     // 1. Cache to Fast Redis (7 day TTL)
     if (redisClient) {
-      redisClient.setex(redisKey, 86400 * 7, imageUrl).catch((err: any) => console.error("Redis Cache Write Error:", err));
+      redisClient.setex(redisKey, 86400 * 7, imageUrl).catch((err: any) => logger.error("Redis Cache Write Error:", err));
     }
 
     // 2. Persist safely in Prisma

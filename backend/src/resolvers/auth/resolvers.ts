@@ -7,6 +7,7 @@ import { AuthorizationService, UserRole } from "../../auth/authorization";
 import { AppContext } from "../types/context"; // Import the full AppContext
 import { VoiceCloningService } from "../../services/voiceCloningService";
 import { redisClient } from "../../lib/redis";
+import { logger } from "../../utils/logger";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -195,8 +196,8 @@ export const authResolvers = {
 
       const { password: userPassword, ...userWithoutPassword } = user;
 
-      // Log login attempt (you'd add proper logging here)
-      console.log(`User ${user.email} logged in successfully`);
+      // Log login attempt
+      logger.info(`User ${user.email} logged in successfully`);
 
       return {
         user: userWithoutPassword,
@@ -395,7 +396,7 @@ export const authResolvers = {
 
       const { password, ...userWithoutPassword } = user;
 
-      console.log(`User ${user.email} logged in successfully via Voice Identity`);
+      logger.info(`User ${user.email} logged in successfully via Voice Identity`);
 
       return {
         user: userWithoutPassword,
@@ -450,7 +451,7 @@ export const authenticateToken = async (prisma: PrismaClient, token: string) => 
       role: payload.role, // Include role from token
     };
   } catch (error) {
-    console.error('Token authentication failed:', error);
+    logger.error('Token authentication failed:', error);
     return null;
   }
 };

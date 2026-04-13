@@ -135,7 +135,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   // 1. Capture Network Errors
   if (error && 'networkError' in error && error.networkError) {
-      console.error(`[Network error]:`, error.networkError);
+      logger.error(`[Network error]:`, error.networkError);
       
       // 👇 SEND TO SENTRY
       ErrorMonitor.capture(error.networkError as Error, {
@@ -148,7 +148,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
   //  GraphQL execution errors
   if (CombinedGraphQLErrors.is(error)) {
     error.errors.forEach(({ message, locations, path, extensions }) => {
-      console.error(
+      logger.error(
         `[GraphQL error]: Message: ${message}, Location: ${JSON.stringify(
           locations
         )}, Path: ${path}`
@@ -185,7 +185,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
   //  Multipart / protocol errors
   if (CombinedProtocolErrors.is(error)) {
     error.errors.forEach(({ message, extensions }) => {
-      console.error(
+      logger.error(
         `[Protocol error]: ${message}, Extensions: ${JSON.stringify(extensions)}`
       );
     });
@@ -194,7 +194,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   //  Server returned non-200
   if (ServerError.is(error)) {
-    console.error(
+    logger.error(
       `[Server error]: ${error.statusCode} - ${error.message}`
     );
     return;
@@ -202,24 +202,24 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   //  JSON parse error
   if (ServerParseError.is(error)) {
-    console.error("[Parse error]:", error.message);
+    logger.error("[Parse error]:", error.message);
     return;
   }
 
   //  Local cache/state errors
   if (LocalStateError.is(error)) {
-    console.error("[Local state error]:", error.message);
+    logger.error("[Local state error]:", error.message);
     return;
   }
 
   // Anything weird
   if (UnconventionalError.is(error)) {
-    console.error("[Unconventional error]:", error.message);
+    logger.error("[Unconventional error]:", error.message);
     return;
   }
 
   //  Fallback
-  console.error("[Unknown error]:", error);
+  logger.error("[Unknown error]:", error);
 });
 
 

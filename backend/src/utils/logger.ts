@@ -30,22 +30,21 @@ const logFormat = winston.format.combine(
 );
 
 export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: process.env.NODE_ENV === 'production' ? 'error' : 'debug',
   format: logFormat,
   defaultMeta: { 
     service: 'backend-api',
     environment: process.env.NODE_ENV || 'development'
   },
   transports: [
-    // Console transport for development
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    }),
-    // File transports for production
-    ...(process.env.NODE_ENV === 'production' ? [
+    ...(process.env.NODE_ENV !== 'production' ? [
+      new winston.transports.Console({
+        format: winston.format.combine(
+          winston.format.colorize(),
+          winston.format.simple()
+        )
+      }),
+    ] : [
       new winston.transports.File({ 
         filename: 'logs/error.log', 
         level: 'error',
@@ -57,7 +56,7 @@ export const logger = winston.createLogger({
         maxsize: 5242880,
         maxFiles: 5,
       }),
-    ] : [])
+    ])
   ],
 });
 
@@ -70,11 +69,9 @@ export const requestLogger = {
       const duration = Date.now() - start;
       logger.info('HTTP Request', {
         method: req.method,
-        url: req.url,
+        path: req.originalUrl?.split('?')[0] ?? req.url,
         statusCode: res.statusCode,
         duration: `${duration}ms`,
-        userAgent: req.get('User-Agent'),
-        ip: req.ip,
       });
     });
     

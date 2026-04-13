@@ -8,6 +8,7 @@ import { DocumentProcessor } from "../services/documentProcessor";
 import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
 import { AIManager } from "../utils/aiManager"; // Import our new Manager
 import { DocumentRetrievalService } from "../services/ai/DocumentRetrievalService";
+import { logger } from "../utils/logger";
 
 const MAX_HISTORY_TURNS = 20; // cap to avoid blowing context window
 
@@ -198,7 +199,7 @@ export const sendMessageWithResponse = {
           hasFileAttachment = true;
           modelUserMessage = `FILE CONTENT:\n${extractedText}\n\nUSER MESSAGE:\n${originalUserMessage}`;
         } catch (e: any) {
-          console.error("File processing error:", e);
+          logger.error("File processing error:", e);
         }
       }
 
@@ -236,7 +237,7 @@ export const sendMessageWithResponse = {
             };
           }
         } catch (ragError) {
-          console.error("⚠️ RAG Search failed:", ragError);
+          logger.warn("⚠️ RAG Search failed:", ragError);
         }
       }
 
@@ -298,7 +299,7 @@ export const sendMessageWithResponse = {
 
            usedGemini = true; // Mark that we hit the API
          } catch (providerError: any) {
-           console.error("LLM generation failed:", providerError);
+           logger.error("LLM generation failed:", providerError);
            aiResponse = "I am having trouble reaching the AI provider right now due to high demand. Please retry in a few moments.";
          }
       }
@@ -318,7 +319,7 @@ export const sendMessageWithResponse = {
       return { userMessage, aiMessage, usedCustomResponse: !usedGemini };
 
     } catch (error: any) {
-      console.error("Chat Error:", error);
+      logger.error("Chat Error:", error);
       throw new ApolloError(error.message);
     }
   },

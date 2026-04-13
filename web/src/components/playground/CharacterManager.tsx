@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import { FaceCapture } from "../auth/FaceCapture";
 import { useToast } from "../ui/toastContext";
+import { logger } from "../../utils/logger";
 import { Plus, User, Search, Users, Sparkles, RefreshCw, X, CheckCircle2, Fingerprint } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -116,7 +117,7 @@ export default function CharacterManager() {
         addToast({ type: 'error', title: 'Error', message: responseData?.addWorkspaceCharacter.message || 'Failed to add character' });
       }
     } catch (e) { 
-      console.error(e);
+      logger.error(e);
       addToast({ type: 'error', title: 'Error', message: 'Failed to add character' });
     }
   };
@@ -148,7 +149,7 @@ export default function CharacterManager() {
         });
       }
     } catch (e) { 
-      console.error(e);
+      logger.error(e);
       setTestResult({
         success: false,
         message: "Error during verification"

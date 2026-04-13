@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import type { SignInFormData, SignUpFormData } from '../types/auth';
 import { LOGIN_WITH_FACE, LOGIN_WITH_VOICE } from '../graphql/users';
 import client from '../lib/apolloClient';
+import { logger } from '../utils/logger';
 
 interface User {
   id: string;
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const wakeUpAIEngine = () => {
     if (!aiEngineUrl) return;
 
-    console.log('🚀 Pinging AI Engine for wake-up...');
+    logger.info('🚀 Pinging AI Engine for wake-up...');
     fetch(aiEngineUrl, { mode: 'no-cors' }).catch(() => {}); // Fire and forget
   };
 
@@ -70,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
-        console.log("somethng went wrong parsing user data from storage", error);
+        logger.warn("something went wrong parsing user data from storage", error);
       }
     }
 
@@ -124,8 +125,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // 4. Reset Apollo cache LAST
       await client.resetStore();
-
-      console.log('Token starts with:', authToken.substring(0, 5) + '...');
       
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -233,7 +232,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return message || 'Login successful';
     } catch (error: unknown) {
-      console.error('Face Login Error:', error);
+      logger.error('Face Login Error:', error);
       if (error instanceof Error) {
         throw new Error(error.message || 'Face login failed');
       }
@@ -272,7 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return 'Voice login successful';
     } catch (error: unknown) {
-      console.error('Voice Login Error:', error);
+      logger.error('Voice Login Error:', error);
       if (error instanceof Error) {
         throw new Error(error.message || 'Voice login failed');
       }

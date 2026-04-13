@@ -43,6 +43,8 @@ const features = [
     icon: MessageSquare,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10",
+    href: "/chat",
+    cta: "Open Chat",
   },
   {
     title: "Biometric Lab",
@@ -180,6 +182,15 @@ export default function LandingPage() {
                 <p className="text-slate-400 leading-relaxed font-medium">
                   {feature.description}
                 </p>
+                {feature.href && (
+                  <Link
+                    to={feature.href}
+                    className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300 hover:text-white transition-colors"
+                  >
+                    {feature.cta}
+                    <ArrowRight size={16} />
+                  </Link>
+                )}
               </motion.div>
             ))}
           </div>
