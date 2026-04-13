@@ -39,6 +39,13 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
   const inputRef = useRef<HTMLInputElement>(null);
   const [localStatus, setLocalStatus] = useState<'processing' | 'ready' | 'failed' | null>(null);
 
+  type NavigatorWithConnection = Navigator & {
+    connection?: {
+      effectiveType?: string;
+      saveData?: boolean;
+    };
+  };
+
   const [uploadDocument, { loading }] = useMutation<UploadDocumentResponse>(UPLOAD_DOCUMENT);
   const { data: lifecycleData, startPolling, stopPolling } = useQuery<DocumentLifecycleData>(GET_DOCUMENT_LIFECYCLE, {
     fetchPolicy: 'cache-and-network',
@@ -60,7 +67,7 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
     const isProcessing = localStatus === 'processing' || latestStatus === 'processing';
 
     if (isProcessing) {
-      const conn = (navigator as any).connection;
+      const conn = (navigator as NavigatorWithConnection).connection;
       const isSlowNetwork = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
       // Reduce polling frequency on slow/saving data connections to conserve battery & bandwidth
       startPolling(isSlowNetwork ? 15000 : 8000);

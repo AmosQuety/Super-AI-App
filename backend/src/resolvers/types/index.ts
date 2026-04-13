@@ -2,3 +2,4 @@
 export { userResolvers } from "./userResolvers";
 export { chatResolvers } from "./chatResolvers";
 export { messageResolvers } from "./messageResolvers";
+export { taskResolvers } from "./taskResolvers";

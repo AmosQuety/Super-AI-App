@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { DocumentProcessor } from './documentProcessor';
 import { logger } from '../utils/logger';
+import { TaskService } from './taskService';
 
 type EmbeddingService = {
   getEmbedding(text: string): Promise<number[]>;
@@ -11,6 +12,8 @@ type DocumentIngestionDeps = {
   embeddingService: EmbeddingService;
   sourceBuffer?: Buffer;
   sourceMimeType?: string;
+  taskService?: TaskService;
+  taskId?: string;
 };
 
 const processor = new DocumentProcessor();
@@ -34,7 +37,7 @@ const EMBEDDING_VERSION = 1;
  */
 export async function processDocument(
   documentId: string,
-  { prisma, embeddingService, sourceBuffer, sourceMimeType }: DocumentIngestionDeps,
+  { prisma, embeddingService, sourceBuffer, sourceMimeType, taskService, taskId }: DocumentIngestionDeps,
 ): Promise<void> {
   logger.info('[ingestion] starting', { documentId });
 
@@ -47,6 +50,13 @@ export async function processDocument(
   });
   logger.info('[ingestion] status updated', { documentId, status: 'processing' });
 
+  if (taskService && taskId) {
+    await taskService.markProcessing(taskId, document.userId, {
+      documentId,
+      stage: 'starting',
+    });
+  }
+
   try {
     // ── 1. Text extraction ────────────────────────────────────────────────────
     const fullText = sourceBuffer
@@ -54,6 +64,14 @@ export async function processDocument(
       : await processor.extractTextFromUrl(document.fileUrl, document.fileType);
 
     logger.info('[ingestion] text extracted', { documentId, characterCount: fullText.length });
+
+    if (taskService && taskId) {
+      await taskService.updateProgress(taskId, document.userId, 15, {
+        documentId,
+        stage: 'text-extracted',
+        characterCount: fullText.length,
+      });
+    }
 
     if (!fullText.trim()) throw new Error('Could not extract text from document');
 
@@ -67,6 +85,14 @@ export async function processDocument(
     });
 
     if (textChunks.length === 0) throw new Error('Document produced no chunks');
+
+    if (taskService && taskId) {
+      await taskService.updateProgress(taskId, document.userId, 25, {
+        documentId,
+        stage: 'chunking-complete',
+        chunkCount: textChunks.length,
+      });
+    }
 
     // Idempotent: clear any previous partial run.
     await prisma.documentChunk.deleteMany({ where: { documentId } });
@@ -143,6 +169,19 @@ export async function processDocument(
           // Chunk is still saved without an embedding vector
         }
       }));
+
+      if (taskService && taskId) {
+        const completedChunks = Math.min(batchStart + batch.length, textChunks.length);
+        const progress = 25 + Math.round((completedChunks / textChunks.length) * 65);
+        await taskService.updateProgress(taskId, document.userId, progress, {
+          documentId,
+          stage: 'embedding-progress',
+          completedChunks,
+          totalChunks: textChunks.length,
+          embeddedCount,
+          skippedCount,
+        });
+      }
     }
 
     logger.info('[ingestion] embeddings complete', { documentId, embeddedCount, skippedCount });
@@ -154,6 +193,17 @@ export async function processDocument(
       data: { status: 'ready' },
     });
     logger.info('[ingestion] status updated', { documentId, status: 'ready' });
+
+    if (taskService && taskId) {
+      await taskService.completeTask(taskId, document.userId, {
+        resultReference: documentId,
+        metadata: {
+          documentId,
+          embeddedCount,
+          skippedCount,
+        },
+      });
+    }
 
   } catch (error) {
     // A truly fatal error (e.g. text extraction failed, no text at all).
@@ -168,6 +218,14 @@ export async function processDocument(
       documentId,
       error: error instanceof Error ? error.message : String(error),
     });
+
+    if (taskService && taskId) {
+      await taskService.failTask(taskId, document.userId, error instanceof Error ? error.message : String(error), {
+        metadata: {
+          documentId,
+        },
+      });
+    }
 
     throw error;
   }

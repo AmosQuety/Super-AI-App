@@ -1,4 +1,6 @@
 import { processDocument } from "../../services/documentIngestionService";
+import { AppContext, Upload } from "../types/context";
+import { CloudinaryService } from "../../services/cloudinaryService";
 import { logger } from "../../utils/logger";
 
 export const documentMutations = {
@@ -34,6 +36,22 @@ export const documentMutations = {
         } as any,
       });
 
+      const task = await context.taskService.createTask({
+        userId: context.user.userId,
+        feature: "document_ingestion",
+        metadata: {
+          documentId: document.id,
+          filename,
+          mimeType: mimetype,
+        },
+      });
+
+      await context.taskService.markProcessing(task.id, context.user.userId, {
+        documentId: document.id,
+        filename,
+        mimeType: mimetype,
+      });
+
       // 4. Kick off ingestion asynchronously — the mutation returns immediately
       //    and the client polls GET_DOCUMENT_LIFECYCLE until status = 'ready'.
       void processDocument(document.id, {
@@ -41,6 +59,8 @@ export const documentMutations = {
         embeddingService: context.geminiAIService,
         sourceBuffer: buffer,        // reuse the already-downloaded buffer
         sourceMimeType: mimetype,
+        taskService: context.taskService,
+        taskId: task.id,
       }).catch((error) => {
         logger.error(`Document ingestion failed for ${document.id}:`, error);
       });

@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import * as dotenv from 'dotenv';
 import path from 'path';
-import { logger } from './logger';
+import { logger } from '../utils/logger';
 
 // Ensure .env is loaded
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });

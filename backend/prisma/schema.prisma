@@ -20,6 +20,9 @@ model User {
   lastLoginAt DateTime?
   isActive  Boolean           @default(true)
   chats     Chat[]
+  tasks     Task[]
+  pushSubscriptions PushSubscription[]
+  pushDeliveryEvents PushDeliveryEvent[]
   images    ImageGeneration[]
   audioJobs AudioJob[]
   documents Document[]
@@ -142,6 +145,99 @@ model DocumentChunk {
   createdAt  DateTime @default(now())
 
   @@index([documentId, chunkIndex])
+}
+
+model Task {
+  id              String   @id @default(cuid())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  feature         String
+  status          String   @default("queued")
+  progress        Int      @default(0)
+  metadata        String?
+  resultReference String?
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  canceledAt      DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  events          TaskEvent[]
+  pushDeliveryEvents PushDeliveryEvent[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, status, updatedAt(sort: Desc)])
+  @@index([userId, archivedAt, updatedAt(sort: Desc)])
+  @@index([feature, status])
+  @@map("tasks")
+}
+
+model TaskEvent {
+  id              String   @id @default(cuid())
+  task            Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId          String
+  userId          String
+  feature         String
+  eventType       String
+  status          String
+  progress        Int?
+  resultReference String?
+  errorMessage    String?
+  metadata        String?
+  idempotencyKey  String   @unique
+  createdAt       DateTime @default(now())
+
+  @@index([taskId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@map("task_events")
+}
+
+model PushSubscription {
+  id                String   @id @default(cuid())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  endpoint          String   @unique
+  p256dh            String
+  auth              String
+  deviceLabel       String?
+  userAgent         String?
+  isActive          Boolean  @default(true)
+  lastSuccessAt     DateTime?
+  lastFailureAt     DateTime?
+  lastFailureReason String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  pushDeliveryEvents PushDeliveryEvent[]
+
+  @@index([userId, isActive])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("push_subscriptions")
+}
+
+model PushDeliveryEvent {
+  id                String   @id @default(cuid())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  task              Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskId            String?
+  subscription      PushSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  subscriptionId    String?
+  endpointHash      String?
+  eventType         String
+  deliveryClass     String?
+  providerStatusCode Int?
+  attemptCount      Int?
+  metadata          String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([deliveryClass, createdAt(sort: Desc)])
+  @@map("push_delivery_events")
 }
 
 model Workspace {

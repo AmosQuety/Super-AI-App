@@ -72,8 +72,8 @@ export default function ImageGenerator() {
       type: 'info',
       title: 'Running in background',
       message: notificationsEnabled
-        ? 'You can leave this tab. We’ll notify you when the images are ready.'
-        : 'You can leave this tab. Keep the page open if you want to see the result here.',
+        ? 'You can leave, we will notify you when images are ready, and the task stays recoverable in Recent AI Tasks.'
+        : 'You can leave safely. Even without notifications, you can recover results in Recent AI Tasks.',
     });
 
     try {

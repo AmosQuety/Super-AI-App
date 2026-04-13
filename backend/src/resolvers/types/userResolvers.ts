@@ -2,6 +2,13 @@
 import { AppContext } from "./context";
 
 export const userResolvers = {
+  tasks: async (parent: any, _: any, context: AppContext) => {
+    return await context.prisma.task.findMany({
+      where: { userId: parent.id },
+      orderBy: { updatedAt: "desc" },
+    });
+  },
+
   chats: async (parent: any, _: any, context: AppContext) => {
     return await context.prisma.chat.findMany({
       where: { userId: parent.id },

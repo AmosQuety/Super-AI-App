@@ -10,6 +10,8 @@ import { UserRole } from "../../auth/authorization";
 import { DataLoaderService } from "../../services/DataLoaderService";
 import { DataLoaders } from '../../loaders/index';
 import { logger } from '../../utils/logger';
+import { TaskService } from "../../services/taskService";
+import { PushNotificationService } from "../../services/pushNotificationService";
 
 // ✅ CHANGED: Import Pollinations instead of HuggingFace
 import { PollinationsService } from '../../services/pollinations.service'; 
@@ -31,6 +33,7 @@ const singletonServices = {
   // This maintains backward compatibility with your existing code
   imageGenerationService: PollinationsService.getInstance(), 
   huggingFaceService: PollinationsService.getInstance(), // Same instance, different name for compatibility
+  pushNotificationService: new PushNotificationService(prisma),
 };
 
 export interface Upload {
@@ -62,10 +65,12 @@ export interface AppContext {
   // But we keep the same property names for backward compatibility
   imageGenerationService: PollinationsService; 
   huggingFaceService: PollinationsService;
+  pushNotificationService: PushNotificationService;
   
   chatService: ChatService;
   userService: UserService;
   messageService: MessageService;
+  taskService: TaskService;
   dataLoaderService: DataLoaderService;
   loaders: DataLoaders;
   pubsub?: any;
@@ -102,6 +107,7 @@ export async function createContext({ req, connection }: any): Promise<AppContex
     chatService: new ChatService(prisma),
     userService: new UserService(prisma),
     messageService: new MessageService(prisma),
+    taskService: new TaskService(prisma),
     dataLoaderService: new DataLoaderService(prisma),
     loaders: new DataLoaders(prisma),
   };

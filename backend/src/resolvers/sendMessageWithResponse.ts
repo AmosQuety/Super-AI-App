@@ -170,6 +170,8 @@ export const sendMessageWithResponse = {
     ]);
     if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
 
+    let task: any = null;
+
     let userPrefs = null;
     if (userProfile?.preferences) {
       try { userPrefs = JSON.parse(userProfile.preferences); } catch {}
@@ -181,6 +183,27 @@ export const sendMessageWithResponse = {
     );
 
     try {
+      task = await context.taskService.createTask({
+        userId,
+        feature: "chat_response",
+        metadata: {
+          chatId,
+          hasAttachment: Boolean(fileUri || imageUrl),
+          activeDocumentCount: activeDocumentIds?.length ?? 0,
+        },
+      });
+
+      await context.taskService.markProcessing(task.id, userId, {
+        chatId,
+        hasAttachment: Boolean(fileUri || imageUrl),
+        activeDocumentCount: activeDocumentIds?.length ?? 0,
+      });
+
+      await context.taskService.updateProgress(task.id, userId, 10, {
+        phase: "context-preparation",
+        chatId,
+      });
+
       const originalUserMessage = content?.trim() || '';
       let modelUserMessage = originalUserMessage;
       let hasFileAttachment = false;
@@ -251,6 +274,11 @@ export const sendMessageWithResponse = {
         },
       });
 
+      await context.taskService.updateProgress(task.id, userId, 35, {
+        phase: "user-message-saved",
+        chatId,
+      });
+
       // 7. Generate Response (with Quota Logic)
       let aiResponse = "";
       let usedGemini = false;
@@ -297,6 +325,11 @@ export const sendMessageWithResponse = {
             },
           });
 
+          await context.taskService.updateProgress(task.id, userId, 80, {
+            phase: "ai-response-generated",
+            chatId,
+          });
+
            usedGemini = true; // Mark that we hit the API
          } catch (providerError: any) {
            logger.error("LLM generation failed:", providerError);
@@ -309,6 +342,11 @@ export const sendMessageWithResponse = {
         data: { chatId, role: "assistant", content: aiResponse },
       });
 
+      await context.taskService.updateProgress(task.id, userId, 95, {
+        phase: "assistant-message-saved",
+        chatId,
+      });
+
       // --- STRATEGY 1: INCREMENT USAGE (Only if we used the API) ---
       if (usedGemini) {
         await AIManager.incrementUsage(userId, 'chat');
@@ -316,10 +354,25 @@ export const sendMessageWithResponse = {
 
       await pubsub.publish('MESSAGE_ADDED', { messageAdded: { ...aiMessage, chatId } });
 
+      await context.taskService.completeTask(task.id, userId, {
+        resultReference: aiMessage.id,
+        metadata: {
+          chatId,
+          usedCustomResponse: !usedGemini,
+        },
+      });
+
       return { userMessage, aiMessage, usedCustomResponse: !usedGemini };
 
     } catch (error: any) {
       logger.error("Chat Error:", error);
+      if (task) {
+        await context.taskService.failTask(task.id, userId, error.message || "Failed to send message with response", {
+          metadata: {
+            chatId,
+          },
+        });
+      }
       throw new ApolloError(error.message);
     }
   },

@@ -9,6 +9,7 @@ export const voiceTaskResolvers = {
       if (!userId) throw new AuthenticationError("Login required");
 
       const { text, action, targetLanguage } = input;
+      let task: any = null;
       
       if (!text || text.trim() === "") {
         return { success: false, error: "No text provided." };
@@ -25,6 +26,25 @@ export const voiceTaskResolvers = {
         } else {
             return { success: false, error: `Unknown action: ${action}` };
         }
+
+        task = await context.taskService.createTask({
+          userId,
+          feature: "voice_processing",
+          metadata: {
+            action,
+            hasTargetLanguage: Boolean(targetLanguage),
+          },
+        });
+
+        await context.taskService.markProcessing(task.id, userId, {
+          action,
+          hasTargetLanguage: Boolean(targetLanguage),
+        });
+
+        await context.taskService.updateProgress(task.id, userId, 30, {
+          action,
+          phase: "prompt-prepared",
+        });
 
         const contents = [
             {
@@ -44,6 +64,18 @@ export const voiceTaskResolvers = {
             fullResponse += delta;
         });
 
+        await context.taskService.updateProgress(task.id, userId, 85, {
+          action,
+          phase: "response-generated",
+        });
+
+        await context.taskService.completeTask(task.id, userId, {
+          resultReference: "voice-processing-result",
+          metadata: {
+            action,
+          },
+        });
+
         return {
           success: true,
           result: fullResponse.trim(),
@@ -51,6 +83,13 @@ export const voiceTaskResolvers = {
 
       } catch (error: any) {
         console.error("Voice Task Error:", error);
+        if (task) {
+          await context.taskService.failTask(task.id, userId, error.message || "Failed to process voice task.", {
+            metadata: {
+              action,
+            },
+          });
+        }
         return {
             success: false,
             error: error.message || "Failed to process voice task."

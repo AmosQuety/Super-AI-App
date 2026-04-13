@@ -1,6 +1,7 @@
 // src/components/Layout.tsx
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, NavLink, useNavigate } from "react-router-dom";
+import { useMutation } from "@apollo/client/react";
 import {
   MessageSquare,
   ImageIcon,
@@ -21,6 +22,9 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../contexts/useTheme";
 import { VoiceIntelligenceProvider } from "../contexts/VoiceIntelligenceContext"; // Import Provider
 import logger from "../utils/logger";
+import RecentTasksPanel from "./tasks/RecentTasksPanel";
+import { TRACK_PUSH_ENGAGEMENT } from "../graphql/push";
+import { isTaskCenterEnabledForUser } from "../utils/featureFlags";
 
 // --- CONFIGURATION ---
 const PRODUCT_NAME = "Xemora";
@@ -67,6 +71,7 @@ const Layout = () => {
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [trackPushEngagement] = useMutation(TRACK_PUSH_ENGAGEMENT);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -78,7 +83,50 @@ const Layout = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const pushTaskId = searchParams.get("pushTaskId");
+    const pushEvent = searchParams.get("pushEvent");
+
+    if (!pushTaskId || !pushEvent) {
+      return;
+    }
+
+    const track = async () => {
+      try {
+        if (pushEvent === "clicked") {
+          await trackPushEngagement({
+            variables: {
+              taskId: pushTaskId,
+              eventType: "CLICKED",
+              metadata: JSON.stringify({ path: location.pathname }),
+            },
+          });
+        }
+
+        await trackPushEngagement({
+          variables: {
+            taskId: pushTaskId,
+            eventType: "OPENED_APP",
+            metadata: JSON.stringify({ path: location.pathname }),
+          },
+        });
+      } catch (error) {
+        logger.warn("Failed to track push engagement", error);
+      } finally {
+        searchParams.delete("pushTaskId");
+        searchParams.delete("pushEvent");
+        const nextSearch = searchParams.toString();
+        const nextUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+        window.history.replaceState({}, "", nextUrl);
+      }
+    };
+
+    void track();
+  }, [location.pathname, location.search, trackPushEngagement]);
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const taskCenterEnabled = isTaskCenterEnabledForUser(user?.id);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -406,6 +454,8 @@ const Layout = () => {
 
                 </div>
               </div>
+
+              {taskCenterEnabled ? <RecentTasksPanel /> : null}
             </div>
           ) : (
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">

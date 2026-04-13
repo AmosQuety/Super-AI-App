@@ -5,6 +5,7 @@ import { useToast } from "../components/ui/toastContext";
 import { useTheme } from "../contexts/useTheme";
 import FaceSettings from "../components/settings/FaceSettings";
 import VoiceSettings from "../components/settings/VoiceSettings";
+import PushNotificationSettings from "../components/settings/PushNotificationSettings";
 import {
   User,
   Lock,
@@ -13,7 +14,6 @@ import {
   Loader2,
   Save,
   ExternalLink,
-  Bell,
   Sun,
   Moon,
   Monitor
@@ -282,6 +282,11 @@ export default function SettingsPage() {
 
 
                 </div>
+              </section>
+
+              <section className="pt-8 border-t border-slate-700/50">
+                <h2 className="text-xl font-bold text-white mb-6">Notifications</h2>
+                <PushNotificationSettings />
               </section>
 
               <section className="pt-8 border-t border-slate-700/50">

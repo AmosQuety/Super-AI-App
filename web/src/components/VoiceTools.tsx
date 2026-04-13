@@ -121,7 +121,7 @@ export default function VoiceTools() {
     setFinalAudioUrl(null);
     setTtsStatus('generating');
     void requestPermission();
-    showInfo("Running in background", "You can leave this tab. We’ll notify you when the audio is ready.");
+    showInfo("Running in background", "You can leave, we will notify you when audio is ready, and Recent AI Tasks can recover results anytime.");
     audioChunksBuffer.current = [];
     
     // Emotion-Responsive Synthesis Logic
@@ -186,7 +186,6 @@ export default function VoiceTools() {
 
   // Combine transcripts for display
   const fullDisplay = (transcript + " " + interimTranscript).trim();
-  const wordCount = fullDisplay ? fullDisplay.split(/\s+/).length : 0;
 
   // Copy transcript
   const handleCopyTranscript = async () => {

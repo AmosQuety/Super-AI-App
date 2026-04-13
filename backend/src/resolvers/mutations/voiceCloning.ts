@@ -18,16 +18,41 @@ export const voiceCloningResolvers = {
         if (!context.user) throw new Error("Unauthorized");
         const userId = context.user.userId;
 
+        const task = await context.taskService.createTask({
+          userId,
+          feature: "voice_registration",
+          metadata: {
+            operation: "registerVoice",
+          },
+        });
+
+        await context.taskService.markProcessing(task.id, userId, {
+          operation: "registerVoice",
+        });
+
+        await context.taskService.updateProgress(task.id, userId, 20, {
+          operation: "registerVoice",
+          phase: "uploading-reference-audio",
+        });
+
         logger.info(`🎙️ Registering voice for user ${userId}`);
         const result = await voiceCloningService.registerVoice(userId, referenceAudio);
 
         if (!result.success) {
+          await context.taskService.failTask(task.id, userId, result.error || "Voice registration failed", {
+            metadata: { operation: "registerVoice" },
+          });
           return {
             success: false,
             message: result.error || "Voice registration failed",
             error: result.error || "Voice registration failed"
           };
         }
+
+        await context.taskService.updateProgress(task.id, userId, 90, {
+          operation: "registerVoice",
+          phase: "provider-complete",
+        });
 
         // Update user record to reflect registration (if it was polled successfully)
         if (result.jobId && result.message?.includes('successfully')) {
@@ -36,6 +61,13 @@ export const voiceCloningResolvers = {
              data: { hasVoiceRegistered: true }
           });
         }
+
+        await context.taskService.completeTask(task.id, userId, {
+          resultReference: result.jobId || null,
+          metadata: {
+            operation: "registerVoice",
+          },
+        });
 
         return {
           success: true,
@@ -97,16 +129,51 @@ export const voiceCloningResolvers = {
         if (!context.user) throw new Error("Unauthorized");
         const userId = context.user.userId;
 
+        const task = await context.taskService.createTask({
+          userId,
+          feature: "voice_clone",
+          metadata: {
+            textLength: text.trim().length,
+            hasReferenceAudio: Boolean(referenceAudio),
+          },
+        });
+
+        await context.taskService.markProcessing(task.id, userId, {
+          textLength: text.trim().length,
+          hasReferenceAudio: Boolean(referenceAudio),
+        });
+
+        await context.taskService.updateProgress(task.id, userId, 20, {
+          operation: "cloneVoice",
+          phase: "queueing",
+        });
+
         logger.info(`🎙️ Starting voice clone for user ${userId}`);
 
         const result = await voiceCloningService.cloneVoice(text, referenceAudio, userId);
 
         if (!result.success || !result.jobId) {
+          await context.taskService.failTask(task.id, userId, result.error || "Voice cloning failed to initialize", {
+            metadata: {
+              textLength: text.trim().length,
+            },
+          });
           return {
             success: false,
             error: result.error || "Voice cloning failed to initialize"
           };
         }
+
+        await context.taskService.transitionTask(task.id, userId, {
+          status: "processing",
+          progress: 70,
+          resultReference: result.jobId,
+          metadata: {
+            textLength: text.trim().length,
+            hasReferenceAudio: Boolean(referenceAudio),
+            jobId: result.jobId,
+          },
+        });
 
         // Return immediately with Job ID so the frontend can start polling
         return {

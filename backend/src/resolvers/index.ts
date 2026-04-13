@@ -2,7 +2,7 @@
 import { scalarResolvers } from "./scalars";
 import { queryResolvers } from "./queries";
 import { mutationResolvers } from "./mutations";
-import { userResolvers, chatResolvers, messageResolvers } from "./types";
+import { userResolvers, chatResolvers, messageResolvers, taskResolvers } from "./types";
 import { authResolvers } from "./auth/resolvers";
 import { IResolvers } from "@graphql-tools/utils";
 import { subscriptionResolvers } from "./subscriptionResolvers";
@@ -46,6 +46,10 @@ export const resolvers: IResolvers = {
   
   Message: { 
     ...messageResolvers 
+  },
+
+  Task: {
+    ...taskResolvers.Task,
   },
 
   Workspace: workspaceResolvers.Workspace ,

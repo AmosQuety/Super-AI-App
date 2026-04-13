@@ -405,8 +405,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     const notificationsEnabled = await requestPermission();
     toast.info(
       notificationsEnabled
-        ? 'Your request is running in the background. You can leave this tab and come back later.'
-        : 'Your request is running in the background. Keep this page open if you want an on-screen update.',
+        ? 'Your request is running in the background. You can leave, we will notify you, and your task is recoverable from Recent AI Tasks.'
+        : 'Your request is running in the background. You can leave safely; you can always recover the result from Recent AI Tasks.',
       { theme: 'dark', autoClose: 5000 }
     );
 

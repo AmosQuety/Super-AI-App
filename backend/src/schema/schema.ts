@@ -16,6 +16,7 @@ export const typeDefs = gql`
     lastLoginAt: DateTime
     isActive: Boolean!
     chats: [Chat!]
+    tasks: [Task!]
     images: [ImageGeneration!]
     audioJobs: [AudioJob!]
     documents: [Document!]
@@ -27,6 +28,44 @@ export const typeDefs = gql`
     totalMessages: Int
     totalVoiceJobs: Int
     totalDocuments: Int
+  }
+
+  type PushNotificationConfig {
+    enabled: Boolean!
+    publicKey: String
+    serviceWorkerUrl: String!
+    rolloutPercent: Int!
+    reason: String
+  }
+
+  type PushSubscription {
+    id: ID!
+    userId: ID!
+    endpoint: String!
+    deviceLabel: String
+    userAgent: String
+    isActive: Boolean!
+    lastSuccessAt: DateTime
+    lastFailureAt: DateTime
+    lastFailureReason: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type PushDeliveryMetrics {
+    windowMinutes: Int!
+    sent: Int!
+    failed: Int!
+    clicked: Int!
+    openedApp: Int!
+    transientFailures: Int!
+    permanentFailures: Int!
+    failureRate: Float!
+  }
+
+  enum PushEngagementEventType {
+    CLICKED
+    OPENED_APP
   }
 
   type UserPreferences {
@@ -108,6 +147,25 @@ export const typeDefs = gql`
     fileType: String!
     fileUrl: String!
     status: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  type Task {
+    id: ID!
+    user: User!
+    userId: String!
+    feature: String!
+    status: String!
+    progress: Int!
+    metadata: String
+    resultReference: String
+    errorMessage: String
+    startedAt: DateTime
+    completedAt: DateTime
+    failedAt: DateTime
+    canceledAt: DateTime
+    archivedAt: DateTime
     createdAt: DateTime!
     updatedAt: DateTime!
   }
@@ -194,6 +252,13 @@ export const typeDefs = gql`
 
     myWorkspaces: [Workspace!]!
 
+    task(id: ID!): Task
+    myTasks(limit: Int = 20, includeArchived: Boolean = false): [Task!]!
+
+    pushNotificationConfig: PushNotificationConfig!
+    myPushSubscriptions: [PushSubscription!]!
+    pushDeliveryMetrics(windowMinutes: Int = 60): PushDeliveryMetrics!
+
     getVoiceJobStatus(jobId: String!): VoiceJobStatus!
 
     securityAuditLogs(userId: ID, limit: Int): [SecurityAuditLog!]!
@@ -251,6 +316,18 @@ export const typeDefs = gql`
     sendMessageWithResponse(chatId: ID!, content: String!, imageUrl: String, fileName: String, fileUri: String, fileMimeType: String, activeDocumentIds: [ID!]): SendMessageResponse!
 
     processVoiceTask(input: ProcessVoiceTaskInput!): ProcessVoiceTaskResponse!
+
+    registerPushSubscription(input: RegisterPushSubscriptionInput!): PushSubscription!
+    unregisterPushSubscription(endpoint: String!): Boolean!
+    trackPushEngagement(taskId: ID!, eventType: PushEngagementEventType!, metadata: String): Boolean!
+  }
+
+  input RegisterPushSubscriptionInput {
+    endpoint: String!
+    p256dh: String!
+    auth: String!
+    deviceLabel: String
+    userAgent: String
   }
 
   input ProcessVoiceTaskInput {

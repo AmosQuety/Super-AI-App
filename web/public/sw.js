@@ -69,3 +69,63 @@ self.addEventListener('fetch', (e) => {
     })
   );
 });
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (_error) {
+    payload = {
+      title: 'Xemora update',
+      body: event.data ? event.data.text() : 'Your task has an update.',
+    };
+  }
+
+  const title = payload.title || 'Xemora notification';
+  const options = {
+    body: payload.body || 'Your task has an update.',
+    icon: payload.icon || '/icon.svg',
+    badge: payload.badge || '/icon.svg',
+    tag: payload.tag || 'xemora-task-update',
+    renotify: Boolean(payload.renotify),
+    data: payload.data || { url: '/dashboard' },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const destination = event.notification?.data?.url || '/dashboard';
+  const targetUrlObject = new URL(destination, self.location.origin);
+  const taskId = event.notification?.data?.taskId || null;
+  if (taskId) {
+    targetUrlObject.searchParams.set('pushTaskId', taskId);
+  }
+  targetUrlObject.searchParams.set('pushEvent', 'clicked');
+  const targetUrl = targetUrlObject.href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (!('focus' in client)) {
+          continue;
+        }
+
+        if ('navigate' in client) {
+          return client.navigate(targetUrl).then(() => client.focus()).catch(() => client.focus());
+        }
+
+        return client.focus();
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+
+      return Promise.resolve();
+    })
+  );
+});

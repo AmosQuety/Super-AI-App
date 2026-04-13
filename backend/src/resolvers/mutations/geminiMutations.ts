@@ -1,6 +1,7 @@
 import customResponses from "../../IntelligentMatcher/customResponses";
 import { createIntelligentMatcher } from "../../IntelligentMatcher/IntelligentMatcher";
 import { logger } from "../../utils/logger";
+import { AppContext } from "../types/context";
 
 // lazy initialization of IntelligentMatcher
 let intelligentMatcher: any = null;
