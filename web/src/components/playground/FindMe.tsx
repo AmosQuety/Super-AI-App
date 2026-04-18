@@ -1,6 +1,8 @@
-import React, { useState } from "react";
-import { useMutation } from "@apollo/client/react";
+import React, { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
 import { FIND_FACE } from "../../graphql/playground";
+import { GET_TASK } from "../../graphql/tasks";
 import { Upload, Search, Download, X, User, Users, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDelight } from "../../hooks/useDelight";
@@ -31,6 +33,41 @@ export default function FindMe() {
   
   // This mutation takes longer, so we handle loading state carefully
   const [findMutation, { loading }] = useMutation<FindFaceData>(FIND_FACE);
+
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
+
+  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+    pollInterval: 2000,
+  });
+
+  // Restore task state
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'face_processing' && metadata.operation === 'find') {
+        if (task.status === 'completed') {
+          setResult({
+            success: true,
+            matches: metadata.matches,
+            processed_image: metadata.processed_image,
+          });
+          stopPolling();
+        } else if (task.status === 'failed') {
+          stopPolling();
+        }
+      }
+    }
+  }, [taskData, stopPolling]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'target' | 'crowd') => {
     if (e.target.files && e.target.files[0]) {

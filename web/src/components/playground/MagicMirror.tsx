@@ -1,6 +1,8 @@
-import  { useState } from "react";
-import { useMutation } from "@apollo/client/react";
+import  { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
 import { ANALYZE_FACE } from "../../graphql/playground";
+import { GET_TASK } from "../../graphql/tasks";
 import { FaceCapture } from "../auth/FaceCapture";
 import { Loader2, Sparkles, RefreshCcw, User, Smile, Activity, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion"; 
@@ -34,6 +36,44 @@ export default function MagicMirror() {
   const { addToast } = useToast();
   // Track specific error state for the UI
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
+
+  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+    pollInterval: 2000,
+  });
+
+  // Restore task state
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'face_processing' && metadata.operation === 'mirror') {
+        if (task.status === 'completed') {
+          setAnalysis({
+            age: metadata.age,
+            gender: metadata.gender,
+            emotion: metadata.emotion,
+            emotion_score: metadata.emotion_score,
+          });
+          setIsFlipped(true);
+          stopPolling();
+        } else if (task.status === 'failed') {
+          setErrorMessage(task.errorMessage || "Scan failed");
+          stopPolling();
+        }
+      }
+    }
+  }, [taskData, stopPolling]);
 
   const handleCapture = async (file: File) => {
     try {

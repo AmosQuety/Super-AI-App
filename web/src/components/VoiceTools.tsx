@@ -1,5 +1,6 @@
 // src/components/VoiceTools.tsx
-import { useState, Suspense, lazy } from "react";
+import { useState, Suspense, lazy, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { 
   Mic, 
   Square, 
@@ -27,10 +28,12 @@ import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
 import VoiceVisualizer from "./ui/VoiceVisualizer";
-import { useEffect, useRef } from "react";
 import logger from "../utils/logger";
 
 export default function VoiceTools() {
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
+  
   const { requestPermission, notifyWhenReady } = useBrowserNotification();
   const { 
     isListening, 
@@ -45,6 +48,13 @@ export default function VoiceTools() {
   const [ttsText, setTtsText] = useState("In a world where technology moves at the speed of light, waiting is no longer an option. We have bridged the gap between human thought and digital execution.");
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'intelligence' | 'lab'>('intelligence');
+
+  // Auto-switch to Lab if taskId is present
+  useEffect(() => {
+    if (taskId) {
+      setActiveTab('lab');
+    }
+  }, [taskId]);
 
   const [ttsProgress, setTtsProgress] = useState(0);
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'generating' | 'done' | 'error'>('idle');

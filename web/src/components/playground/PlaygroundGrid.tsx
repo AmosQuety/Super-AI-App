@@ -1,9 +1,13 @@
-import  { useState } from "react";
+import  { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Users, Search, X, ArrowRight } from "lucide-react";
+import { useQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
+import { GET_TASK } from "../../graphql/tasks";
 import MagicMirror from "./MagicMirror";
 import TwinOMeter from "./TwinOMeter";
 import FindMe from "./FindMe";
+import logger from "../../utils/logger";
 
 // 1. Configuration for our "Bento Cards"
 const FEATURES = [
@@ -41,6 +45,29 @@ const FEATURES = [
 
 export default function PlaygroundGrid() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
+
+  const { data: taskData } = useQuery(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+  });
+
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'face_processing' && metadata.operation) {
+        setSelectedId(metadata.operation);
+      }
+    }
+  }, [taskData]);
 
   return (
     <div className="w-full relative">

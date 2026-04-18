@@ -133,6 +133,7 @@ export const voiceCloningResolvers = {
           userId,
           feature: "voice_clone",
           metadata: {
+            text: text.trim(),
             textLength: text.trim().length,
             hasReferenceAudio: Boolean(referenceAudio),
           },
@@ -169,6 +170,7 @@ export const voiceCloningResolvers = {
           progress: 70,
           resultReference: result.jobId,
           metadata: {
+            text: text.trim(),
             textLength: text.trim().length,
             hasReferenceAudio: Boolean(referenceAudio),
             jobId: result.jobId,

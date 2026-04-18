@@ -42,6 +42,8 @@ function getFeatureLabel(feature: string): string {
       return "Voice clone";
     case "voice_registration":
       return "Voice profile";
+    case "face_processing":
+      return "Face";
     case "document_ingestion":
       return "Document";
     default:
@@ -79,6 +81,8 @@ function getTaskLink(task: TaskRecord): string {
     case "voice_clone":
     case "voice_registration":
       return `/voice?taskId=${encodeURIComponent(task.id)}`;
+    case "face_processing":
+      return `/playground?taskId=${encodeURIComponent(task.id)}`;
     case "document_ingestion":
       return `/chat?taskId=${encodeURIComponent(task.id)}`;
     default:

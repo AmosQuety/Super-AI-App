@@ -252,26 +252,135 @@ export const faceAuthMutations = {
     }
   },
 
-  analyzeFaceAttribute: async (_: any, { image }: { image: Promise<Upload> }, _context: AppContext) => {
-    return await faceService.analyzeFace(image);
+  analyzeFaceAttribute: async (
+    _: any,
+    { image }: { image: Promise<Upload> },
+    context: AppContext
+  ) => {
+    if (!context.user) {
+      throw new AuthenticationError("Login required to analyze faces");
+    }
+
+    const userId = context.user.userId;
+    let task: any = null;
+
+    try {
+      task = await context.taskService.createTask({
+        userId,
+        feature: "face_processing",
+        metadata: { operation: "mirror" },
+      });
+    } catch (taskError) {
+      // Task tracking failure must not block core functionality.
+      // Log for observability but allow face analysis to proceed.
+      console.error(
+        "[faceAuthMutations] createTask failed — proceeding without task record:",
+        taskError
+      );
+    }
+    
+    if (task) {
+      await context.taskService.markProcessing(task.id, userId, { operation: "mirror" });
+    }
+
+    try {
+      if (task && userId) await context.taskService.updateProgress(task.id, userId, 30, { phase: "analyzing" });
+      const result = await faceService.analyzeFace(image);
+      
+      if (task && userId) {
+        if (result.success) {
+          await context.taskService.completeTask(task.id, userId, {
+             metadata: { operation: "mirror", ...result.data }
+          });
+        } else {
+          await context.taskService.failTask(task.id, userId, result.error || "Analysis failed", {
+            metadata: { operation: "mirror" }
+          });
+        }
+      }
+      return result;
+    } catch (error: any) {
+      if (task && userId) {
+        await context.taskService.failTask(task.id, userId, error.message || "Analysis crashed", {
+          metadata: { operation: "mirror" }
+        });
+      }
+      throw error;
+    }
   },
 
-  compareFaces: async (_: any, { image1, image2 }: any, _context: AppContext) => {
+  compareFaces: async (_: any, { image1, image2 }: any, context: AppContext) => {
+    const userId = context.user?.userId;
+    let task: any = null;
+
+    if (userId) {
+      task = await context.taskService.createTask({
+        userId,
+        feature: "face_processing",
+        metadata: { operation: "twin" },
+      });
+      await context.taskService.markProcessing(task.id, userId, { operation: "twin" });
+    }
+
     try {
       const health = await faceService.checkHealth();
-      if (!health.isOnline) return { success: false, error: "Biometric engine is offline." };
+      if (!health.isOnline) {
+        if (task && userId) await context.taskService.failTask(task.id, userId, "Biometric engine offline");
+        return { success: false, error: "Biometric engine is offline." };
+      }
+
+      if (task && userId) await context.taskService.updateProgress(task.id, userId, 40, { phase: "comparing" });
       const result = await faceService.compareFaces(image1, image2);
-      return { success: result.success, data: result.data, error: null };
+      
+      if (task && userId) {
+        if (result.success) {
+          await context.taskService.completeTask(task.id, userId, {
+            metadata: { operation: "twin", ...result.data }
+          });
+        } else {
+          await context.taskService.failTask(task.id, userId, result.error || "Comparison failed");
+        }
+      }
+      return { success: result.success, data: result.data, error: result.error };
     } catch (error: any) {
+      if (task && userId) await context.taskService.failTask(task.id, userId, error.message);
       return { success: false, error: "Comparison failed: " + error.message, data: null };
     }
   },
 
-  findFaceInCrowd: async (_: any, { target, crowd }: any, _context: AppContext) => {
+  findFaceInCrowd: async (_: any, { target, crowd }: any, context: AppContext) => {
+    const userId = context.user?.userId;
+    let task: any = null;
+
+    if (userId) {
+      task = await context.taskService.createTask({
+        userId,
+        feature: "face_processing",
+        metadata: { operation: "find" },
+      });
+      await context.taskService.markProcessing(task.id, userId, { operation: "find" });
+    }
+
     try {
+      if (task && userId) await context.taskService.updateProgress(task.id, userId, 20, { phase: "scanning-crowd" });
       const result = await faceService.findFaceInCrowd(target, crowd);
-      return { success: result.success, matches: result.matches, processed_image: result.processed_image, error: null };
+      
+      if (task && userId) {
+        if (result.success) {
+          await context.taskService.completeTask(task.id, userId, {
+            metadata: { 
+              operation: "find", 
+              matches: result.matches, 
+              processed_image: result.processed_image 
+            }
+          });
+        } else {
+          await context.taskService.failTask(task.id, userId, result.error || "Crowd scan failed");
+        }
+      }
+      return { success: result.success, matches: result.matches, processed_image: result.processed_image, error: result.error };
     } catch (error: any) {
+      if (task && userId) await context.taskService.failTask(task.id, userId, error.message);
       return { success: false, matches: 0, processed_image: null, error: error.message };
     }
   },

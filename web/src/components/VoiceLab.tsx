@@ -1,12 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Zap, AlertCircle, ShieldCheck, UserCheck, Settings,
   ChevronDown, ChevronUp, Music4, RefreshCw,
   Mic, Square, Upload, CheckCircle2, Trash2, Loader2
 } from 'lucide-react';
-import { useMutation, useLazyQuery } from '@apollo/client/react';
 import { REGISTER_VOICE, CLONE_VOICE, GET_VOICE_JOB_STATUS } from '../graphql/voice';
+import { GET_TASK } from '../graphql/tasks';
 import { useVoiceIntelligence } from '../contexts/VoiceIntelligenceContext';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import ProcessingState from './loading/ProcessingState';
 import { useToast } from './ui/toastContext';
 import { useBrowserNotification } from '../hooks/useBrowserNotification';
@@ -28,6 +30,23 @@ interface VoiceJobStatusData {
     error?: string;
     message?: string;
   };
+}
+
+
+interface Task {
+  id: string;
+  feature: string;
+  status: string;
+  progress: number;
+  metadata?: string | null;
+  resultReference?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TaskData {
+  task: Task;
 }
 
 
@@ -61,6 +80,45 @@ export default function VoiceLab() {
   const [cloningStatus, setCloningStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [spaceStatus, setSpaceStatus] = useState<string>('Ready');
   const [clonedAudioUrl, setClonedAudioUrl] = useState<string | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get('taskId');
+
+  const { data: taskData } = useQuery<TaskData>(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+  });
+
+  // Restore state from Task
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'voice_clone' || task.feature === 'voice_registration') {
+        setPhase('generation');
+        if (metadata.text) {
+          setTtsText(metadata.text);
+        }
+
+        if (task.resultReference) {
+          setCurrentJobId(task.resultReference);
+          if (task.status === 'completed' || task.status === 'processing') {
+            setCloningStatus('processing');
+            setSpaceStatus(task.status === 'completed' ? 'Recovering result...' : 'Synthesizing Neural Speech...');
+          } else if (task.status === 'failed') {
+            setCloningStatus('error');
+            setSpaceStatus(task.errorMessage || 'Task failed');
+          }
+        }
+      }
+    }
+  }, [taskData]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);

@@ -1,6 +1,8 @@
-import React, { useState } from "react";
-import { useMutation } from "@apollo/client/react";
+import React, { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
 import { COMPARE_FACES } from "../../graphql/playground";
+import { GET_TASK } from "../../graphql/tasks";
 import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { compressImage } from "../../utils/imageUtils";
@@ -33,6 +35,40 @@ export default function TwinOMeter() {
   const [result, setResult] = useState<ComparisonResult | null>(null);
   
   const [compareMutation, { loading }] = useMutation<CompareFacesData>(COMPARE_FACES);
+
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
+
+  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+    pollInterval: 2000,
+  });
+
+  // Restore task state
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'face_processing' && metadata.operation === 'twin') {
+        if (task.status === 'completed') {
+          setResult({
+            verified: metadata.verified,
+            similarity_score: metadata.similarity_score,
+          });
+          stopPolling();
+        } else if (task.status === 'failed') {
+          stopPolling();
+        }
+      }
+    }
+  }, [taskData, stopPolling]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
     if (e.target.files && e.target.files[0]) {

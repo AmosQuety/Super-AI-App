@@ -11,6 +11,12 @@ import { logger } from "../../utils/logger";
 
 const voiceCloningService = new VoiceCloningService();
 
+// Pre-generated bcrypt hash (cost factor 12) used purely for timing parity.
+// Ensures bcrypt.compare() always runs even for non-existent users,
+// preventing response-time-based email enumeration.
+// This is NOT a secret — it is a public dummy value, intentionally not in .env.
+const DUMMY_HASH = "$2a$12$R.v5u01w1R.yA1eQJQ1K.OB37P4vL1kH02Q4iJw8A9H6pM9.D3PGO";
+
 // Use the full AppContext instead of limited AuthContext
 type UserResponse = {
   id: string;
@@ -66,8 +72,12 @@ export const authResolvers = {
         select: { hasVoiceRegistered: true, id: true }
       });
 
-      if (!user) throw new UserInputError("User not found");
-      if (!user.hasVoiceRegistered) throw new UserInputError("Voice not enrolled for this account");
+      if (!user || !user.hasVoiceRegistered) {
+        // Identical response regardless of which condition failed — prevents enumeration
+        throw new UserInputError(
+          "If this account exists and is enrolled, a voice challenge has been queued."
+        );
+      }
 
       // Check rate limit for challenge generation
       if (redisClient) {
@@ -174,17 +184,11 @@ export const authResolvers = {
         where: { email: email.toLowerCase().trim() },
       });
 
-      if (!user) {
-        // Use same error message to prevent email enumeration
-        throw new AuthenticationError("Invalid email or password");
-      }
-
-      if (!user.password) {
-        throw new AuthenticationError("Please use face authentication or set a password");
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
+      const isValidPassword = await bcrypt.compare(
+        password,
+        user?.password || DUMMY_HASH
+      );
+      if (!user || !user.password || !isValidPassword) {
         throw new AuthenticationError("Invalid email or password");
       }
 

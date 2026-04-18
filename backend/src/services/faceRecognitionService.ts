@@ -56,7 +56,10 @@ export class FaceRecognitionService {
         `/register`,
         formData,
         {
-          headers: { ...formData.getHeaders() },
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
           timeout: 60000, // 60s for model loading
@@ -102,7 +105,10 @@ export class FaceRecognitionService {
         `/verify`,
         formData,
         {
-          headers: { ...formData.getHeaders() },
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          },
           validateStatus: (status) => status < 500, // Handle 401s manually
           timeout: 60000, // 60s
         }
@@ -157,7 +163,10 @@ export class FaceRecognitionService {
         `/analyze`,
         formData,
         {
-          headers: { ...formData.getHeaders() },
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          },
           timeout: 60000, 
         }
       );
@@ -205,7 +214,10 @@ export class FaceRecognitionService {
         `/compare`,
         formData,
         {
-         headers: { ...formData.getHeaders()  },
+         headers: { 
+           ...formData.getHeaders(),
+           "x-service-key": process.env.SERVICE_API_KEY,
+         },
         maxContentLength: Infinity,
           maxBodyLength: Infinity,
          timeout: 60000,
@@ -235,7 +247,10 @@ export class FaceRecognitionService {
         `/find-face`,
         formData,
         {
-          headers: { ...formData.getHeaders() },
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
           timeout: 300000 // <--- Increase to 5 minutes for CPU safety

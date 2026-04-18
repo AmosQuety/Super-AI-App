@@ -197,6 +197,8 @@ export const imageGenerationResolvers = {
 
       if (!userId) throw new GraphQLError('Authentication required');
       
+      let task: any = null;
+
       try {
         // Spam limit for variants is tighter (3 per minute)
         if (!checkSpamLimit(userId, 3, 60000)) {
@@ -208,6 +210,15 @@ export const imageGenerationResolvers = {
         // Check global daily quota
         await AIManager.checkQuota(userId, 'image');
 
+        task = await context.taskService.createTask({
+          userId,
+          feature: "image_generation",
+          metadata: { prompt: prompt.trim() },
+        });
+
+        await context.taskService.markProcessing(task.id, userId, { prompt: prompt.trim() });
+        await context.taskService.updateProgress(task.id, userId, 25, { phase: "requesting-generation" });
+
         // Generate 4 variants
         const result = await context.huggingFaceService.generateImages({
           prompt: prompt.trim(),
@@ -217,6 +228,8 @@ export const imageGenerationResolvers = {
         const duration = Date.now() - startTime;
         
         if (result.success) {
+            await context.taskService.updateProgress(task.id, userId, 90, { phase: "finalizing-records" });
+            
             await AIManager.incrementUsage(userId, 'image');
 
             // Persist to DB for profile activity counter
@@ -235,11 +248,21 @@ export const imageGenerationResolvers = {
               logger.warn('⚠️ Failed to persist variants record', { error: dbErr.message, userId });
             }
 
+            await context.taskService.completeTask(task.id, userId, {
+              metadata: { prompt: prompt.trim(), images: result.images },
+            });
+
             logger.info('✅ AI Variants completed', { 
               userId, 
               duration: `${duration}ms`,
               service: 'Pollinations.ai'
             });
+        } else {
+            if (task) {
+              await context.taskService.failTask(task.id, userId, result.error || 'Failed to generate image variants', {
+                metadata: { prompt: prompt.trim() },
+              });
+            }
         }
 
         return {
@@ -248,6 +271,11 @@ export const imageGenerationResolvers = {
           generationTime: `${duration}ms`,
         };
       } catch (error: any) {
+        if (task) {
+          await context.taskService.failTask(task.id, userId, error.message || 'Failed to generate image variants', {
+            metadata: { prompt: prompt?.trim?.() || prompt },
+          });
+        }
         return {
           success: false,
           images: [],

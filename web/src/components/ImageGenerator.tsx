@@ -1,8 +1,10 @@
 // src/components/ImageGenerator.tsx
-import  { useState, useEffect } from "react";
+import  { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
 import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
+import { GET_TASK } from "../graphql/tasks";
 import { useToast } from "./ui/toastContext";
 import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
@@ -37,8 +39,48 @@ export default function ImageGenerator() {
   const [downloading, setDownloading] = useState<number | null>(null);
   const { addToast } = useToast();
   const { requestPermission, notifyWhenReady } = useBrowserNotification();
- 
+  
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
 
+  // Query for task status if taskId is present
+  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+    variables: { id: taskId },
+    skip: !taskId,
+    pollInterval: 2000,
+  });
+
+  // Restore state from Task
+  useEffect(() => {
+    if (taskData?.task) {
+      const task = taskData.task;
+      let metadata: any = {};
+      try {
+        metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata || {};
+      } catch (e) {
+        logger.error("Failed to parse task metadata", e);
+      }
+
+      if (task.feature === 'image_generation') {
+        if (metadata.prompt) {
+          setPrompt(metadata.prompt);
+        }
+
+        if (task.status === 'completed' && metadata.images) {
+           setImages(metadata.images);
+           setLoading(false);
+           stopPolling();
+        } else if (task.status === 'processing') {
+           setLoading(true);
+           setError(null);
+        } else if (task.status === 'failed') {
+           setLoading(false);
+           setError(task.errorMessage || "Task failed");
+           stopPolling();
+        }
+      }
+    }
+  }, [taskData, stopPolling]);
   // Check AI service status on component mount
   const { data: statusData, loading: statusLoading, error: statusError } = useQuery<AIImageStatusData>(GET_AI_IMAGE_STATUS, {
     fetchPolicy: 'network-only',

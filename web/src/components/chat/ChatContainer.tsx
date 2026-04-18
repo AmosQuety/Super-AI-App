@@ -7,6 +7,7 @@ import ContextPanel from "./ContextPanel";
 import { Bot, WifiOff, Menu, ArrowDown, Sparkles, Zap, MessageSquare, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion"; 
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client/react";
+import { useSearchParams } from "react-router-dom";
 import { GET_CHATS, CREATE_CHAT, GET_CHAT_HISTORY, SEND_MESSAGE_WITH_RESPONSE } from "../../graphql/chats";
 import { toast} from "react-toastify";
 import type { ToastOptions } from 'react-toastify';
@@ -177,10 +178,20 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false); 
   const [isAtBottom, setIsAtBottom] = useState(true);  
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const urlChatId = searchParams.get("chatId");
+
+  const [conversationId, setConversationId] = useState<string | null>(urlChatId);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user: authUser } = useAuth();
-  
+
+  // Auto-select chat from URL
+  useEffect(() => {
+    if (urlChatId && urlChatId !== conversationId) {
+      setAllMessages([]); // Clear current messages to prevent ghosting
+      setConversationId(urlChatId);
+    }
+  }, [urlChatId, conversationId, setAllMessages]);  
   const [aiState, setAiState] = useState<"idle" | "thinking" | "responding">("idle");
   const [showContextPanel, setShowContextPanel] = useState(false);
   // Track uploaded docs for context panel
@@ -311,12 +322,13 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
   // Fetch history when conversation changes
   useEffect(() => {
-    if (conversationId && userInfo.id) {
+    // Only fetch if we have a conversationId and a valid, non-placeholder userId
+    if (conversationId && isValidUserId) {
       getChatHistory({
         variables: { chatId: conversationId },
       });
     }
-  }, [conversationId, userInfo.id, getChatHistory]);
+  }, [conversationId, isValidUserId, getChatHistory]);
 
   // Update messages from history data
   useEffect(() => {

@@ -17,8 +17,9 @@ export const chatMutations = {
       throw new AuthenticationError("You must be logged in to create a chat");
     }
 
-    // Optional: Security check to ensure user isn't creating chat for someone else
-    // if (args.userId !== context.user.userId) throw new AuthenticationError("Unauthorized");
+    if (args.userId !== context.user.userId) {
+      throw new AuthenticationError("You can only create chats for your own account.");
+    }
 
     // Check if user exists first (We can skip this if we trust the Token, but safer to keep)
     const userExists = await context.prisma.user.findUnique({
@@ -31,7 +32,7 @@ export const chatMutations = {
 
     return context.prisma.chat.create({
       data: {
-        userId: args.userId,
+        userId: context.user.userId, // Always use the authenticated session ID, never args
         title: args.title,
         messages: {
           create: args.messages,

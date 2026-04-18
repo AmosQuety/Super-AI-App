@@ -76,7 +76,13 @@ export class VoiceCloningService {
       const { data: queued } = await aiEngineClient.post(
         `/audio/register`,
         formData,
-        { headers: { ...formData.getHeaders() }, timeout: 30000 }
+        { 
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          }, 
+          timeout: 30000 
+        }
       );
 
       if (!queued.jobId) {
@@ -137,7 +143,13 @@ export class VoiceCloningService {
       const { data: queued } = await aiEngineClient.post(
         `/audio/clone`,
         formData,
-        { headers: { ...formData.getHeaders() }, timeout: 30000 }
+        { 
+          headers: { 
+            ...formData.getHeaders(),
+            "x-service-key": process.env.SERVICE_API_KEY,
+          }, 
+          timeout: 30000 
+        }
       );
 
       if (!queued.jobId) {
@@ -175,7 +187,10 @@ export class VoiceCloningService {
       // 2. SLOW PATH: Fallback to directly asking Python (if webhook missed or still processing)
       const { data } = await aiEngineClient.get(
         `/audio/status/${jobId}`,
-        { timeout: 10000 }
+        { 
+          headers: { "x-service-key": process.env.SERVICE_API_KEY },
+          timeout: 10000 
+        }
       );
       return data;
     } catch (error: any) {
@@ -211,7 +226,10 @@ export class VoiceCloningService {
         `/audio/verify`,
         formData,
         { 
-            headers: { ...formData.getHeaders() }, 
+            headers: { 
+              ...formData.getHeaders(),
+              "x-service-key": process.env.SERVICE_API_KEY,
+            }, 
             timeout: 60000 // Verification might take longer due to STT
         }
       );
