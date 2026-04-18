@@ -68,6 +68,21 @@ class ErrorMonitor {
 
     return errorId;
   }
+
+  static captureMessage(message: string, context: ErrorContext = {}) {
+    if (env.MODE === 'development') {
+      logger.info(`📝 Message Captured: ${message}`, context);
+    }
+
+    if (this.isInitialized) {
+      Sentry.withScope((scope) => {
+        Object.entries(context).forEach(([key, value]) => {
+          scope.setExtra(key, value);
+        });
+        Sentry.captureMessage(message);
+      });
+    }
+  }
 }
 
 export default ErrorMonitor;

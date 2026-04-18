@@ -1,4 +1,5 @@
 // src/utils/logger.ts
+import ErrorMonitor from '../lib/ErrorMonitor';
 
 /**
  * A simple logger utility that only prints to the console in development mode.
@@ -49,6 +50,16 @@ export const logger = {
     // In prod, this could flush to Datadog/Sentry
     if (isDev || duration > 1000) {
        console.info(`[Perf] ${operation} took ${Math.round(duration)}ms (user: ${anonUser})`);
+       
+       if (!isDev) {
+         // Forward slow performance bottlenecks to Sentry!
+         ErrorMonitor.captureMessage(`[Perf] ${operation} was slow`, {
+           type: 'PerformanceTrace',
+           durationMs: Math.round(duration),
+           userId: anonUser,
+           operationName: operation
+         });
+       }
     }
   }
 };
