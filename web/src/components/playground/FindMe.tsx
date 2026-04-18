@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useSearchParams } from "react-router-dom";
 import { FIND_FACE } from "../../graphql/playground";
 import { GET_TASK } from "../../graphql/tasks";
+import type { TaskData } from "../../types/task";
 import { Upload, Search, Download, X, User, Users, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDelight } from "../../hooks/useDelight";
@@ -37,7 +38,7 @@ export default function FindMe() {
   const [searchParams] = useSearchParams();
   const taskId = searchParams.get("taskId");
 
-  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+  const { data: taskData, stopPolling } = useQuery<TaskData>(GET_TASK, {
     variables: { id: taskId },
     skip: !taskId,
     pollInterval: 2000,

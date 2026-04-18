@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useSearchParams } from "react-router-dom";
 import { ANALYZE_FACE } from "../../graphql/playground";
 import { GET_TASK } from "../../graphql/tasks";
+import type { TaskData } from "../../types/task";
 import { FaceCapture } from "../auth/FaceCapture";
 import { Loader2, Sparkles, RefreshCcw, User, Smile, Activity, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion"; 
@@ -40,7 +41,7 @@ export default function MagicMirror() {
   const [searchParams] = useSearchParams();
   const taskId = searchParams.get("taskId");
 
-  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+  const { data: taskData, stopPolling } = useQuery<TaskData>(GET_TASK, {
     variables: { id: taskId },
     skip: !taskId,
     pollInterval: 2000,

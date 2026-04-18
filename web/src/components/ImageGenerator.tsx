@@ -1,10 +1,10 @@
-// src/components/ImageGenerator.tsx
-import  { useState, useEffect, useMemo } from "react";
+import  { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useSearchParams } from "react-router-dom";
 import { Sparkles, Download, RotateCcw, Image as ImageIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GENERATE_AI_IMAGE_VARIANTS, GET_AI_IMAGE_STATUS } from "../graphql/images";
 import { GET_TASK } from "../graphql/tasks";
+import type { TaskData } from "../types/task";
 import { useToast } from "./ui/toastContext";
 import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
@@ -44,7 +44,7 @@ export default function ImageGenerator() {
   const taskId = searchParams.get("taskId");
 
   // Query for task status if taskId is present
-  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+  const { data: taskData, stopPolling } = useQuery<TaskData>(GET_TASK, {
     variables: { id: taskId },
     skip: !taskId,
     pollInterval: 2000,

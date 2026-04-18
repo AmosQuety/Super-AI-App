@@ -4,6 +4,7 @@ import { Sparkles, Users, Search, X, ArrowRight } from "lucide-react";
 import { useQuery } from "@apollo/client/react";
 import { useSearchParams } from "react-router-dom";
 import { GET_TASK } from "../../graphql/tasks";
+import type { TaskData } from "../../types/task";
 import MagicMirror from "./MagicMirror";
 import TwinOMeter from "./TwinOMeter";
 import FindMe from "./FindMe";
@@ -48,7 +49,7 @@ export default function PlaygroundGrid() {
   const [searchParams] = useSearchParams();
   const taskId = searchParams.get("taskId");
 
-  const { data: taskData } = useQuery(GET_TASK, {
+  const { data: taskData } = useQuery<TaskData>(GET_TASK, {
     variables: { id: taskId },
     skip: !taskId,
   });

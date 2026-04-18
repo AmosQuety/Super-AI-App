@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useSearchParams } from "react-router-dom";
 import { COMPARE_FACES } from "../../graphql/playground";
 import { GET_TASK } from "../../graphql/tasks";
+import type { TaskData } from "../../types/task";
 import { Upload, X, ArrowRightLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { compressImage } from "../../utils/imageUtils";
@@ -39,7 +40,7 @@ export default function TwinOMeter() {
   const [searchParams] = useSearchParams();
   const taskId = searchParams.get("taskId");
 
-  const { data: taskData, stopPolling } = useQuery(GET_TASK, {
+  const { data: taskData, stopPolling } = useQuery<TaskData>(GET_TASK, {
     variables: { id: taskId },
     skip: !taskId,
     pollInterval: 2000,
