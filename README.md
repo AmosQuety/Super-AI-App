@@ -1,105 +1,132 @@
-# 💎 Xemora: The Biometric Intelligence Platform
+# 💎 Xemora: Biometric Intelligence Platform
+
+A production-grade, multi-modal AI workspace integrating **Biometric Security**, **Computer Vision**, and **Generative Intelligence** into a premium interface.
 
 ![Project Banner](image.png)
-
-**Xemora** is a production-grade, multi-modal AI workspace that seamlessly integrates **Biometric Security**, **Computer Vision**, and **Generative Intelligence** into a unified, premium interface.
-
-It features a distributed microservices architecture, separating the **Node.js Gateway (The Manager)** from the **Python AI Engine (The Brain)**, enabling secure, scalable face recognition, speaker verification, and document intelligence.
 
 ---
 
 ## 🚀 Live Demo
-*  **Video Demo:** [https://youtu.be/E5pNRct9X4Q](https://youtu.be/E5pNRct9X4Q)
 *   **Frontend:** [https://prism-vision.vercel.app](https://prism-vision.vercel.app)
-*   **Backend API:** Available in the hosted app; direct deployment links are intentionally omitted.
-*   **AI Engine:** Available in the hosted app; direct deployment links are intentionally omitted.
+*   **Video Demo:** [https://youtu.be/E5pNRct9X4Q](https://youtu.be/E5pNRct9X4Q)
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-### 📈 Integrated Dashboard (Core Layout)
-*   **Bento Grid Interface:** A modular, high-end dashboard providing real-time telemetry and quick-access cards for all platform features.
-*   **Global Quick Actions:** Header-level action chips for one-click access to face analysis, email drafting, and image generation.
-*   **Liquid UI Experience:** Powered by Framer Motion, featuring smooth transitions, glassmorphism, and responsive layouts.
-*   **Universal Search & Nav:** Integrated sidebar and mobile-friendly navigation with active-state tracking.
+### 📈 Core Dashboard (The Experience)
+*   **Bento Grid Interface:** High-end modular dashboard with real-time telemetry and activity chips.
+*   **Liquid UI Experience:** Smooth state transitions and glassmorphism powered by **Framer Motion 12**.
+*   **Global Quick Actions:** Rapid access to face analysis, content drafting, and voice tools from any page.
+*   **Recent AI Tasks:** Persistent side panel tracking long-running operations (Voice synthesis, RAG indexing).
 
 ### ☄️ Blaze Intelligence (Personalization)
-*   **Persona Configuration:** Custom-tune the AI's tone (Casual/Formal), technical depth (Beginner to Expert), and verbosity.
-*   **Professional Context Injection:** Define your role, domain expertise, and current goals to receive hyper-personalized assistance across all chat sessions.
-*   **Language & Format Mastery:** Set global preferences for communication languages and response formats (Narrative, Bullet Points, or Mixed).
+*   **Persona Tuning:** Configure AI tone (Casual/Formal), technical depth, and verbosity.
+*   **Context Injection:** Define domain expertise and goals for hyper-personalized responses.
+*   **Dynamic UI**: Real-time interface updates based on persona preferences.
 
-### 🛡️ Biometric Security Center (SOC)
-*   **Security Operations Center (SOC):** Real-time audit logs monitoring biometric enrollment, verification events, and account security status.
-*   **Face ID Login:** Passwordless authentication using 512-dimensional vector embeddings and anti-spoofing liveness detection.
-*   **Voice Identity Login:** Multi-factor biometric voice authentication using SpeechBrain speaker verification models.
-*   **Challenge-Response Protection:** Secure "Speak the Code" mechanism to prevent replay attacks.
+### 🛡️ Biometric Security & SOC
+*   **Face ID Identity**: Passwordless login using 512-dimensional vector embeddings and **Magic Mirror** emotion analysis.
+*   **Voice Identity Login**: Multi-factor authentication via **SpeechBrain** speaker verification and challenge-response phrase matching.
+*   **Security Operations Center (SOC)**: Real-time audit logs monitoring biometric enrollment and verification events.
 
-### 🧪 The Biometric Lab (Playground)
-*   **Full Theme Compatibility:** The entire playground is fully responsive to Light and Dark modes with specialized high-contrast assets.
-*   **Magic Mirror:** Real-time analysis of Age, Gender, and Emotional State using DeepFace models.
-*   **Twin-O-Meter:** 1:1 Verification calculating facial similarity percentages between target photos.
-*   **Crowd Scanner:** 1:N Identification for pinpointing target faces within complex group photos using RetinaFace detectors.
-*   **Workspace Mapping:** Securely manage isolated "Universes" (Tenant-level facial databases).
+### 🧪 The Biometric Lab (Vision Playground)
+*   **Magic Mirror**: Real-time analysis of age, gender, and emotional state using **DeepFace**.
+*   **Twin-O-Meter**: 1:1 facial verification calculating similarity percentages between two images.
+*   **Crowd Scanner**: 1:N identification for pinpointing target faces in complex group photos using **RetinaFace**.
 
-### 🎙️ Voice Intelligence Layer (Upgrade)
-*   **Interactive AI Orb:** A pulsing, morphing 3D-like visualizer that reacts to user voice input in real-time.
-*   **Babel Fish Translator:** Instant AI-powered translation across Spanish, French, Japanese, Luganda, and Chinese.
-*   **Brain Dump Summarizer:** Real-time condensation of voice sessions into actionable, condensed notes.
-*   **Emotion-Responsive TTS:** Advanced synthesis that adapts its tone based on detected user sentiment.
-*   **Global Voice Commands:** Hands-free UI control and navigation using local Web Speech APIs.
+### 🎙️ Voice Intelligence Layer
+*   **Interactive AI Orb**: A pulsing 3D visualizer that reacts to live voice input.
+*   **High-Fidelity Voice Cloning**: Zero-shot voice synthesis using **XTTS v2**.
+*   **Babel Fish Translator**: Instant AI translation across multiple languages (Spanish, French, Japanese, Luganda, Chinese).
+*   **Brain Dump Summarizer**: Real-time condensation of voice sessions into actionable notes.
 
-### 🧠 The Knowledge Brain (RAG)
-*   **Chat with Data:** Upload PDF documents and interact with them using hybrid semantic search.
-*   **Dynamic Context Heuristic:** Intelligent `topK` auto-scaling (automatically increases context from 3 to 8 chunks when documents are active).
-*   **Asynchronous Processing:** Long-running AI tasks (voice cloning, indexing) are managed via an optimized job pipeline.
+### 🧠 Knowledge Brain (RAG)
+*   **Chat with Data**: Interactive PDF interaction using hybrid semantic search via **Prisma pgvector**.
+*   **Job Pipeline**: Robust handling of large document indexing and audio processing via **BullMQ** and **Redis**.
 
 ---
 
 ## 🏗️ Architecture & Tech Stack
 
-### 1. Frontend (The Experience)
-*   **Core:** React 18 + Vite + TypeScript
-*   **State:** Apollo Client (GraphQL) + Context API
-*   **Styling:** Tailwind CSS + Framer Motion (Liquid UI)
-*   **Theme Engine:** Sophisticated Light/Dark mode implementation with persistent user preferences.
+### 1. Frontend (Web & Mobile)
+*   **Web**: React 19, Vite 7, TypeScript, Tailwind CSS 4, Apollo Client 4.
+*   **Mobile**: React Native (Expo), NativeWind, React 19, Lucide icons.
+*   **State**: Apollo Client (GraphQL) + React Context API.
 
-### 2. Backend Gateway (The Manager)
-*   **Runtime:** Node.js + Express
-*   **API:** Apollo Server (GraphQL) with comprehensive Audit Logging.
-*   **Database ORM:** Prisma
-*   **Security:** Stateless JWT Auth + Redis-backed Challenge-Response TTL.
+### 2. Backend Gateway (Node.js)
+*   **Runtime**: Node.js + Express.
+*   **API**: Apollo Server (GraphQL) with real-time subscriptions for AI job updates.
+*   **Database**: PostgreSQL + **Prisma ORM**.
+*   **Storage**: **Supabase Storage** (S3-compatible) & **Cloudinary** for biometric assets.
+*   **Task Queue**: **BullMQ** + **Redis** for asynchronous AI processing.
 
-### 3. AI Engine (The Brain)
-*   **Runtime:** Python 3.9 + FastAPI
-*   **ML Libraries:** DeepFace (Vision), SpeechBrain (Voice), OpenCV, NumPy
-*   **Processor:** Optimized for Hugging Face Spaces with hardware acceleration.
-
-### 4. Infrastructure (The Memory)
-*   **Database:** Supabase PostgreSQL + `pgvector` for high-performance retrieval.
-*   **Storage:** Supabase Storage (S3-compatible) for biometric assets.
-*   **LLM Engine:** Google Gemini 1.5 Flash (with implemented Key Rotation & Rate Limiting).
+### 3. AI Engine (Python)
+*   **Framework**: FastAPI.
+*   **Vision**: DeepFace, RetinaFace, MTCNN, OpenCV.
+*   **Voice**: Coqui XTTS v2, SpeechBrain, OpenAI Whisper.
+*   **Execution**: Optimized for both GPU (CUDA) and OOM-protected CPU modes (4GB RAM safe-mode).
 
 ---
 
 ## 🛠️ Local Installation
 
-### 1. Clone & Install
+### 1. Prerequisite: AI Engine
+The AI Engine lives in a separate repository: **[FaceSearch](https://github.com/AmosQuety/FaceSearch)**. 
+
+1. **Clone & Run FaceSearch**: Clone the repository and follow its specific setup guide (installing Python dependencies, setting up models, etc.).
+2. **Set Service URL**: Once the AI Engine is running (default: `http://localhost:8000`), ensure `PYTHON_FACE_SERVICE_URL=http://localhost:8000` is set in your **Backend Gateway** `.env` file.
+
+
+### 2. Backend Gateway (Node.js)
 ```bash
-git clone https://github.com/AmosQuety/Super-AI-App.git
-cd Super-AI-App/src/apps
+cd backend
+npm install
+npx prisma generate
+npm run dev # Runs on Port 4001
 ```
 
-### 2. Deployment Setup
-Please refer to the detailed environment setup guides in `backend` and `web` directories for configuring your `pgvector` database, Redis cache, and Gemini/Cloning API keys.
+### 3. Frontend Web (React)
+```bash
+cd web
+npm install
+npm run dev # Runs on Port 5173
+```
 
 ---
 
-## 🛡️ License
-Distributed under the **MIT License**.
+## ⚙️ Environment Variables
+
+### Backend (`backend/.env`)
+| Variable | Description |
+| :--- | :--- |
+| `DATABASE_URL` | PostgreSQL connection string (with pgvector support) |
+| `SUPABASE_URL` | Supabase API endpoint |
+| `SUPABASE_KEY` | Supabase Service Role Key |
+| `GEMINI_API_KEY` | Google Generative AI key (Gemini 1.5 Flash) |
+| `SERVICE_API_KEY` | Shared secret with the Python AI Engine |
+| `PYTHON_FACE_SERVICE_URL` | URL of the Python API (Default: http://127.0.0.1:8000) |
+| `REDIS_URL` | Redis instance for BullMQ and Caching |
+
+### Frontend (`web/.env.local`)
+| Variable | Description |
+| :--- | :--- |
+| `VITE_GRAPHQL_URL` | URL of the Gateway (Default: http://localhost:4001/graphql) |
+
+---
+
+## 📁 Project Structure
+```text
+.
+├── backend/            # Node.js Gateway (GraphQL, Prisma, BullMQ, RAG)
+├── web/                # React 19 Frontend (Bento Grid, Apollo, Tailwind 4)
+├── mobile/             # Expo React Native App
+└── packages/           # Shared monorepo packages (ai-orchestrator, types, ui)
+```
 
 ---
 
 ## 👨‍💻 Author
 **Nabasa Amos**
 *   [GitHub](https://github.com/AmosQuety)
+*   Distributed under the **MIT License**.
