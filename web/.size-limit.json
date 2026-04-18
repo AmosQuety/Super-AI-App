@@ -1,0 +1,26 @@
+[
+  {
+    "name": "vendor-core",
+    "path": "dist/assets/vendor-core-*.js",
+    "limit": "150 KB",
+    "gzip": true
+  },
+  {
+    "name": "vendor-apollo",
+    "path": "dist/assets/vendor-apollo-*.js",
+    "limit": "120 KB",
+    "gzip": true
+  },
+  {
+    "name": "vendor-motion",
+    "path": "dist/assets/vendor-motion-*.js",
+    "limit": "120 KB",
+    "gzip": true
+  },
+  {
+    "name": "total JS (index entry)",
+    "path": "dist/assets/index-*.js",
+    "limit": "150 KB",
+    "gzip": true
+  }
+]

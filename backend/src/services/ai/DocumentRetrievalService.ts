@@ -3,6 +3,18 @@ import type { DocumentChunk } from '@super-ai/ai-orchestrator';
 import { redisClient } from '../../lib/redis';
 import crypto from 'crypto';
 import { recordLatency, getP95Latency, logger } from '../../utils/logger';
+import { cacheDelPattern } from '../../lib/redis';
+
+/**
+ * Bust all RAG retrieval caches for a given user.
+ * Call this whenever a user's documents are updated or re-ingested.
+ */
+export async function invalidateUserRAGCache(userId: string): Promise<void> {
+  await cacheDelPattern(`RAG:userId:${userId}:*`);
+  // Also bust embedding cache — normalised query hashes are user-agnostic,
+  // but retrieval results are user-scoped, so only bust those.
+  logger.debug('[rag] cache invalidated for user', { userId });
+}
 
 export interface EmbeddingProvider {
   getEmbedding(text: string): Promise<number[]>;
@@ -68,13 +80,15 @@ export class DocumentRetrievalService {
            queryEmbedding = JSON.parse(cachedEmbed);
         } else {
            queryEmbedding = await this.embeddingProvider.getEmbedding(normalizedQuery);
-           await redisClient.set(embedCacheKey, JSON.stringify(queryEmbedding), 'EX', 86400); // 24 hours
+           // TTL: 10 minutes — embeddings are stable for a given query string
+           await redisClient.set(embedCacheKey, JSON.stringify(queryEmbedding), 'EX', 600);
         }
       } else {
         queryEmbedding = await this.embeddingProvider.getEmbedding(normalizedQuery);
       }
       const vectorString = `[${queryEmbedding.join(',')}]`;
 
+      const t_vector_start = performance.now();
       const vectorResults = await this.prisma.$queryRaw<
         Array<{ content: string; similarity: number | null }>
       >`
@@ -93,14 +107,8 @@ export class DocumentRetrievalService {
         ORDER BY dc.embedding <=> ${vectorString}::vector ASC
         LIMIT ${topK}
       `;
-
-      logger.info('[rag] vector retrieval complete', {
-        userId,
-        queryLength: normalizedQuery.length,
-        requestedTopK,
-        appliedTopK: topK,
-        retrievedCount: vectorResults.length,
-      });
+      const t_vector_end = performance.now();
+      logger.debug('[rag] vector_search_ms', { userId, durationMs: (t_vector_end - t_vector_start).toFixed(2), count: vectorResults.length });
 
       if (vectorResults.length > 0) {
         finalResults = vectorResults
@@ -128,7 +136,8 @@ export class DocumentRetrievalService {
     }
 
     if (redisClient && finalResults) {
-      await redisClient.set(resultCacheKey, JSON.stringify(finalResults), 'EX', 180); // 3 minutes TTL
+      // TTL: 2 minutes — results are user + document state dependent
+      await redisClient.set(resultCacheKey, JSON.stringify(finalResults), 'EX', 120);
     }
 
     const t1 = performance.now();
@@ -157,6 +166,7 @@ export class DocumentRetrievalService {
 
     if (tsQueryTerms) {
       try {
+        const t_fts_start = performance.now();
         const ftResults = await this.prisma.$queryRaw<Array<{ content: string; rank: number }>>`
           SELECT
             dc.content,
@@ -172,6 +182,8 @@ export class DocumentRetrievalService {
           ORDER BY rank DESC
           LIMIT ${topK}
         `;
+        const t_fts_end = performance.now();
+        logger.debug('[rag] fts_search_ms', { userId, durationMs: (t_fts_end - t_fts_start).toFixed(2), count: ftResults.length });
 
         if (ftResults.length > 0) {
           logger.info('[rag] full-text search succeeded', {
@@ -202,6 +214,7 @@ export class DocumentRetrievalService {
       // representative keyword and accept some recall loss here.
       const primaryKeyword = `%${keywords[0]}%`;
       try {
+        const t_ilike_start = performance.now();
         const ilikeResults = await this.prisma.$queryRaw<Array<{ content: string }>>`
           SELECT dc.content
           FROM "DocumentChunk" dc
@@ -211,6 +224,8 @@ export class DocumentRetrievalService {
             AND dc.content ILIKE ${primaryKeyword}
           LIMIT ${topK}
         `;
+        const t_ilike_end = performance.now();
+        logger.debug('[rag] ilike_search_ms', { userId, durationMs: (t_ilike_end - t_ilike_start).toFixed(2), count: ilikeResults.length });
 
         if (ilikeResults.length > 0) {
           logger.info('[rag] ILIKE search succeeded', {

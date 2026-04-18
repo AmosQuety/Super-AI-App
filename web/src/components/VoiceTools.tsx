@@ -23,6 +23,7 @@ import { useMutation } from "@apollo/client/react";
 import { PROCESS_VOICE_TASK } from "../graphql/voice";
 import { useVoiceIntelligence } from "../contexts/VoiceIntelligenceContext";
 import { useToast } from "./ui/toastContext";
+import { useNetworkQuality } from "../hooks/useNetworkQuality";
 const VoiceLab = lazy(() => import('./VoiceLab'));
 import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
@@ -65,12 +66,9 @@ export default function VoiceTools() {
   const [targetLanguage, setTargetLanguage] = useState("Spanish");
   const [processTask] = useMutation<{ processVoiceTask: { success: boolean, result: string, error: string } }>(PROCESS_VOICE_TASK);
   const { showSuccess, showError, showInfo } = useToast();
-
-  const [isSlowNetwork, setIsSlowNetwork] = useState(false);
-  useEffect(() => {
-     const conn = (navigator as any).connection;
-     if (conn) setIsSlowNetwork(conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData || conn.rtt > 500);
-  }, []);
+  
+  const network = useNetworkQuality();
+  const isSlowNetwork = network.isSlowNetwork;
 
 
   const workerRef = useRef<Worker | null>(null);

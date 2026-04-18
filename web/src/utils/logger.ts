@@ -31,6 +31,25 @@ export const logger = {
   },
   groupEnd: () => {
     if (isDev) console.groupEnd();
+  },
+  // Phase 4: Performance monitoring helper
+  logOperationTiming: (operation: string, startMs: number, userId?: string) => {
+    const duration = performance.now() - startMs;
+    let anonUser = "anon";
+    if (userId) {
+      // Very basic hash to anonymize the user ID for logs
+      let hash = 0;
+      for (let i = 0; i < userId.length; i++) {
+        hash = (hash << 5) - hash + userId.charCodeAt(i);
+        hash |= 0;
+      }
+      anonUser = `u_${Math.abs(hash).toString(16)}`;
+    }
+    
+    // In prod, this could flush to Datadog/Sentry
+    if (isDev || duration > 1000) {
+       console.info(`[Perf] ${operation} took ${Math.round(duration)}ms (user: ${anonUser})`);
+    }
   }
 };
 

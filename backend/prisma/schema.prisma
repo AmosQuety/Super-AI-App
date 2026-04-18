@@ -259,6 +259,7 @@ model Workspace {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, isDefault])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Face {

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { DocumentProcessor } from './documentProcessor';
 import { logger } from '../utils/logger';
 import { TaskService } from './taskService';
+import { invalidateUserRAGCache } from './ai/DocumentRetrievalService';
 
 type EmbeddingService = {
   getEmbedding(text: string): Promise<number[]>;
@@ -102,7 +103,10 @@ export async function processDocument(
     let embeddedCount = 0;
     let skippedCount = 0;
 
-    const MAX_CONCURRENT_CHUNKS = parseInt(process.env.EMBEDDING_CONCURRENCY ?? '5', 10);
+    // EMBEDDING_CONCURRENCY env var controls parallelism.
+    //   Default: 3 — conservative limit to stay within embedding provider rate caps.
+    //   Service: backend   Required: No   Default: 3
+    const MAX_CONCURRENT_CHUNKS = parseInt(process.env.EMBEDDING_CONCURRENCY ?? '3', 10);
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
     for (let batchStart = 0; batchStart < textChunks.length; batchStart += MAX_CONCURRENT_CHUNKS) {
@@ -193,6 +197,10 @@ export async function processDocument(
       data: { status: 'ready' },
     });
     logger.info('[ingestion] status updated', { documentId, status: 'ready' });
+
+    // Bust the RAG retrieval cache for this user so subsequent queries
+    // pick up the newly ingested document immediately.
+    await invalidateUserRAGCache(document.userId);
 
     if (taskService && taskId) {
       await taskService.completeTask(taskId, document.userId, {

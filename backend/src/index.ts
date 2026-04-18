@@ -25,6 +25,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { RateLimitService } from './auth/rate-limiting';
 import { SecurityConfig } from './auth/security';
 import { queryComplexityPlugin } from './utils/queryComplexityPlugin';
+import { apolloCachePlugin } from './utils/apolloCachePlugin';
 import { logger } from './utils/logger';
 import { 
   loggingMiddleware, 
@@ -94,9 +95,10 @@ const corsOptions: cors.CorsOptions = {
     app.options("*", cors(corsOptions)); // Handle preflight for all routes
 
     // 3. COMPRESSION
-    // Add Brotli/Gzip response compression with threshold tuning for bandwidth constraints
+    // Brotli/Gzip compression — 1 KB threshold minimises overhead on tiny responses
+    // while still compressing all meaningful payloads (GraphQL, JSON, HTML).
     app.use(compression({
-      threshold: 512, // Compress payloads larger than 512 bytes
+      threshold: 1024, // Only compress payloads > 1 KB
       filter: (req, res) => {
         if (req.headers['x-no-compression']) {
           return false;
@@ -168,18 +170,7 @@ const corsOptions: cors.CorsOptions = {
     // CREATE EXECUTABLE SCHEMA
     const schema = makeExecutableSchema({ typeDefs, resolvers });
 
-    // Add this validation before Apollo Server creation
-    try {
-      logger.info("🔍 Validating schema and resolvers...");
-      makeExecutableSchema({ 
-        typeDefs, 
-        resolvers 
-      });
-      logger.info("✅ Schema validation passed");
-    } catch (schemaError) {
-      logger.error("❌ SCHEMA VALIDATION ERROR:", schemaError);
-      process.exit(1);
-    }
+    // Schema was already built above — no need to compile it a second time.
 
     // Initialize Apollo Server with optimized context
     apolloServerInstance = new ApolloServer({
@@ -189,6 +180,7 @@ const corsOptions: cors.CorsOptions = {
       introspection: process.env.NODE_ENV !== 'production',
       cache: 'bounded',
       plugins: [
+        apolloCachePlugin,  // Must run first — short-circuits resolvers on cache hit
         queryComplexityPlugin,
         {
           async serverWillStart() {

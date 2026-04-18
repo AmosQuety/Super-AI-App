@@ -2,10 +2,14 @@ import axios from 'axios';
 import FormData from 'form-data';
 import http from 'http';
 import https from 'https';
+import crypto from 'crypto';
 import { Readable } from 'stream';
 import { logger } from '../utils/logger';
 import { Upload } from '../resolvers/types/upload';
 import { redisClient } from '../lib/redis';
+
+/** Generate a UUID v4 for idempotent outbound requests. */
+const newRequestId = () => crypto.randomUUID();
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
@@ -80,8 +84,9 @@ export class VoiceCloningService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           }, 
-          timeout: 30000 
+          timeout: 60000, // 60s — voice registration is a long-running operation
         }
       );
 
@@ -147,8 +152,9 @@ export class VoiceCloningService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           }, 
-          timeout: 30000 
+          timeout: 60000, // 60s — voice cloning endpoint is long-running per spec
         }
       );
 
@@ -188,10 +194,14 @@ export class VoiceCloningService {
       const { data } = await aiEngineClient.get(
         `/audio/status/${jobId}`,
         { 
-          headers: { "x-service-key": process.env.SERVICE_API_KEY },
+          headers: { "x-service-key": process.env.SERVICE_API_KEY, "x-request-id": newRequestId() },
           timeout: 10000 
         }
       );
+      // Cache the slow-path result for 10s to reduce repeated Python polls
+      if (redisClient) {
+        await redisClient.set(`JOB_STATUS_${jobId}`, JSON.stringify(data), 'EX', 10);
+      }
       return data;
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -229,8 +239,9 @@ export class VoiceCloningService {
             headers: { 
               ...formData.getHeaders(),
               "x-service-key": process.env.SERVICE_API_KEY,
+              "x-request-id": newRequestId(),
             }, 
-            timeout: 60000 // Verification might take longer due to STT
+            timeout: 60000 // Verification is long-running due to STT
         }
       );
 

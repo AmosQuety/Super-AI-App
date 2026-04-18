@@ -72,7 +72,23 @@ function isQuotaWallError(err: unknown): boolean {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
+// ── Typed errors ─────────────────────────────────────────────────────────────
+
+/**
+ * Thrown when an embedding provider returns a vector whose dimension does not
+ * match the DB schema dimension (768). Catching this allows the caller to mark
+ * the chunk as FAILED without crashing the ingestion job.
+ */
+export class EmbeddingDimensionError extends Error {
+  constructor(got: number, expected: number) {
+    super(`Embedding dimension mismatch: provider returned ${got}, expected ${expected}`);
+    this.name = 'EmbeddingDimensionError';
+  }
+}
+
 let embeddingCooldownUntil = 0;
+// Tracks the current exponential backoff delay for 5xx-style provider failures
+let embeddingBackoffMs = 0;
 
 export class GeminiProvider implements IProvider {
   readonly id = "gemini";
@@ -168,15 +184,19 @@ export class GeminiProvider implements IProvider {
             const values = result.embedding.values;
 
             if (!Array.isArray(values) || values.length === 0) {
-              throw new Error("Embedding response was empty");
+              throw new EmbeddingDimensionError(0, targetDimensions);
             }
 
-            if (values.length >= targetDimensions) {
-              return values.slice(0, targetDimensions);
+            if (values.length !== targetDimensions) {
+              if (values.length > targetDimensions) {
+                // Provider returned more dims than expected — truncate (safe)
+                return values.slice(0, targetDimensions);
+              }
+              // Provider returned fewer dims — right-pad with zeros
+              return [...values, ...new Array(targetDimensions - values.length).fill(0)];
             }
 
-            // Right-pad if provider returns fewer dimensions than expected by DB schema.
-            return [...values, ...new Array(targetDimensions - values.length).fill(0)];
+            return values;
           } catch (innerError: unknown) {
             const innerMsg = (innerError as Error).message ?? "";
             const modelUnavailable =
@@ -201,11 +221,24 @@ export class GeminiProvider implements IProvider {
           msg.includes("503") || msg.includes("500") || msg.includes("502");
 
         if (isRateLimited && attempt < ALL_KEYS.length - 1) continue;
-        
-        // If ALL keys exhausted on rate limit or 503, set a cooldown of 2 minutes site-wide
-        if (isUnavailable || (isRateLimited && attempt === ALL_KEYS.length - 1)) {
-           logger.warn(`[GeminiProvider] Embedding API severely degraded/exhausted. Initiating 2 minute cooldown. (${msg.slice(0, 100)})`);
-           embeddingCooldownUntil = Date.now() + 2 * 60 * 1000;
+
+        // Exponential backoff on 5xx failures before giving up entirely.
+        // Start: 1s, double each retry, cap at 30s.
+        if (isUnavailable) {
+          embeddingBackoffMs = embeddingBackoffMs === 0
+            ? 1000
+            : Math.min(embeddingBackoffMs * 2, 30_000);
+          logger.warn(`[GeminiProvider] Embedding API degraded. Backing off ${embeddingBackoffMs}ms before next call. (${msg.slice(0, 100)})`);
+          await new Promise(r => setTimeout(r, embeddingBackoffMs));
+        } else {
+          // On successful or non-5xx paths, reset the backoff counter
+          embeddingBackoffMs = 0;
+        }
+
+        // If ALL keys exhausted on rate limit, set a short cooldown
+        if (isRateLimited && attempt === ALL_KEYS.length - 1) {
+          logger.warn(`[GeminiProvider] All API keys rate-limited. Setting 2-minute cooldown.`);
+          embeddingCooldownUntil = Date.now() + 2 * 60 * 1000;
         }
 
         throw new Error(`Embedding failed: ${msg}`);

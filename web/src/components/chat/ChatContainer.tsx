@@ -14,9 +14,11 @@ import type { ToastOptions } from 'react-toastify';
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/useTheme";
 import { useToast } from '../ui/toastContext';
-import { UPLOAD_DOCUMENT, GET_DOCUMENT_LIFECYCLE } from "../../graphql/chats";
+import { GET_DOCUMENT_LIFECYCLE, UPLOAD_DOCUMENT } from "../../graphql/chats";
 import { useBrowserNotification } from "../../hooks/useBrowserNotification";
 import { logger } from "../../utils/logger";
+import { useNetworkQuality } from "../../hooks/useNetworkQuality";
+import * as offlineQueue from "../../lib/offlineQueue";
 
 export type MessageStatus = "sending" | "sent" | "error" | "retrying";
 
@@ -164,6 +166,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   const { theme } = useTheme();
   const { showError } = useToast();
   const { requestPermission, notifyWhenReady } = useBrowserNotification();
+  const network = useNetworkQuality();
   
   const {
     messages,
@@ -259,7 +262,8 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     variables: { userId: currentUser.id },
     skip: !isValidUserId,
     fetchPolicy: "cache-and-network",
-    pollInterval: 10000, 
+    // Smart network-adaptive polling interval
+    pollInterval: network.isOffline ? 0 : network.is2G ? 20000 : network.is3G ? 5000 : 10000, 
   });
 
   useEffect(() => {
@@ -404,6 +408,15 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     }
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // If offline, push straight to the module store and stop.
+    if (network.isOffline) {
+      offlineQueue.enqueue(userContent, attachment);
+      setIsAtBottom(true);
+      toast.info("Queued. Will send when reconnected.", { theme: "dark" });
+      return;
+    }
+
     const optimisticMessage = addOptimisticMessage({
       tempId,
       text: userContent,
@@ -411,16 +424,6 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
       attachment: attachment || undefined,
       conversationId: conversationId || undefined,
     });
-    
-    // Scroll to bottom immediately on send
-    setIsAtBottom(true);
-    const notificationsEnabled = await requestPermission();
-    toast.info(
-      notificationsEnabled
-        ? 'Your request is running in the background. You can leave, we will notify you, and your task is recoverable from Recent AI Tasks.'
-        : 'Your request is running in the background. You can leave safely; you can always recover the result from Recent AI Tasks.',
-      { theme: 'dark', autoClose: 5000 }
-    );
 
     try {
       let currentConversationId = conversationId;
@@ -591,22 +594,31 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   }, [setAllMessages]);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
+  const [offlineQ, setOfflineQ] = useState(offlineQueue.getQueue());
+  
   useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); toast.success("Back online!", { theme: "dark" }); };
-    const handleOffline = () => { setIsOnline(false); toast.error("You are offline.", { theme: "dark" }); };
+    // Keep local component state in sync with the module-level offline queue
+    const syncOfflineQueue = () => setOfflineQ([...offlineQueue.getQueue()]);
+    // The queue store calls listeners when a flush happens
+    const unsubscribe = offlineQueue.onFlush((pendingMessages) => {
+      syncOfflineQueue();
+      if (pendingMessages.length > 0) {
+        toast.info(`Sending ${pendingMessages.length} offline message(s)...`, { theme: "dark" });
+        // Very basic flush implementation — send each consecutively.
+        // Full conflict/retry handling would go here in Phase 5+.
+        pendingMessages.forEach((msg, idx) => {
+          setTimeout(() => handleSendMessage(msg.text, msg.attachment), idx * 1000);
+        });
+      }
+    });
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+    // Also sync if the component remounts or user types
+    const interval = setInterval(syncOfflineQueue, 1000);
+    return () => { unsubscribe(); clearInterval(interval); };
+  }, [handleSendMessage]);
 
   const renderConnectionStatus = useMemo(() => {
-    if (!isOnline) {
+    if (network.isOffline) {
       return (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3 backdrop-blur">
@@ -620,7 +632,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
       );
     }
     return null;
-  }, [isOnline]);
+  }, [network.isOffline]);
 
   if (chatsLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse">Loading workspace...</div>;
 
@@ -709,7 +721,34 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                  </motion.div>
               ) : (
                 <div className="space-y-6">
+                  {/* Rendering Offline Queued Messages */}
                   <AnimatePresence initial={false}>
+                    {offlineQ.map((msg) => (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                      >
+                         <div className="flex justify-end w-full p-4">
+                            <div className="flex flex-col items-end max-w-[85%] md:max-w-[70%] space-y-1">
+                               <div className="flex items-center space-x-2 text-xs text-amber-500 font-medium mb-1 pl-2 font-mono">
+                                  <span>Queued Offline</span>
+                                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                               </div>
+                               <div className="px-5 py-3 rounded-2xl rounded-tr-sm bg-[#161B22]/60 border border-white/[0.05] shadow-lg text-[15px] prose prose-invert prose-p:leading-relaxed overflow-hidden break-words w-full">
+                                  {msg.attachment && (
+                                     <div className="flex items-center gap-2 p-2 mb-2 rounded border border-white/10 bg-white/5 opacity-70">
+                                       <span className="text-xs truncate">{msg.attachment.name}</span>
+                                     </div>
+                                  )}
+                                  {msg.text}
+                               </div>
+                            </div>
+                         </div>
+                      </motion.div>
+                    ))}
+
+                    {/* Pending & Confirmed Messages */}
                     {messages.map((message) => (
                       <motion.div
                         key={message.id}
@@ -777,7 +816,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                 <InputArea
                   onSendMessage={handleSendMessage}
                   disabled={historyLoading || aiState !== "idle"}
-                  isOnline={isOnline}
+                  isOnline={!network.isOffline}
                   onToggleContext={() => setShowContextPanel(p => !p)}
                   contextOpen={showContextPanel}
                   activeDocs={activeDocs.filter(d => d.status === 'ready').length}

@@ -3,6 +3,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Send, Paperclip, X, Image, FileText, AlertCircle, BookOpen, Zap } from "lucide-react";
 import { useToast } from "../ui/toastContext";
+import { useNetworkQuality } from "../../hooks/useNetworkQuality";
 
 interface InputAreaProps {
   onSendMessage: (text: string, attachment?: File) => void;
@@ -26,28 +27,22 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSlowNetwork, setIsSlowNetwork] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Network detection ────────────────────────────────────────────────────
+  const network = useNetworkQuality();
+  // Override isOnline prop with our central hook's state
+  const online = isOnline && !network.isOffline;
+  
+  // ── 30-Second Slow Network Banner Delay ──────────────────────────────────
+  const [showSlowBanner, setShowSlowBanner] = useState(false);
   useEffect(() => {
-    const checkNetwork = () => {
-      const conn = (navigator as any).connection;
-      if (conn) {
-        setIsSlowNetwork(
-          conn.effectiveType === "2g" ||
-          conn.effectiveType === "slow-2g" ||
-          conn.saveData ||
-          conn.rtt > 500
-        );
-      }
-    };
-    checkNetwork();
-    const conn = (navigator as any).connection;
-    conn?.addEventListener("change", checkNetwork);
-    return () => conn?.removeEventListener("change", checkNetwork);
-  }, []);
+    if (network.isSlowNetwork && online) {
+      const timer = setTimeout(() => setShowSlowBanner(true), 30000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowSlowBanner(false);
+    }
+  }, [network.isSlowNetwork, online]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleTextChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -74,8 +69,8 @@ const InputArea: React.FC<InputAreaProps> = ({
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!disabled && isOnline) setIsDragging(true);
-  }, [disabled, isOnline]);
+    if (!disabled && online) setIsDragging(true);
+  }, [disabled, online]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -85,20 +80,20 @@ const InputArea: React.FC<InputAreaProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (disabled || !isOnline) return;
+    if (disabled || !online) return;
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) handleAttachmentChange(files[0]);
-  }, [disabled, isOnline, handleAttachmentChange]);
+  }, [disabled, online, handleAttachmentChange]);
 
   const handleSendMessage = useCallback(() => {
-    if (disabled || !isOnline) return;
+    if (disabled || !online) return;
     const trimmed = text.trim();
     if (!trimmed && !attachment) return;
     onSendMessage(trimmed, attachment || undefined);
     setText("");
     setAttachment(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [disabled, isOnline, text, attachment, onSendMessage]);
+  }, [disabled, online, text, attachment, onSendMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -107,7 +102,7 @@ const InputArea: React.FC<InputAreaProps> = ({
     }
   };
 
-  const isSendDisabled = disabled || !isOnline || (!text.trim() && !attachment);
+  const isSendDisabled = disabled || !online || (!text.trim() && !attachment);
 
   const getFileIcon = (file: File) =>
     file.type.startsWith("image/")
@@ -122,12 +117,12 @@ const InputArea: React.FC<InputAreaProps> = ({
       onDrop={handleDrop}
     >
       {/* ── Network banners ─────────────────────────────────────────────── */}
-      {!isOnline ? (
+      {!online ? (
         <div className="mb-3 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0" />
           <span className="text-xs text-amber-300">Offline — messages will queue and send when reconnected.</span>
         </div>
-      ) : isSlowNetwork ? (
+      ) : showSlowBanner ? (
         <div className="mb-3 px-4 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center gap-2">
           <Zap className="h-4 w-4 text-orange-400 flex-shrink-0" />
           <span className="text-xs text-orange-300">Slow network detected — requests may take longer.</span>
@@ -192,10 +187,10 @@ const InputArea: React.FC<InputAreaProps> = ({
             {/* File attach */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || !isOnline}
+              disabled={disabled || !online}
               className={`
                 p-2 rounded-xl transition-all duration-200
-                ${disabled || !isOnline
+                ${disabled || !online
                   ? "opacity-40 cursor-not-allowed text-slate-600"
                   : "text-slate-500 hover:text-white hover:bg-white/[0.06]"
                 }
@@ -208,7 +203,7 @@ const InputArea: React.FC<InputAreaProps> = ({
                 type="file"
                 className="hidden"
                 onChange={handleFileInputChange}
-                disabled={disabled || !isOnline}
+                disabled={disabled || !online}
                 accept="image/*,.pdf,.doc,.docx,.txt,.md"
               />
             </button>
@@ -240,7 +235,7 @@ const InputArea: React.FC<InputAreaProps> = ({
             <textarea
               ref={textareaRef}
               placeholder={
-                !isOnline
+                !online
                   ? "Offline — reconnecting…"
                   : disabled
                     ? "Blaze is thinking…"
@@ -252,7 +247,7 @@ const InputArea: React.FC<InputAreaProps> = ({
                 text-sm sm:text-[15px] leading-relaxed
                 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent
                 py-2 px-1
-                ${disabled || !isOnline ? "cursor-not-allowed" : ""}
+                ${disabled || !online ? "cursor-not-allowed" : ""}
               `}
               rows={1}
               value={text}
@@ -260,7 +255,7 @@ const InputArea: React.FC<InputAreaProps> = ({
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              disabled={disabled || !isOnline}
+              disabled={disabled || !online}
               style={{ minHeight: "40px", maxHeight: "180px" }}
             />
           </div>
@@ -276,7 +271,7 @@ const InputArea: React.FC<InputAreaProps> = ({
                 : "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50 hover:scale-105 active:scale-95"
               }
             `}
-            title={!isOnline ? "Offline" : "Send message (Enter)"}
+            title={!online ? "Offline" : "Send message (Enter)"}
           >
             <Send className="h-4 w-4" />
           </button>
@@ -285,7 +280,7 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       {/* Footer hint */}
       <p className="mt-2 text-center text-[11px] text-slate-600">
-        {!isOnline
+        {!online
           ? "🔴 Offline"
           : "Enter to send  ·  Shift+Enter for new line"}
       </p>

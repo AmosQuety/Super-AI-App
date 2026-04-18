@@ -3,8 +3,12 @@ import axios from "axios";
 import FormData from "form-data";
 import http from "http";
 import https from "https";
+import crypto from "crypto";
 import { Upload } from "../resolvers/types/upload"; 
 import { logger } from "../utils/logger";
+
+/** Generate a UUID v4 for idempotent outbound requests. */
+const newRequestId = () => crypto.randomUUID();
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
@@ -18,7 +22,10 @@ export class FaceRecognitionService {
   
   async checkHealth() {
     try {
-      const response = await aiEngineClient.get(`/`, { timeout: 2000 });
+      const response = await aiEngineClient.get(`/`, {
+        timeout: 3000,  // 3s for health/status endpoints per spec
+        headers: { 'x-request-id': newRequestId() },
+      });
       return { 
         isOnline: response.status === 200, 
         message: response.data.system || "Python Service Online",
@@ -59,10 +66,11 @@ export class FaceRecognitionService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 60000, // 60s for model loading
+          timeout: 15000, // 15s for face recognition endpoints per spec
         }
       );
 
@@ -108,9 +116,10 @@ export class FaceRecognitionService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           },
           validateStatus: (status) => status < 500, // Handle 401s manually
-          timeout: 60000, // 60s
+          timeout: 15000, // 15s for face recognition endpoints per spec
         }
       );
 
@@ -166,8 +175,9 @@ export class FaceRecognitionService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           },
-          timeout: 60000, 
+          timeout: 15000, // 15s for face endpoints per spec
         }
       );
 
@@ -217,10 +227,11 @@ export class FaceRecognitionService {
          headers: { 
            ...formData.getHeaders(),
            "x-service-key": process.env.SERVICE_API_KEY,
+           "x-request-id": newRequestId(),
          },
         maxContentLength: Infinity,
           maxBodyLength: Infinity,
-         timeout: 60000,
+         timeout: 15000, // 15s for face endpoints per spec
         }
       );
 
@@ -250,10 +261,11 @@ export class FaceRecognitionService {
           headers: { 
             ...formData.getHeaders(),
             "x-service-key": process.env.SERVICE_API_KEY,
+            "x-request-id": newRequestId(),
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 300000 // <--- Increase to 5 minutes for CPU safety
+          timeout: 300000 // 5 minutes for CPU-bound crowd operations
         }
       );
 

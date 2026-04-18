@@ -10,6 +10,7 @@ import ProcessingState from "./loading/ProcessingState";
 import { useBrowserNotification } from "../hooks/useBrowserNotification";
 import Skeleton from "./ui/Skeleton";
 import { logger } from "../utils/logger";
+import { useNetworkQuality } from "../hooks/useNetworkQuality";
 
 
 // --- TYPE DEFINITIONS ---
@@ -96,6 +97,8 @@ export default function ImageGenerator() {
     });
   }, [statusData, statusLoading, statusError]);
 
+  const network = useNetworkQuality();
+
   const [generateImagesMutation] = useMutation<GenerateImagesData>(GENERATE_AI_IMAGE_VARIANTS, {
     onError: (err) => {
       logger.error("GraphQL error:", err);
@@ -119,8 +122,7 @@ export default function ImageGenerator() {
     });
 
     try {
-      const conn = (navigator as any).connection;
-      const isSlowNetwork = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
+      const isSlowNetwork = network.isSlowNetwork;
       const safePrompt = isSlowNetwork ? `${prompt.trim()} --ar 1:1 --v 5.0 --stop 80 --quality 0.5` : prompt.trim(); // Add midjourney/dalle style quality flags for low bandwidth routing
       
       if (isSlowNetwork) {

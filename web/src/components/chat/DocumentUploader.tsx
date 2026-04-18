@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { FileUp, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { GET_DOCUMENT_LIFECYCLE, UPLOAD_DOCUMENT } from '../../graphql/chats';
+import { useNetworkQuality } from '../../hooks/useNetworkQuality';
 
 interface UploadDocumentResponse {
   uploadDocument: {
@@ -39,12 +40,7 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
   const inputRef = useRef<HTMLInputElement>(null);
   const [localStatus, setLocalStatus] = useState<'processing' | 'ready' | 'failed' | null>(null);
 
-  type NavigatorWithConnection = Navigator & {
-    connection?: {
-      effectiveType?: string;
-      saveData?: boolean;
-    };
-  };
+  const network = useNetworkQuality();
 
   const [uploadDocument, { loading }] = useMutation<UploadDocumentResponse>(UPLOAD_DOCUMENT);
   const { data: lifecycleData, startPolling, stopPolling } = useQuery<DocumentLifecycleData>(GET_DOCUMENT_LIFECYCLE, {
@@ -67,16 +63,19 @@ export default function DocumentUploader({ disabled = false, onStatus }: Documen
     const isProcessing = localStatus === 'processing' || latestStatus === 'processing';
 
     if (isProcessing) {
-      const conn = (navigator as NavigatorWithConnection).connection;
-      const isSlowNetwork = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData);
       // Reduce polling frequency on slow/saving data connections to conserve battery & bandwidth
-      startPolling(isSlowNetwork ? 15000 : 8000);
+      // If offline, stop polling entirely
+      if (network.isOffline) {
+        stopPolling();
+      } else {
+        startPolling(network.isSlowNetwork ? 15000 : 8000);
+      }
     } else {
       stopPolling();
     }
 
     return () => stopPolling();
-  }, [latestStatus, localStatus, startPolling, stopPolling]);
+  }, [latestStatus, localStatus, startPolling, stopPolling, network.isOffline, network.isSlowNetwork]);
 
   const handleFilePicked = async (file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
