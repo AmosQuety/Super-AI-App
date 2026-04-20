@@ -23,7 +23,9 @@ jobs:
             exit 0
           fi
 
-          curl -fsSI --max-time 30 "$RENDER_HEALTH_URL"
+          if ! curl -fsSLI --connect-timeout 10 --max-time 120 --retry 2 --retry-delay 5 --retry-all-errors "$RENDER_HEALTH_URL"; then
+            echo "Render ping failed after retries (likely cold start or transient network issue)."
+          fi
           echo "Pung Render Backend"
 
       - name: Wake up Python Brain (Hugging Face)
@@ -34,7 +36,9 @@ jobs:
             exit 0
           fi
 
-          curl -fsSI --max-time 30 "$HF_SPACE_URL"
+          if ! curl -fsSLI --connect-timeout 10 --max-time 120 --retry 2 --retry-delay 5 --retry-all-errors "$HF_SPACE_URL"; then
+            echo "Hugging Face ping failed after retries."
+          fi
           echo "Pung Hugging Face"
 
       - name: Wake up Frontend (Vercel)
@@ -47,5 +51,7 @@ jobs:
             exit 0
           fi
 
-          curl -fsSI --max-time 30 "$FRONTEND_TARGET"
+          if ! curl -fsSLI --connect-timeout 10 --max-time 120 --retry 2 --retry-delay 5 --retry-all-errors "$FRONTEND_TARGET"; then
+            echo "Vercel ping failed after retries."
+          fi
           echo "Pung Vercel Frontend"
