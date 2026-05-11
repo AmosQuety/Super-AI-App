@@ -186,7 +186,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
 
   const [conversationId, setConversationId] = useState<string | null>(urlChatId);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user: authUser } = useAuth();
+  const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Auto-select chat from URL
   useEffect(() => {
@@ -208,6 +208,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   };
 
   const isValidUserId = !!currentUser.id && currentUser.id !== 'user-123';
+  const canUseChat = !authLoading && isAuthenticated;
 
   // 1. Get Chats List
   const {
@@ -399,6 +400,11 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   }, [chatsData]);
 
   const handleSendMessage = useCallback(async (text: string, attachment?: File) => {
+    if (!canUseChat) {
+      toast.warn("Please sign in to create a chat.", { theme: "dark" });
+      return;
+    }
+
     const trimmedText = text.trim();
     const userContent = trimmedText || (attachment ? `[Attached: ${attachment.name}]` : '');
 
@@ -551,7 +557,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
     } finally {
       setAiState("idle");
     }
-  }, [conversationId, currentUser.id, createChat, sendMessage, refetchChats, addOptimisticMessage, updateMessageStatus, replaceTempMessage, addMessage, showError, requestPermission, notifyWhenReady]);
+  }, [conversationId, currentUser.id, createChat, sendMessage, refetchChats, addOptimisticMessage, updateMessageStatus, replaceTempMessage, addMessage, showError, requestPermission, notifyWhenReady, canUseChat, network.isOffline, selectedDocIds, activeDocs]);
 
   const handleRetryMessage = useCallback((message: MessageType) => {
     if (message.status !== "error" && message.status !== "retrying") return;
@@ -588,11 +594,15 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
   }, [conversationId, setAllMessages]);
 
   const handleCreateNewConversation = useCallback(() => {
+    if (!canUseChat) {
+      return;
+    }
+
     setConversationId(null);
     setAllMessages([]);
     setAiState("idle");
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
-  }, [setAllMessages]);
+  }, [canUseChat, setAllMessages]);
 
   const [offlineQ, setOfflineQ] = useState(offlineQueue.getQueue());
   
@@ -709,6 +719,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
                         <button 
                           key={idx}
                           onClick={() => handleSendMessage(item.text)}
+                          disabled={!canUseChat}
                           className="flex items-center space-x-3 p-4 bg-theme-secondary border border-theme-light rounded-xl hover:bg-theme-tertiary transition-all text-left shadow-theme-sm hover:shadow-theme-md group"
                         >
                           <div className={`p-2 rounded-lg bg-theme-tertiary ${item.color} group-hover:scale-110 transition-transform`}>
@@ -815,7 +826,7 @@ const ChatContainer: React.FC<Props> = ({ userInfo }) => {
               <div className="max-w-3xl mx-auto">
                 <InputArea
                   onSendMessage={handleSendMessage}
-                  disabled={historyLoading || aiState !== "idle"}
+                  disabled={historyLoading || aiState !== "idle" || !canUseChat}
                   isOnline={!network.isOffline}
                   onToggleContext={() => setShowContextPanel(p => !p)}
                   contextOpen={showContextPanel}

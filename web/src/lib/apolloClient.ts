@@ -11,7 +11,6 @@ import {
   type Operation,
 } from "@apollo/client";
 import { getMainDefinition } from "@apollo/client/utilities";
-import { setContext } from "@apollo/client/link/context";
 import { RetryLink } from "@apollo/client/link/retry";
 import { ErrorLink } from "@apollo/client/link/error";
 import {
@@ -34,6 +33,13 @@ const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/g
 
 // ✅ DEFINE PUBLIC ROUTES - These should NEVER redirect to login
 const PUBLIC_ROUTES = ['/', '/login', '/register'];
+const PUBLIC_OPERATION_NAMES = new Set([
+  'Login',
+  'Register',
+  'LoginWithFace',
+  'LoginWithVoice',
+  'GetVoiceLoginChallenge',
+]);
 
 logger.log('🔧 Apollo Client Configuration:', {
   graphqlUrl: GRAPHQL_URL,
@@ -83,21 +89,34 @@ const decrementRequest = () => {
   logger.log(`📡 Active GraphQL requests: ${activeRequests}`);
 };
 
-// Auth link - Get token from localStorage
-const authLink = setContext(async (_, { headers }) => {
-  // Read token fresh from localStorage every time
+// Auth link - Get token from localStorage and stop protected operations early
+const authLink = new ApolloLink((operation, forward) => {
   const token = localStorage.getItem('authToken');
+  const operationName = operation.operationName || 'AnonymousOperation';
+  const isPublicOperation = PUBLIC_OPERATION_NAMES.has(operationName);
 
-  // Debug log to ensure token exists when query fires
-  if (!token) logger.warn('⚠️ No auth token found in localStorage');
+  if (!token && !isPublicOperation) {
+    const message =
+      operationName === 'CreateChat'
+        ? 'You must be logged in to create a chat'
+        : `You must be logged in to run ${operationName}`;
 
-  return {
+    logger.warn(`⚠️ Blocking protected GraphQL operation without auth: ${operationName}`);
+
+    return new Observable((observer) => {
+      observer.error(new Error(message));
+    });
+  }
+
+  operation.setContext(({ headers = {} }) => ({
     headers: {
       ...headers,
       "apollo-require-preflight": "true",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-    }
-  };
+    },
+  }));
+
+  return forward(operation);
 });
 
 // Retry logic

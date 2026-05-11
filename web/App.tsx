@@ -12,7 +12,7 @@ import { WorkspaceProvider } from "./src/contexts/WorkspaceProvider";
 import { ErrorBoundary } from "./src/components/ui/ErrorBoundary/ErrorBoundary";
 import ErrorMonitor from "./src/lib/ErrorMonitor";
 
-const ChatContainer = lazy(() => import("./src/components/chat/ChatContainer"));
+const ChatScreen = lazy(() => import("./src/pages/ChatScreen"));
 const ImageGenerator = lazy(() => import("./src/components/ImageGenerator"));
 const VoiceTools = lazy(() => import("./src/components/VoiceTools"));
 const ProfilePage = lazy(() => import("./src/pages/ProfilePage"));
@@ -96,12 +96,6 @@ const HomeContent = () => (
 // App Routes
 // ==============================
 const AppRoutes = () => {
-  const { user: authUser, token: authToken } = useAuth();
-
-  const userInfo = authUser
-    ? { id: authUser.id, username: authUser.name || authUser.email || "User" }
-    : null;
-
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <Routes>
@@ -143,16 +137,7 @@ const AppRoutes = () => {
 
           <Route
             path="chat"
-            element={
-              userInfo ? (
-                <ChatContainer
-                  token={authToken || ""}
-                  userInfo={userInfo}
-                />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
+            element={<ChatScreen />}
           />
 
           <Route path="playground" element={<PlaygroundPage />} />

@@ -62,7 +62,8 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
   onCloseMobile
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAuthenticated, isLoading: authLoading } = useAuth();
+  const canCreateConversation = isAuthenticated && !authLoading;
   
 
   const filteredSessions = useMemo(() => {
@@ -132,6 +133,7 @@ const Sidebar: React.FC<ChatHistorySidebarProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onCreateNewConversation}
+              disabled={!canCreateConversation}
               className="w-full group relative flex items-center justify-center space-x-2 bg-theme-primary text-theme-primary font-medium py-2.5 px-4 rounded-lg shadow-theme-lg hover:shadow-theme-xl transition-all duration-200 border border-theme-light"
             >
               <Plus className="w-4 h-4" />
