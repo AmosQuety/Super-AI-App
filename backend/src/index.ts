@@ -58,7 +58,8 @@ const startServer = async (): Promise<any> => {
 
     // 1. DYNAMIC CORS CONFIGURATION
     const allowedOrigins = [
-      "https://prism-vision.vercel.app",
+      "https://xemora.vercel.app",
+      "https://prism-vision.vercel.app", // legacy domain, now redirects to xemora.vercel.app
       "https://studio.apollographql.com",
       "https://sandbox.apollo.dev",
     ];

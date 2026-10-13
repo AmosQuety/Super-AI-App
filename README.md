@@ -7,7 +7,7 @@ A production-grade, multi-modal AI workspace integrating **Biometric Security**,
 ---
 
 ## 🚀 Live Demo
-*   **Frontend:** [https://prism-vision.vercel.app](https://prism-vision.vercel.app)
+*   **Frontend:** [https://xemora.vercel.app](https://xemora.vercel.app)
 *   **Video Demo:** [https://youtu.be/E5pNRct9X4Q](https://youtu.be/E5pNRct9X4Q)
 
 ---
