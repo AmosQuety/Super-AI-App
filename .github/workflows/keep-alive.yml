@@ -44,7 +44,7 @@ jobs:
       - name: Wake up Frontend (Vercel)
         run: |
           # Keeps Vercel edge cache warm
-          FRONTEND_TARGET="${FRONTEND_URL:-https://prism-vision.vercel.app/}"
+          FRONTEND_TARGET="${FRONTEND_URL:-https://xemora.vercel.app/}"
 
           if [ -z "$FRONTEND_TARGET" ]; then
             echo "Skipping Vercel ping: no frontend URL is available."
