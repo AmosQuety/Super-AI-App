@@ -10,6 +10,7 @@
 
     <!-- Primary SEO -->
     <title>Xemora – The Unified AI Ecosystem for Vision, Voice, and Security</title>
+    <link rel="canonical" href="https://xemora.vercel.app/" />
     <meta
       name="description"
       content="Xemora is a unified AI ecosystem for biometric security, computer vision, document intelligence, and generative art. Experience the future of AI workspace."
@@ -25,8 +26,12 @@
       content="Xemora is a unified AI ecosystem for biometric security, computer vision, document intelligence, and generative art."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://prism-vision.vercel.app/" />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:site_name" content="Xemora" />
+    <meta property="og:url" content="https://xemora.vercel.app/" />
+    <meta property="og:image" content="https://xemora.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Xemora – The Unified AI Ecosystem for Vision, Voice, and Security" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -35,7 +40,25 @@
       name="twitter:description"
       content="Unified AI ecosystem combining biometrics, vision, document chat, and generative art."
     />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image" content="https://xemora.vercel.app/og-image.png" />
+
+    <!-- Structured data: tells search engines "Xemora" is the name of this app -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Xemora",
+        "url": "https://xemora.vercel.app/",
+        "description": "Xemora is a unified AI ecosystem for biometric security, computer vision, document intelligence, and generative art.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "author": {
+          "@type": "Person",
+          "name": "AmosQuety",
+          "url": "https://github.com/AmosQuety"
+        }
+      }
+    </script>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,8 +76,29 @@
   </head>
 
   <body class="bg-slate-950 text-white antialiased">
-    <!-- React mounts here -->
-    <div id="root"></div>
+    <!-- React mounts here. The content inside is replaced as soon as the app
+         renders; it exists so search engines and link previews see real text
+         without running JavaScript. Keep it in sync with LandingPage. -->
+    <div id="root">
+      <main style="max-width: 720px; margin: 0 auto; padding: 96px 24px; text-align: center">
+        <h1 style="font-size: 3rem; font-weight: 700; margin: 0 0 16px">Xemora</h1>
+        <p style="font-size: 1.25rem; color: #cbd5e1; margin: 0 0 24px">
+          The AI Ecosystem for Vision, Voice, &amp; Security
+        </p>
+        <p style="color: #94a3b8; line-height: 1.6">
+          Xemora is a unified AI ecosystem for biometric security, computer vision,
+          document intelligence, and generative art, all in one workspace.
+        </p>
+        <ul style="list-style: none; padding: 0; color: #94a3b8; line-height: 1.8">
+          <li><strong>Face Playground</strong>: biometric experiments with real-time liveness detection and 1:N identification.</li>
+          <li><strong>Image Generation</strong>: turn ideas into visuals with generative art tools.</li>
+          <li><strong>Voice Tools</strong>: speak naturally to the AI with multi-modal voice interaction.</li>
+          <li><strong>Knowledge Brain</strong>: chat with your documents and get cited answers.</li>
+          <li><strong>Biometric Lab</strong>: a testing ground for AI-driven security and vision analysis.</li>
+        </ul>
+        <p><a href="/register" style="color: #a78bfa">Get started</a> · <a href="/login" style="color: #a78bfa">Sign in</a></p>
+      </main>
+    </div>
 
     <!-- Vite entry -->
     <script type="module" src="/index.tsx"></script>
