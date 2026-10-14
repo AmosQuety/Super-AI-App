@@ -261,7 +261,7 @@ export default function HomeScreen() {
       {/* Features Section */}
       <View className="px-6 mb-8">
         <Text className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          Why Choose Super AI App?
+          Why Choose Xemora?
         </Text>
         <View className="gap-4">
           {features.map((feature, index) => {
@@ -342,7 +342,7 @@ export default function HomeScreen() {
       <View className="px-6 pb-12">
         <View className="items-center">
           <Text className="text-gray-400 dark:text-gray-500 text-sm mb-2">
-            Super AI App v1.0.0
+            Xemora v1.0.0
           </Text>
           <Text className="text-gray-400 dark:text-gray-500 text-xs text-center">
             Trusted by developers • Powered by advanced AI • Available worldwide

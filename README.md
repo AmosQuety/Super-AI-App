@@ -1,4 +1,8 @@
-# 💎 Xemora: Biometric Intelligence Platform
+<p align="center">
+  <img src="web/public/icon-512.png" alt="Xemora logo" width="112" />
+</p>
+
+# Xemora: Biometric Intelligence Platform
 
 A production-grade, multi-modal AI workspace integrating **Biometric Security**, **Computer Vision**, and **Generative Intelligence** into a premium interface.
 

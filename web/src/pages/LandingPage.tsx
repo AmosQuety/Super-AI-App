@@ -84,9 +84,7 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-3 group transition-transform hover:scale-[1.02]">
-            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 via-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-
-            </div>
+            <img src="/logo.svg" alt="" className="w-10 h-10 rounded-xl shadow-lg shadow-indigo-500/20" />
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               Xemora
             </span>
@@ -285,7 +283,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-3 mb-6">
-
+                <img src="/logo.svg" alt="" className="w-9 h-9 rounded-lg" />
                 <span className="text-2xl font-bold text-white tracking-tight">Xemora</span>
               </div>
               <p className="text-slate-500 max-w-sm mb-8 leading-relaxed">

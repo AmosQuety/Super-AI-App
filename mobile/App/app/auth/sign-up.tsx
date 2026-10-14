@@ -145,7 +145,7 @@ export default function SignUpScreen() {
         {/* App Version/Footer */}
         <View className="items-center mt-8">
           <Text className="text-gray-400 dark:text-gray-500 text-xs">
-            Super AI App v1.0.0
+            Xemora v1.0.0
           </Text>
         </View>
       </View>

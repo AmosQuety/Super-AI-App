@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prism-vision-v3';
+const CACHE_NAME = 'xemora-v4';
 const ASSETS = [
   '/',
   '/index.html',
@@ -85,8 +85,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Xemora notification';
   const options = {
     body: payload.body || 'Your task has an update.',
-    icon: payload.icon || '/icon.svg',
-    badge: payload.badge || '/icon.svg',
+    icon: payload.icon || '/icon-192.png',
+    badge: payload.badge || '/icon-192.png',
     tag: payload.tag || 'xemora-task-update',
     renotify: Boolean(payload.renotify),
     data: payload.data || { url: '/dashboard' },
