@@ -72,7 +72,7 @@ This plan outlines the steps required to implement Voice Identity as a login opt
 ## Open Questions
 
 - **Threshold Tuning**: What is the ideal similarity threshold for "Facenet512" style embeddings in audio? (I'll start with 0.8 and we can tune it).
-- **Phrase Requirement**: Should we require a specific phrase (e.g., "Authorize login for Super AI App") to provide a better user experience?
+- **Phrase Requirement**: Should we require a specific phrase (e.g., "Authorize login for Xemora") to provide a better user experience?
 
 ## Verification Plan
 

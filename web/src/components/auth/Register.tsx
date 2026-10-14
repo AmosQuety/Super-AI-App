@@ -1,7 +1,7 @@
 // src/components/auth/RegisterScreen.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, User, ScanFace } from 'lucide-react';
+import { Eye, EyeOff, User } from 'lucide-react';
 import { useToast } from '../ui/toastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
@@ -155,9 +155,7 @@ export default function RegisterScreen() {
           {/* Logo Section */}
           <div className="mb-6">
             <Link to="/" className="inline-block">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
-                <ScanFace className="w-8 h-8 text-white" />
-              </div>
+              <img src="/logo.svg" alt="Xemora" className="w-16 h-16 rounded-2xl mx-auto shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform" />
             </Link>
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Join Xemora</h1>

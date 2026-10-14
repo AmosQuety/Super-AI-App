@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "super-ai-app",
+    "name": "Xemora",
     "slug": "super-ai-app",
     "version": "1.0.0",
     "web": {
@@ -21,7 +21,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#020617"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -31,7 +31,7 @@
       
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0b1026"
       },    
       "package": "com.danyrivas13.AppDeliveryReactNative",  
       "runtimeVersion": {
@@ -41,7 +41,7 @@
      "ios": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0b1026"
       },  
       "supportsTablet": true,
       "runtimeVersion": {

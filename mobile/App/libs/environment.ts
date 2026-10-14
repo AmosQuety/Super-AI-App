@@ -22,7 +22,7 @@ const developmentConfig: AppConfig = {
   GRAPHQL_URL: 'http://10.200.39.213:4001/graphql',
   FACE_SERVICE_URL: 'http://10.200.39.213:5001',
   
-  APP_NAME: 'Super AI app',
+  APP_NAME: 'Xemora',
   ENVIRONMENT: 'development',
   LOG_LEVEL: 'debug',
   FEATURE_FLAGS: {
