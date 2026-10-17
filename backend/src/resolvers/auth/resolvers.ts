@@ -52,16 +52,23 @@ export const authResolvers = {
 
       const users = await context.prisma.user.findMany({
         orderBy: { createdAt: "desc" },
+        // Allowlist of the User type's stored scalar fields; never select the password hash.
         select: {
           id: true,
           email: true,
           name: true,
+          role: true,
+          avatarUrl: true,
+          lastLoginAt: true,
+          isActive: true,
+          hasFaceRegistered: true,
+          hasVoiceRegistered: true,
           createdAt: true,
-          // Remove updatedAt since it's not in your schema
+          updatedAt: true,
         },
       });
 
-      return users;
+      return users as UserResponse[];
     },
 
     getVoiceLoginChallenge: async (_: any, { email }: { email: string }, context: AppContext): Promise<string> => {
