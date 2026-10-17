@@ -31,7 +31,9 @@ export class AuthorizationService {
       [UserRole.ADMIN]: 3,
     };
 
-    if (roleHierarchy[userRole] < roleHierarchy[requiredRole]) {
+    // Roles are free text in the database, so an unknown value must be denied, not compared.
+    const userLevel: number | undefined = roleHierarchy[userRole];
+    if (userLevel === undefined || userLevel < roleHierarchy[requiredRole]) {
       throw new ForbiddenError(
         `Insufficient permissions. Required role: ${requiredRole}`
       );

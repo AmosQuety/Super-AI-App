@@ -89,6 +89,9 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   if (req) {
     token = req.headers.authorization?.replace("Bearer ", "");
     
+  } else if (connection?.connectionParams?.authToken) {
+    // graphql-ws delivers the client's connection params here
+    token = connection.connectionParams.authToken;
   } else if (connection?.context?.authToken) {
     token = connection.context.authToken;
   }
