@@ -1,6 +1,8 @@
+import { config } from './environment';
+
 export const Config = {
-  // API Configuration
-  API_BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://api.shared-backend.example',
+  // API Configuration (single source of truth lives in environment.ts)
+  API_BASE_URL: config.API_URL,
   
   // Feature Toggles
   FEATURES: {

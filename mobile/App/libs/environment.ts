@@ -17,11 +17,16 @@ export interface AppConfig {
   };
 }
 
+// 10.0.2.2 is how the Android emulator reaches the host machine's localhost.
+// Physical devices must set EXPO_PUBLIC_API_URL to the host's LAN address.
+const ANDROID_EMULATOR_HOST = 'http://10.0.2.2';
+const developmentApiUrl = process.env.EXPO_PUBLIC_API_URL || `${ANDROID_EMULATOR_HOST}:4001`;
+
 const developmentConfig: AppConfig = {
-  API_URL: 'http://10.200.39.213:4001',
-  GRAPHQL_URL: 'http://10.200.39.213:4001/graphql',
-  FACE_SERVICE_URL: 'http://10.200.39.213:5001',
-  
+  API_URL: developmentApiUrl,
+  GRAPHQL_URL: process.env.EXPO_PUBLIC_GRAPHQL_URL || `${developmentApiUrl}/graphql`,
+  FACE_SERVICE_URL: process.env.EXPO_PUBLIC_FACE_SERVICE_URL || `${ANDROID_EMULATOR_HOST}:5001`,
+
   APP_NAME: 'Xemora',
   ENVIRONMENT: 'development',
   LOG_LEVEL: 'debug',
