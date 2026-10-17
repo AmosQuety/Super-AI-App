@@ -1,12 +1,10 @@
 // src/resolvers/queries/imageQueries.ts
-import { AuthenticationError } from "apollo-server-express";
 import { AppContext } from "../types/context";
+import { AuthorizationService } from "../../auth/authorization";
 
 export const imageQueries = {
   images: async (_: any, { userId }: { userId: string }, context: AppContext) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to view images");
-    }
+    AuthorizationService.requireSelfOrAdmin(context, userId);
 
     return await context.prisma.imageGeneration.findMany({
       where: { userId },
