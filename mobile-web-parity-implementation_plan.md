@@ -98,7 +98,7 @@ Then log out and in, and restart VS Code. Quick alternative without re-login: qu
 
 0.8 DONE. First dev build: `npx expo prebuild --platform android` then `npx expo run:android --port 8082`. Fix any JDK 21 or Gradle issue (fall back to JDK 17 via `jenv` if needed).
 
-0.9 PENDING (needs re-login and a new Claude Code session). Run the `argent-environment-inspector` agent once; save its JSON result to project memory; confirm exit test.
+0.9 DONE 2026-10-17. `argent-environment-inspector` ran once and its findings are in project memory. Exit test passed: emulator booted, app launched, screenshot taken, Metro logs read, login as `agent-test@xemora.local` reached the local backend (details in section 8.6).
 
 ### Phase 1: Parity audit (read-only, agent)
 
@@ -232,13 +232,24 @@ cd backend && ./scripts/local-env.sh npm run dev
 # 2. Emulator
 emulator -avd Xemora_Pixel_API_35 -gpu host -no-audio &
 
-# 3. Metro for the already-installed dev build (port 8082; 8081 is used by a Docker container)
+# 3. Metro for the already-installed debug build (port 8082; 8081 is used by a Docker container)
 cd mobile/App && npx expo start --dev-client --port 8082
+
+# 4. Let the emulator reach Metro. Repeat after every emulator restart; without it the app shows a blank screen
+adb -s emulator-5554 reverse tcp:8082 tcp:8082
 
 # Rebuild the native app only after native dependency changes
 cd mobile/App && npx expo run:android --port 8082
 ```
 Use `--clear` on `expo start` after changing Babel or dependency configuration. A full native rebuild takes 4 to 5 minutes warm; the very first one took 40 minutes on this network.
+
+The installed app is a plain `expo run:android` debug build: `expo-dev-client` is not a dependency, so there is no launcher screen and Metro is found only through the `adb reverse` above. The API needs no reverse because the app calls `http://10.0.2.2:4001` (the emulator's alias for the host).
+
+### 8.6 Driving the app with Argent (verified 2026-10-17)
+- Package id `com.danyrivas13.AppDeliveryReactNative`. Pass `port: 8082` to every Argent debugger tool.
+- Login: type the email with `keyboard`, then the password with the placeholder `{{secret:XEMORA_TEST_PASSWORD}}`. The value comes from `ARGENT_SECRET_XEMORA_TEST_PASSWORD` in `~/.argent/secrets.env` (outside the repo, mode 600), which is a copy of `LOCAL_TEST_USER_PASSWORD`; update both if the password changes.
+- `view-network-logs` only captures `fetch()`, and the app talks to the backend through Apollo, so it stays empty. To confirm API calls use `debugger-log-registry` (app console) and the backend log (`User ... logged in successfully`).
+- Exit test passed: app launched, Sign In screen rendered, login as `agent-test@xemora.local` reached the local backend and opened Home.
 
 ### 8.5 Local development database (decision: option A)
 
