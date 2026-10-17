@@ -2,6 +2,7 @@
   "expo": {
     "name": "Xemora",
     "slug": "super-ai-app",
+    "scheme": "xemora",
     "version": "1.0.0",
     "web": {
       "favicon": "./assets/favicon.png",
@@ -39,10 +40,6 @@
       }
     },   
      "ios": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0b1026"
-      },  
       "supportsTablet": true,
       "runtimeVersion": {
         "policy": "sdkVersion"
