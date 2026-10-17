@@ -1,6 +1,7 @@
 // src/auth/security.ts 
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { UserRole } from './authorization';
 
 export interface JWTPayload {
   userId: string;
@@ -72,16 +73,23 @@ export class SecurityConfig {
     } as any);
   }
 
-  // --- ADD THIS NEW METHOD ---
+  // Roles are free text in the database. Only known roles go into a token;
+  // anything else gets the least privilege instead of being trusted.
+  private static roleForToken(storedRole: unknown): string {
+    const knownRoles = Object.values(UserRole) as string[];
+    return typeof storedRole === 'string' && knownRoles.includes(storedRole)
+      ? storedRole
+      : UserRole.USER;
+  }
+
   // This bridges the gap between Prisma User object and your JWT Payload
   static generateToken(user: any): string {
     return this.createToken({
       userId: user.id,
       email: user.email,
-      role: user.role || 'USER', // Default role if missing
+      role: this.roleForToken(user.role),
     });
   }
-  // ---------------------------
 
   static verifyToken(token: string): JWTPayload {
     const config = this.getJWTConfig();

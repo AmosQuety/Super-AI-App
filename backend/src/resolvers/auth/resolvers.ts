@@ -162,11 +162,7 @@ export const authResolvers = {
         },
       });
 
-      const token = SecurityConfig.createToken({
-        userId: user.id,
-        email: user.email,
-        role: UserRole.USER,
-      });
+      const token = SecurityConfig.generateToken(user);
 
       const { password: userPassword, ...userWithoutPassword } = user;
 
@@ -199,11 +195,7 @@ export const authResolvers = {
         throw new AuthenticationError("Invalid email or password");
       }
 
-      const token = SecurityConfig.createToken({
-        userId: user.id,
-        email: user.email,
-        role: UserRole.USER,
-      });
+      const token = SecurityConfig.generateToken(user);
 
       const { password: userPassword, ...userWithoutPassword } = user;
 
@@ -399,11 +391,7 @@ export const authResolvers = {
       });
 
       // Generate Token
-      const token = SecurityConfig.createToken({
-        userId: user.id,
-        email: user.email,
-        role: UserRole.USER,
-      });
+      const token = SecurityConfig.generateToken(user);
 
       const { password, ...userWithoutPassword } = user;
 
