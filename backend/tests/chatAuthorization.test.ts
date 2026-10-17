@@ -6,6 +6,7 @@ import { resolvers } from "../src/resolvers";
 import { AuthorizationService, UserRole } from "../src/auth/authorization";
 import { SecurityConfig } from "../src/auth/security";
 import { createContext } from "../src/resolvers/types/context";
+import { redisClient } from "../src/lib/redis";
 
 type Caller = { userId: string; email: string; role?: string } | null;
 
@@ -33,6 +34,17 @@ async function runQuery(source: string, user: Caller) {
   return graphql({ schema, source, contextValue: contextFor(user) });
 }
 
+// Replaces the Redis calls with a Map so the tests neither touch the dev Redis nor depend on its state.
+const cacheStore = new Map<string, string>();
+
+function useInMemoryCache() {
+  if (!redisClient) return;
+  (redisClient as any).get = async (key: string) => cacheStore.get(key) ?? null;
+  (redisClient as any).set = async (key: string, value: string) => {
+    cacheStore.set(key, value);
+  };
+}
+
 function errorCode(result: any) {
   return result.errors?.[0]?.extensions?.code;
 }
@@ -47,6 +59,16 @@ async function chatsAllowsOwnListAndAdmin() {
   assert.equal(own.errors, undefined);
   const byAdmin = await runQuery('{ chats(userId: "owner_1") { id } }', admin);
   assert.equal(byAdmin.errors, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(byAdmin.data)), { chats: [{ id: "chat_of_owner_1" }] });
+}
+
+// A warm cache must never be served to someone who fails the authorization check.
+async function authorizationRunsBeforeTheCache() {
+  const warmed = '[{"id":"cached_chat","userId":"owner_1"}]';
+  cacheStore.set("user:owner_1:chats", warmed);
+  const result = await runQuery('{ chats(userId: "owner_1") { id } }', otherUser);
+  assert.equal(errorCode(result), "FORBIDDEN");
+  assert.equal(result.data, null);
 }
 
 async function chatHistoryHidesOtherUsersChat() {
@@ -89,6 +111,9 @@ function requireRoleAs(role: string, required: UserRole) {
 function requireRoleFailsClosed() {
   assert.throws(() => requireRoleAs("admin", UserRole.ADMIN), /Insufficient permissions/);
   assert.throws(() => requireRoleAs("SUPERUSER", UserRole.ADMIN), /Insufficient permissions/);
+  for (const inheritedName of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    assert.throws(() => requireRoleAs(inheritedName, UserRole.ADMIN), /Insufficient permissions/);
+  }
   assert.throws(() => requireRoleAs("MODERATOR", UserRole.ADMIN), /Insufficient permissions/);
   assert.doesNotThrow(() => requireRoleAs("ADMIN", UserRole.ADMIN));
   assert.doesNotThrow(() => requireRoleAs("MODERATOR", UserRole.USER));
@@ -104,8 +129,10 @@ async function webSocketContextReadsTokenFromConnectionParams() {
 }
 
 async function main() {
+  useInMemoryCache();
   await chatsRejectsAnotherUsersList();
   await chatsAllowsOwnListAndAdmin();
+  await authorizationRunsBeforeTheCache();
   await chatHistoryHidesOtherUsersChat();
   await chatHistoryTreatsMissingChatTheSame();
   await chatHistoryAllowsOwnerAndAdmin();

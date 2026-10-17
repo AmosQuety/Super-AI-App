@@ -1,5 +1,5 @@
 import { UserInputError } from "apollo-server-express";
-import { AuthorizationService, AuthContext, UserRole } from "./authorization";
+import { AuthorizationService, AuthContext } from "./authorization";
 
 interface ChatLookup {
   prisma: {
@@ -23,7 +23,7 @@ export async function requireChatAccess(context: AuthContext & ChatLookup, chatI
   });
 
   const isOwner = chat?.userId === user.userId;
-  const isAdmin = user.role === UserRole.ADMIN;
+  const isAdmin = AuthorizationService.isAdmin(user);
   if (!chat || (!isOwner && !isAdmin)) {
     throw new UserInputError("Chat not found");
   }

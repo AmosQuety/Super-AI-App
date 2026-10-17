@@ -26,8 +26,8 @@ export const chatQueries = {
     { chatId, limit = 20, offset = 0 }: { chatId: string; limit?: number; offset?: number },
     context: AppContext
   ) => {
-    const user = AuthorizationService.requireAuth(context);
     await requireChatAccess(context, chatId);
+    const user = context.user!;
 
     if (redisClient) {
       const cacheKey = `user:${user.userId}:chatHistory:${chatId}:limit:${limit}:offset:${offset}`;

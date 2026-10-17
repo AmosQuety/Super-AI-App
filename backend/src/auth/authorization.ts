@@ -20,6 +20,10 @@ export class AuthorizationService {
     return context.user;
   }
 
+  static isAdmin(user: { role?: string }): boolean {
+    return user.role === UserRole.ADMIN;
+  }
+
   static requireRole(context: AuthContext, requiredRole: UserRole) {
     const user = this.requireAuth(context);
     
@@ -31,9 +35,10 @@ export class AuthorizationService {
       [UserRole.ADMIN]: 3,
     };
 
-    // Roles are free text in the database, so an unknown value must be denied, not compared.
-    const userLevel: number | undefined = roleHierarchy[userRole];
-    if (userLevel === undefined || userLevel < roleHierarchy[requiredRole]) {
+    // Roles are free text in the database, so a value that is not a real role must be
+    // denied, not compared (this also rejects names such as "constructor").
+    const isKnownRole = (Object.values(UserRole) as string[]).includes(userRole);
+    if (!isKnownRole || roleHierarchy[userRole] < roleHierarchy[requiredRole]) {
       throw new ForbiddenError(
         `Insufficient permissions. Required role: ${requiredRole}`
       );
@@ -45,8 +50,7 @@ export class AuthorizationService {
     
     // FIX: use userId instead of id
     if (user.userId !== resourceUserId) {
-      const userRole = (user as any).role || UserRole.USER;
-      if (userRole !== UserRole.ADMIN) {
+      if (!this.isAdmin(user)) {
         throw new ForbiddenError('Access denied. You can only access your own resources.');
       }
     }
@@ -57,8 +61,7 @@ export class AuthorizationService {
     
     // FIX: use userId instead of id
     if (user.userId !== targetUserId) {
-      const userRole = (user as any).role || UserRole.USER;
-      if (userRole !== UserRole.ADMIN) {
+      if (!this.isAdmin(user)) {
         throw new ForbiddenError('Access denied. You can only access your own profile.');
       }
     }
