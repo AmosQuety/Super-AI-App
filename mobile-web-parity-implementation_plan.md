@@ -166,7 +166,7 @@ Done for a slice = behavior matches web for the agreed acceptance list, two clea
 | :--- | :--- |
 | Argent MCP cannot start (PATH) | Phase 0.2 |
 | Low RAM freezes the emulator | Phase 0.1, 4 GB AVD, close browsers while agents run |
-| Test data written to a real database | Decide the test-data policy before Phase 3 (section 6) |
+| Test data written to a real database | Local Postgres and Redis plus a guard script (section 8.5). Remaining cloud side effects are listed there |
 | Expo SDK 53 and Android API 37 incompatibility | Use an API 35 AVD |
 | JDK 21 vs RN 0.79 Gradle | Verify in 0.8; JDK 17 fallback |
 | Native modules missing from Expo Go | Dev build from Phase 0.8 |
@@ -178,13 +178,13 @@ Done for a slice = behavior matches web for the agreed acceptance list, two clea
 
 ## 6. Decisions needed from the developer
 
-1. **Test data policy.** Is `backend/.env`'s Supabase database safe for agent test accounts, or should there be a separate dev project/branch? Is a throwaway test user acceptable? (Blocks Phase 3.)
+1. **Test data policy.** RESOLVED 2026-10-17: option A, a separate local development database (section 8.5). Agents never use the cloud database.
 2. **Scope.** Full parity including playground and games, or core first (slices 1 to 6) with biometrics, security and playground later?
 3. **`android/` folder.** Commit generated native code (bare-style) or keep regenerating with `expo prebuild`?
 4. **Android package id.** Confirm the intended id (current value is a template leftover) and whether any build has been published under it.
 5. **Stop unrelated Docker containers** during agent sessions (frees RAM and port 8081)?
 6. **Commit `.claude/claude.md`** (the Argent agent rules) to the repo, or keep it local?
-7. **Backend to test against.** Local backend on port 4001 (preferred for debugging) or the deployed Render instance?
+7. **Backend to test against.** RESOLVED: local backend on port 4001 against the local database (section 8.5).
 
 ---
 
@@ -223,8 +223,11 @@ Do not upgrade `nativewind`, `react-native-reanimated` or add `react-native-work
 
 ### 8.4 Quick start (after reboot or re-login)
 ```bash
-# 1. Backend (port 4001)
-cd backend && npm run dev
+# 0. Local database containers (start once; they restart with Docker)
+docker start xemora-dev-postgres xemora-dev-redis
+
+# 1. Backend (port 4001) against the LOCAL database. Always use the guard script.
+cd backend && ./scripts/local-env.sh npm run dev
 
 # 2. Emulator
 emulator -avd Xemora_Pixel_API_35 -gpu host -no-audio &
@@ -236,3 +239,36 @@ cd mobile/App && npx expo start --dev-client --port 8082
 cd mobile/App && npx expo run:android --port 8082
 ```
 Use `--clear` on `expo start` after changing Babel or dependency configuration. A full native rebuild takes 4 to 5 minutes warm; the very first one took 40 minutes on this network.
+
+### 8.5 Local development database (decision: option A)
+
+Agents and manual testing use a local database. The cloud Supabase database and Upstash Redis in `backend/.env` are not touched.
+
+| Piece | Detail |
+| :--- | :--- |
+| Postgres | Docker container `xemora-dev-postgres` (image `pgvector/pgvector:pg16`), `127.0.0.1:5433`, database `xemora_dev`, volume `xemora-dev-pgdata` |
+| Redis | Docker container `xemora-dev-redis` (`redis:7-alpine`), `127.0.0.1:6380` |
+| Settings | `backend/.env.local` (gitignored, mode 600): `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL` and `LOCAL_TEST_USER_PASSWORD`. These override `.env` because `dotenv` never replaces variables that are already set |
+| Guard | `backend/scripts/local-env.sh <command>` loads `.env.local` and refuses to run unless the database and Redis addresses are local. Use it for every backend, Prisma and seed command |
+| Schema | Built with `prisma db push` (the migrations folder has no baseline, so `migrate deploy` cannot build a fresh database), after `CREATE EXTENSION vector`. Then the UP section of `20260418_vector_fts_indexes` was applied by hand (the file also contains a DOWN section; do not run it whole). 18 tables, two vector columns |
+| Test account | `agent-test@xemora.local`; password in `LOCAL_TEST_USER_PASSWORD` (`backend/.env.local`). Created by `./scripts/local-env.sh npx ts-node scripts/seed-local-users.ts` |
+
+Rebuild from scratch (container or volume lost):
+```bash
+docker run -d --name xemora-dev-postgres --restart unless-stopped -p 127.0.0.1:5433:5432 \
+  -e POSTGRES_USER=xemora -e POSTGRES_PASSWORD=<same as in .env.local> -e POSTGRES_DB=xemora_dev \
+  -v xemora-dev-pgdata:/var/lib/postgresql/data pgvector/pgvector:pg16
+docker run -d --name xemora-dev-redis --restart unless-stopped -p 127.0.0.1:6380:6379 redis:7-alpine
+docker exec xemora-dev-postgres psql -U xemora -d xemora_dev -c "CREATE EXTENSION IF NOT EXISTS vector;"
+cd backend && ./scripts/local-env.sh npx prisma db push --skip-generate
+sed '/^-- DOWN/,$d' prisma/migrations/20260418_vector_fts_indexes/migration.sql | \
+  docker exec -i xemora-dev-postgres psql -U xemora -d xemora_dev -v ON_ERROR_STOP=1
+./scripts/local-env.sh npx ts-node scripts/seed-local-users.ts
+```
+
+**Still cloud-backed (agents can cause real side effects here):**
+- Supabase Storage and Cloudinary: avatar, face and voice uploads go to the real buckets and account.
+- Gemini and Hugging Face API keys: calls use real quota. The Hugging Face Space AI engine (face and voice) is shared.
+- Decision for later: create separate dev buckets or keys before the biometrics slice.
+
+**Found along the way:** `backend/prisma/seed.ts` is stale (it writes a `title` field that `Document` no longer has) and fails to compile. It was not changed; fixing or retiring it is a separate decision.
