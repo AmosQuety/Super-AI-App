@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  SafeAreaView,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { gql } from '@apollo/client';
 import { useMutation } from '@apollo/client/react';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../hooks/use-auth';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -75,7 +75,7 @@ export default function NewChatScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView edges={['bottom', 'left', 'right']} className="flex-1 bg-gray-50">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

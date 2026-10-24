@@ -9,14 +9,13 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  SafeAreaView,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../hooks/use-auth';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GET_CHATS = gql`
   query GetChats($userId: ID!) {

@@ -1,6 +1,7 @@
 // app/features/chats/_layout.tsx - PROFESSIONAL STYLED VERSION
 import { Stack } from 'expo-router';
 import { Platform } from 'react-native';
+import { renderScreenHeader } from '../../../components/ui/screen-header';
 
 export default function ChatsLayout() {
   return (
@@ -16,6 +17,10 @@ export default function ChatsLayout() {
         headerTintColor: '#1f2937',
         headerShadowVisible: true,
         animation: 'slide_from_right',
+        // Draws its own status-bar inset (see components/ui/screen-header.tsx).
+        header: renderScreenHeader(),
+        // Dark icons over the white header; the library sets this per screen.
+        statusBarStyle: 'dark',
       }}>
       <Stack.Screen
         name="index"

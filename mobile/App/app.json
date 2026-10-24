@@ -28,6 +28,7 @@
         "backgroundColor": "#0b1026"
       },
       "package": "com.xemora.app",
+      "edgeToEdgeEnabled": true,
       "runtimeVersion": {
         "policy": "sdkVersion"
       }
