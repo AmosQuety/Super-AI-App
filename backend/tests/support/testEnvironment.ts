@@ -1,0 +1,4 @@
+// Import this first in tests that load the resolvers: some modules build a
+// Supabase client when they are imported and fail if the variables are unset.
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+process.env.SUPABASE_KEY = process.env.SUPABASE_KEY || "test-key-not-used";

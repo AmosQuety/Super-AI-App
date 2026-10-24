@@ -1,3 +1,4 @@
+import "./support/testEnvironment";
 import assert from "node:assert/strict";
 import axios from "axios";
 import { makeExecutableSchema } from "@graphql-tools/schema";
@@ -29,7 +30,13 @@ function contextFor(user: Caller) {
     },
     taskService: {
       getTaskByResultReferenceForUser: async (userId: string, jobId: string) =>
-        userId === "owner_1" && jobId === "job_1" ? { id: "task_1" } : null,
+        userId !== "owner_1"
+          ? null
+          : jobId === "job_1"
+            ? { id: "task_1", feature: "voice_clone" }
+            : jobId === "image_1"
+              ? { id: "task_2", feature: "image_generation" }
+              : null,
       completeTask: async () => undefined,
       failTask: async () => undefined,
     },
@@ -67,6 +74,13 @@ async function voiceJobStatusIsLimitedToTheJobsOwner() {
   assert.equal((await run(query, admin)).errors, undefined);
 }
 
+async function aNonVoiceTaskDoesNotGrantAccessToAVoiceJob() {
+  const callsBefore = voiceServiceCalls;
+  const result = await run('{ getVoiceJobStatus(jobId: "image_1") { status } }', owner);
+  assert.equal(result.errors?.[0]?.message, "Voice job not found");
+  assert.equal(voiceServiceCalls, callsBefore);
+}
+
 async function faceServiceCountIsAdminOnly() {
   const query = "{ faceServiceStatus { isOnline registeredFacesCount } }";
   for (const caller of [null, owner]) {
@@ -82,6 +96,7 @@ async function faceServiceCountIsAdminOnly() {
 async function main() {
   await imagesAreLimitedToTheirOwner();
   await voiceJobStatusIsLimitedToTheJobsOwner();
+  await aNonVoiceTaskDoesNotGrantAccessToAVoiceJob();
   await faceServiceCountIsAdminOnly();
   console.log("authorizationFollowups tests passed");
 }

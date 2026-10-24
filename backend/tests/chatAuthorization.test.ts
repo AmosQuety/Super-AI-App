@@ -1,3 +1,4 @@
+import "./support/testEnvironment";
 import assert from "node:assert/strict";
 import { makeExecutableSchema } from "@graphql-tools/schema";
 import { graphql } from "graphql";

@@ -191,7 +191,8 @@ export const authResolvers = {
         password,
         user?.password || DUMMY_HASH
       );
-      if (!user || !user.password || !isValidPassword) {
+      // A disabled account gets the same generic failure, after the password check so timing is unchanged.
+      if (!user || !user.password || !isValidPassword || !user.isActive) {
         throw new AuthenticationError("Invalid email or password");
       }
 
@@ -309,6 +310,10 @@ export const authResolvers = {
 
       if (!user) {
         throw new AuthenticationError("User not found");
+      }
+
+      if (!user.isActive) {
+        throw new AuthenticationError("Account disabled.");
       }
 
       if (!user.hasVoiceRegistered) {
