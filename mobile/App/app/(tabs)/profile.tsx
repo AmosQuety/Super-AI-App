@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/button';
@@ -47,7 +48,14 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Button title="Sign Out" variant="outline" className="mt-6" onPress={signOut} />
+        <Button
+          testID="profile-change-password"
+          title="Change password"
+          variant="outline"
+          className="mt-6"
+          onPress={() => router.push('/features/account/change-password')}
+        />
+        <Button title="Sign Out" variant="outline" className="mt-3" onPress={signOut} />
       </Card>
     </SafeAreaView>
   );
