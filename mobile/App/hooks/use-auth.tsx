@@ -22,6 +22,13 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
+// A failure the server explained (wrong password, validation) is shown to the user by the
+// caller; only unexpected errors are logged, because console.error raises a banner in development.
+function logUnexpected(action: string, error: unknown) {
+  if (error instanceof ApiError) return;
+  console.error(`${action} failed:`, error);
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -60,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       await storageService.setUser(userData);
     } catch (error) {
-      console.error('Auth check failed:', error);
+      logUnexpected('Auth check', error);
       await restoreCachedUserAfterOutage(error);
     } finally {
       setIsLoading(false);
@@ -87,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(response.user);
       await storageService.setUser(response.user);
     } catch (error) {
-      console.error('Sign in failed:', error);
+      logUnexpected('Sign in', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -101,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(response.user);
       await storageService.setUser(response.user);
     } catch (error) {
-      console.error('Sign up failed:', error);
+      logUnexpected('Sign up', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -114,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiService.logout();
       setUser(null);
     } catch (error) {
-      console.error('Sign out failed:', error);
+      logUnexpected('Sign out', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -126,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updatedUser = await apiService.updateProfile(updates);
       setUser(updatedUser);
     } catch (error) {
-      console.error('Profile update failed:', error);
+      logUnexpected('Profile update', error);
       throw error;
     }
   };
@@ -135,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       return await apiService.changePassword(currentPassword, newPassword);
     } catch (error) {
-      console.error('Password change failed:', error);
+      logUnexpected('Password change', error);
       throw error;
     }
   };
@@ -147,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
       }
     } catch (error) {
-      console.error('User refresh failed:', error);
+      logUnexpected('User refresh', error);
       throw error;
     }
   };

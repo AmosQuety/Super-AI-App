@@ -93,6 +93,8 @@ const OPERATIONS_WITH_EXPECTED_AUTH_ERRORS = new Set([
   'ChangePassword',
 ]);
 
+const EXPECTED_ERROR_CODES = new Set(['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN']);
+
 let isEndingSession = false;
 
 // Drops the stored login and cached data. Failures are logged, not thrown: a stale cache
@@ -138,7 +140,10 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   if (CombinedGraphQLErrors.is(error)) {
     error.errors.forEach(({ message, path, extensions }) => {
-      console.error(
+      // Errors the server meant for the user are routine; console.error would raise a
+      // development banner over the screen that is already showing them.
+      const log = EXPECTED_ERROR_CODES.has(String(extensions?.code)) ? console.log : console.error;
+      log(
         `[GraphQL error] ${operationName}: ${message}, Path: ${path?.join('.')}, Code: ${extensions?.code}`
       );
     });

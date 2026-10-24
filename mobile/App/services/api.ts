@@ -153,8 +153,11 @@ class ApiService {
       if (!result.data) throw new Error('No data returned from query');
       return result.data as T;
     } catch (error) {
-      logOperationFailure(operationName, error);
-      throw toUserFacingError(error);
+      const apiError = toUserFacingError(error);
+      // A failure the server explained has a code and reaches the user through the caller;
+      // only the rest (network, unexpected) is logged, since console.error raises a dev banner.
+      if (!apiError.code) logOperationFailure(operationName, error);
+      throw apiError;
     }
   }
 
@@ -169,8 +172,11 @@ class ApiService {
       if (!result.data) throw new Error('No data returned from mutation');
       return result.data as T;
     } catch (error) {
-      logOperationFailure(operationName, error);
-      throw toUserFacingError(error);
+      const apiError = toUserFacingError(error);
+      // A failure the server explained has a code and reaches the user through the caller;
+      // only the rest (network, unexpected) is logged, since console.error raises a dev banner.
+      if (!apiError.code) logOperationFailure(operationName, error);
+      throw apiError;
     }
   }
 
