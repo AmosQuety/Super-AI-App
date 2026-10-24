@@ -79,6 +79,7 @@ export const CHANGE_PASSWORD_MUTATION = gql`
     changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
       success
       message
+      token
     }
   }
 `;

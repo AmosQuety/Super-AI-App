@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_ME, UPDATE_PROFILE, CHANGE_PASSWORD } from "../graphql/users";
+import { newPasswordSchema, PASSWORD_HINT } from "../lib/validation-schemas";
 import { useToast } from "../components/ui/toastContext";
 import { useTheme } from "../contexts/useTheme";
 import FaceSettings from "../components/settings/FaceSettings";
@@ -72,10 +73,17 @@ export default function SettingsPage() {
     if (passwords.new !== passwords.confirm) {
       return addToast({ type: 'error', title: 'Error', message: 'Passwords do not match' });
     }
+    const newPasswordCheck = newPasswordSchema.safeParse(passwords.new);
+    if (!newPasswordCheck.success) {
+      return addToast({ type: 'error', title: 'Error', message: newPasswordCheck.error.issues[0].message });
+    }
     try {
-      await changePassword({
+      const { data: result } = await changePassword({
         variables: { currentPassword: passwords.current, newPassword: passwords.new }
       });
+      // The server ended every earlier session, including this one; keep this tab signed in.
+      const freshToken = result?.changePassword?.token;
+      if (freshToken) localStorage.setItem('authToken', freshToken);
       addToast({ type: 'success', title: 'Success', message: 'Password changed successfully.' });
       setPasswords({ current: "", new: "", confirm: "" });
     } catch (err: unknown) {
@@ -194,6 +202,7 @@ export default function SettingsPage() {
                         onChange={e => setPasswords({ ...passwords, new: e.target.value })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-pink-500 outline-none"
                       />
+                      <p className="mt-1 text-xs text-slate-500">{PASSWORD_HINT}</p>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Confirm New</label>

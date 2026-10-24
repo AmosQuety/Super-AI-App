@@ -23,6 +23,8 @@ import {
 interface ChangePasswordResult {
   success: boolean;
   message: string;
+  // A password change ends every earlier session; this one keeps this device signed in.
+  token?: string | null;
 }
 
 interface FaceServiceStatus {
@@ -235,6 +237,11 @@ class ApiService {
     );
     if (!data.changePassword) {
       throw new Error('Invalid password change response');
+    }
+    // The token in use was just revoked by the server, so swap in the fresh one before
+    // anything else makes a request.
+    if (data.changePassword.success && data.changePassword.token) {
+      await storageService.setAuthToken(data.changePassword.token);
     }
     return data.changePassword;
   }

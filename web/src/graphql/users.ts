@@ -122,6 +122,7 @@ export const CHANGE_PASSWORD = gql`
     changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
       success
       message
+      token
     }
   }
 `;
