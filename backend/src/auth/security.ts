@@ -15,42 +15,32 @@ export interface JWTPayload {
 export class SecurityConfig {
   private static validateSecret(): string {
     const secret = process.env.JWT_SECRET;
-    
+
     if (!secret) {
       throw new Error('JWT_SECRET environment variable is required');
     }
-    
+
     if (secret.length < 32) {
-      throw new Error('JWT_SECRET must be at least 32 characters long for production');
+      throw new Error('JWT_SECRET must be at least 32 characters long');
     }
-    
-    // Allow the default secret in development/test if needed, or remove this check
-    if (secret === 'your-super-secret-jwt-key-at-least-32-chars' && process.env.NODE_ENV === 'production') {
-      throw new Error('Change the default JWT_SECRET in production');
+
+    // The documented example value is public, so it must never sign real tokens.
+    if (secret === 'your-super-secret-jwt-key-at-least-32-chars') {
+      throw new Error('JWT_SECRET is still the default example value; set a unique secret');
     }
-    
+
     return secret;
   }
 
+  // There is deliberately no fallback secret: a missing or weak secret must stop
+  // the server rather than let anyone who has read the source forge tokens.
   static getJWTConfig() {
-    // Wrap in try/catch to handle validation errors gracefully or just return secret
-    try {
-        const secret = this.validateSecret();
-        return {
-          secret,
-          expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-          issuer: process.env.JWT_ISSUER || 'blaze-chat-app',
-          audience: process.env.JWT_AUDIENCE || 'blaze-chat-users',
-        };
-    } catch (e) {
-        // Fallback for development if env vars aren't set perfectly
-        return {
-            secret: 'fallback-secret-key-must-be-long-enough-for-signing',
-            expiresIn: '7d',
-            issuer: 'blaze-chat-app',
-            audience: 'blaze-chat-users',
-        }
-    }
+    return {
+      secret: this.validateSecret(),
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      issuer: process.env.JWT_ISSUER || 'blaze-chat-app',
+      audience: process.env.JWT_AUDIENCE || 'blaze-chat-users',
+    };
   }
 
   static generateSessionId(): string {

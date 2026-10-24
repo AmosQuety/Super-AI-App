@@ -130,9 +130,7 @@ const corsOptions: cors.CorsOptions = {
       logger.info("✅ Security configuration validated");
     } catch (error: any) {
       logger.error("❌ Security configuration error:", { error: error.message });
-      if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-      }
+      process.exit(1);
     }
 
     // Helper to decide if error is safe to show
