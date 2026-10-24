@@ -54,6 +54,8 @@ export default function SignInScreen() {
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
                   className=""
                 />
               </View>
@@ -70,6 +72,9 @@ export default function SignInScreen() {
                   name="password"
                   placeholder="Enter your password"
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="current-password"
                   className=""
                 />
                 <TouchableOpacity
