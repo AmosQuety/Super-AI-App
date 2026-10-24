@@ -7,7 +7,7 @@ import { Form, FormField } from '../../components/ui/form';
 import { useToast } from '../../components/ui/toast';
 import { useAuth } from '../../hooks/use-auth';
 import { useZodForm } from '../../hooks/use-form';
-import { signUpSchema, type SignUpFormData } from '../../libs/validation-schemas';
+import { PASSWORD_HINT, signUpSchema, type SignUpFormData } from '../../libs/validation-schemas';
 
 export default function SignUpScreen() {
   const { showSuccess, showError } = useToast();
@@ -102,9 +102,7 @@ export default function SignUpScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Password must be at least 8 characters long
-              </Text>
+              <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">{PASSWORD_HINT}</Text>
             </View>
 
             <TouchableOpacity

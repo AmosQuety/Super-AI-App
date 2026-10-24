@@ -18,7 +18,7 @@ import { useZodForm } from '../../../hooks/use-form';
 import { ApiError } from '../../../services/api';
 import {
   changePasswordSchema,
-  MIN_PASSWORD_LENGTH,
+  PASSWORD_HINT,
   type ChangePasswordFormData,
 } from '../../../libs/validation-schemas';
 
@@ -77,7 +77,7 @@ export default function ChangePasswordScreen() {
               label="New password"
               hidden={!showPasswords}
               autoComplete="new-password"
-              hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
+              hint={PASSWORD_HINT}
             />
             <PasswordField
               control={form.control}

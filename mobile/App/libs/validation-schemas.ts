@@ -4,9 +4,34 @@ import { z } from 'zod';
 // so the app must not tell users that anything shorter is acceptable.
 export const MIN_PASSWORD_LENGTH = 8;
 
+// bcrypt reads only the first 72 bytes, so the backend refuses longer NEW passwords. The limit
+// is in bytes, not characters: an emoji is 4 bytes and an accented letter usually 2.
+export const MAX_PASSWORD_BYTES = 72;
+
+// Counts UTF-8 bytes the way the backend does. TextEncoder is not guaranteed on Hermes.
+// A lone surrogate counts as 3 bytes (the replacement character), as in Node.
+export function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (const character of text) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint < 0x80) bytes += 1;
+    else if (codePoint < 0x800) bytes += 2;
+    else if (codePoint < 0x10000) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
+}
+
+// Only new passwords are capped. Sign-in and the current password are not, because an older
+// account may hold a longer password that still works.
 const newPasswordRule = z
   .string()
-  .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+  .refine((password) => utf8ByteLength(password) <= MAX_PASSWORD_BYTES, {
+    message: `Password must be at most ${MAX_PASSWORD_BYTES} bytes (fewer characters if you use emoji or accented letters)`,
+  });
+
+export const PASSWORD_HINT = `At least ${MIN_PASSWORD_LENGTH} characters, up to ${MAX_PASSWORD_BYTES} bytes (fewer characters if you use emoji or accented letters)`;
 
 // Sign-in only checks that a password was typed: the server decides whether it is correct,
 // and an older account may predate the length rule.

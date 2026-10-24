@@ -4,6 +4,8 @@ import {
   changePasswordSchema,
   signInSchema,
   signUpSchema,
+  utf8ByteLength,
+  MAX_PASSWORD_BYTES,
   MIN_PASSWORD_LENGTH,
 } from '../libs/validation-schemas';
 
@@ -142,8 +144,8 @@ test('each change password error lands on the field the user has to fix', () => 
   assert.match(String(noConfirmation?.message), /confirm/i);
 });
 
-test('passwords are not trimmed or capped on the client, matching what the backend accepts', () => {
-  for (const password of ['1234567 ', '        ', '😀😀😀😀', 'x'.repeat(1000)]) {
+test('passwords are not trimmed on the client, matching what the backend accepts', () => {
+  for (const password of ['1234567 ', '        ', '😀😀😀😀']) {
     assert.equal(
       signUpSchema.safeParse({ name: 'Ada', email: 'ada@example.test', password }).success,
       true,
@@ -159,4 +161,68 @@ test('passwords are not trimmed or capped on the client, matching what the backe
       `change with ${JSON.stringify(password.slice(0, 12))}`
     );
   }
+});
+
+test('the maximum password size matches the backend rule and is counted in bytes', () => {
+  assert.equal(MAX_PASSWORD_BYTES, 72);
+});
+
+test('utf8ByteLength counts bytes the way the backend does, without TextEncoder', () => {
+  assert.equal(utf8ByteLength(''), 0);
+  assert.equal(utf8ByteLength('abc'), 3);
+  assert.equal(utf8ByteLength('é'), 2);
+  assert.equal(utf8ByteLength('€'), 3);
+  assert.equal(utf8ByteLength('😀'), 4);
+  // A lone surrogate is encoded as the 3 byte replacement character.
+  assert.equal(utf8ByteLength('\ud83d'), 3);
+  for (const sample of ['x'.repeat(100), 'é€😀 mixed ünïcode', '\ud83dabc']) {
+    assert.equal(utf8ByteLength(sample), Buffer.byteLength(sample, 'utf8'), sample);
+  }
+});
+
+const AT_LIMIT = ['a'.repeat(72), 'é'.repeat(36), '😀'.repeat(18)];
+const OVER_LIMIT = ['a'.repeat(73), 'é'.repeat(37), '😀'.repeat(19)];
+
+test('a new password of exactly 72 bytes is accepted and one byte more is refused', () => {
+  for (const password of AT_LIMIT) {
+    assert.equal(
+      signUpSchema.safeParse({ name: 'Ada', email: 'ada@example.test', password }).success,
+      true,
+      `sign-up with ${utf8ByteLength(password)} bytes`
+    );
+    assert.equal(
+      changePasswordSchema.safeParse({
+        currentPassword: 'old-password-1',
+        newPassword: password,
+        confirmPassword: password,
+      }).success,
+      true,
+      `change with ${utf8ByteLength(password)} bytes`
+    );
+  }
+  for (const password of OVER_LIMIT) {
+    const signUp = signUpSchema.safeParse({ name: 'Ada', email: 'ada@example.test', password });
+    assert.equal(signUp.success, false, `sign-up with ${utf8ByteLength(password)} bytes`);
+    assert.match(String(firstMessage(signUp)), /72 bytes/);
+
+    const change = changePasswordSchema.safeParse({
+      currentPassword: 'old-password-1',
+      newPassword: password,
+      confirmPassword: password,
+    });
+    assert.deepEqual(firstIssue(change)?.path, ['newPassword']);
+    assert.match(String(firstMessage(change)), /72 bytes/);
+  }
+});
+
+test('sign-in and the current password are not capped, so older long passwords still work', () => {
+  const longOldPassword = 'b'.repeat(100);
+  assert.equal(
+    signInSchema.safeParse({ email: 'ada@example.test', password: longOldPassword }).success,
+    true
+  );
+  assert.equal(
+    changePasswordSchema.safeParse({ ...validChange, currentPassword: longOldPassword }).success,
+    true
+  );
 });
