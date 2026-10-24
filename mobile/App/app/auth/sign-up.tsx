@@ -103,7 +103,7 @@ export default function SignUpScreen() {
                 </TouchableOpacity>
               </View>
               <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Password must be at least 6 characters long
+                Password must be at least 8 characters long
               </Text>
             </View>
 

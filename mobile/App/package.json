@@ -8,6 +8,8 @@
     "prebuild": "expo prebuild",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "test:session": "tsc libs/session.ts tests/session.test.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck --types node && node --test .test-build/tests/session.test.js",
+    "test:validation": "tsc libs/validation-schemas.ts tests/validation.test.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck --types node && node --test .test-build/tests/validation.test.js",
+    "test": "npm run test:session && npm run test:validation",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "web": "expo start --web"
   },
