@@ -270,8 +270,9 @@ export const authResolvers = {
       }
 
       const isValidPassword = await bcrypt.compare(currentPassword, dbUser.password);
+      // Wrong input, not a bad session: clients sign the user out on UNAUTHENTICATED.
       if (!isValidPassword) {
-        throw new AuthenticationError("Current password is incorrect");
+        throw new UserInputError("Current password is incorrect");
       }
 
       // Prevent reusing the same password
