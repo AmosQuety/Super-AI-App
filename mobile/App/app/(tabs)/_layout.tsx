@@ -17,6 +17,7 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Home',
+            tabBarButtonTestID: 'tab-home',
             tabBarIcon: ({ color, size }) => <Home color={color} size={size || 24} />,
           }}
         />
@@ -24,6 +25,7 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: 'Profile',
+            tabBarButtonTestID: 'tab-profile',
             tabBarIcon: ({ color, size }) => <User color={color} size={size || 24} />,
           }}
         />
