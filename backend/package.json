@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "seed": "ts-node prisma/seed.ts",
     "test:tasks": "ts-node tests/taskLifecycle.test.ts && ts-node tests/taskEventPublisher.test.ts",
-    "test:authz": "ts-node tests/usersQueryAuthorization.test.ts && ts-node tests/chatAuthorization.test.ts && ts-node tests/authorizationFollowups.test.ts && ts-node tests/tokenRole.test.ts && ts-node tests/jwtSecret.test.ts",
+    "test:authz": "ts-node tests/usersQueryAuthorization.test.ts && ts-node tests/chatAuthorization.test.ts && ts-node tests/authorizationFollowups.test.ts && ts-node tests/tokenRole.test.ts && ts-node tests/jwtSecret.test.ts && ts-node tests/webhookAuth.test.ts",
     "push:generate-vapid-keys": "ts-node scripts/generateVapidKeys.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
