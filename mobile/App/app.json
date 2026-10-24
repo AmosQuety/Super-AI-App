@@ -34,7 +34,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b1026"
       },    
-      "package": "com.danyrivas13.AppDeliveryReactNative",  
+      "package": "com.xemora.app",
       "runtimeVersion": {
         "policy": "sdkVersion"
       }
