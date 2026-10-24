@@ -19,12 +19,20 @@ export function isValidWebhookSecret(provided: unknown): boolean {
   return crypto.timingSafeEqual(providedDigest, expectedDigest);
 }
 
-// The URL handed to the AI engine for each job. The engine posts back to exactly
-// this URL, so carrying the secret in it needs no change on the engine side.
+// Startup diagnostic: callbacks are rejected without a usable secret, and voice jobs
+// then rely on the polling fallback.
+export function webhookSecretProblem(): string | null {
+  if (configuredSecret()) return null;
+  return `WEBHOOK_SECRET is missing or shorter than ${MIN_SECRET_LENGTH} characters; voice-engine callbacks will be rejected`;
+}
+
+// The URL handed to the AI engine for each job. The engine posts back to exactly this
+// URL, or to it with the job id appended; the secret sits in the path so both work
+// and no engine change is needed. Paths are redacted from our logs (see loggableUrl).
 export function webhookCallbackUrl(): string {
   const baseUrl = process.env.APP_URL || "http://localhost:4001";
   const secret = configuredSecret();
   return secret
-    ? `${baseUrl}${CALLBACK_PATH}?secret=${encodeURIComponent(secret)}`
+    ? `${baseUrl}${CALLBACK_PATH}/cb/${encodeURIComponent(secret)}`
     : `${baseUrl}${CALLBACK_PATH}`;
 }

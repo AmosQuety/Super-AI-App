@@ -430,32 +430,3 @@ export const authResolvers = {
     },
   },
 };
-
-export const authenticateToken = async (prisma: PrismaClient, token: string) => {
-  try {
-    const payload = SecurityConfig.verifyToken(token) as JWTPayload;
-    
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { 
-        id: true, 
-        email: true, 
-        name: true, 
-        createdAt: true,
-        // Add role when you implement it in your schema
-      },
-    });
-
-    if (!user) {
-      return null;
-    }
-
-    return {
-      ...user,
-      role: payload.role, // Include role from token
-    };
-  } catch (error) {
-    logger.error('Token authentication failed:', error);
-    return null;
-  }
-};

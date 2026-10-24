@@ -1,5 +1,6 @@
 // src/index.ts
 
+import { webhookSecretProblem } from "./auth/webhookAuth";
 import './utils/quietConsole';
 import "./utils/sentry"; 
 import * as Sentry from "@sentry/node";
@@ -131,6 +132,11 @@ const corsOptions: cors.CorsOptions = {
     } catch (error: any) {
       logger.error("❌ Security configuration error:", { error: error.message });
       process.exit(1);
+    }
+
+    const webhookProblem = webhookSecretProblem();
+    if (webhookProblem) {
+      logger.warn(`⚠️ ${webhookProblem}`);
     }
 
     // Helper to decide if error is safe to show

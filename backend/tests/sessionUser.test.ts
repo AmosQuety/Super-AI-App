@@ -35,11 +35,12 @@ async function aDisabledOrDeletedAccountHasNoSession() {
   assert.equal(await authenticateToken(tokenFor("ADMIN"), lookupReturning(null).lookup), null);
 }
 
-async function aFailedLookupFailsClosed() {
+// A database outage must not look like "your session was rejected", or clients log everyone out.
+async function aFailedLookupIsARetryableErrorNotAnAnonymousCaller() {
   const failing = async () => {
     throw new Error("database unavailable");
   };
-  assert.equal(await authenticateToken(tokenFor("ADMIN"), failing), null);
+  await assert.rejects(() => authenticateToken(tokenFor("ADMIN"), failing), /temporarily unavailable/);
 }
 
 async function badOrMissingTokensNeverReachTheDatabase() {
@@ -68,7 +69,7 @@ async function main() {
   await theStoredRoleOverridesTheRoleInTheToken();
   await anUnknownStoredRoleBecomesUser();
   await aDisabledOrDeletedAccountHasNoSession();
-  await aFailedLookupFailsClosed();
+  await aFailedLookupIsARetryableErrorNotAnAnonymousCaller();
   await badOrMissingTokensNeverReachTheDatabase();
   await contextUsesTheLiveAccountForHttpAndWebSocket();
   console.log("sessionUser tests passed");

@@ -6,9 +6,20 @@ import crypto from 'crypto';
  * Comprehensive logging middleware for Express
  * Logs all incoming requests and outgoing responses
  */
-// Query-string credentials (for example the webhook secret) must never reach the logs.
+// Credentials in a URL (the webhook secret in its path, or a secret/token/key/password
+// query parameter) must never reach the logs.
 export const loggableUrl = (url: string): string =>
-  url.replace(/([?&](?:secret|token|key|password)=)[^&]*/gi, '$1[redacted]');
+  url
+    .replace(/(\/python\/cb\/)[^/?#]+/gi, '$1[redacted]')
+    .replace(/([?&](?:secret|token|key|password)=)[^&]*/gi, '$1[redacted]');
+
+const SENSITIVE_QUERY_KEY = /secret|token|key|password/i;
+
+export const loggableQuery = (query: Record<string, unknown> | undefined) =>
+  query &&
+  Object.fromEntries(
+    Object.entries(query).map(([name, value]) => [name, SENSITIVE_QUERY_KEY.test(name) ? '[redacted]' : value])
+  );
 
 export const loggingMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
@@ -17,8 +28,8 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
   const requestLog = {
     method: req.method,
     url: loggableUrl(req.url),
-    path: req.path,
-    query: req.query,
+    path: loggableUrl(req.path),
+    query: loggableQuery(req.query),
     headers: {
       'user-agent': req.get('User-Agent'),
       'content-type': req.get('Content-Type'),
@@ -156,7 +167,7 @@ export const errorLoggingMiddleware = (
     url: loggableUrl(req.url),
     ip: req.ip,
     body: process.env.NODE_ENV === 'development' ? req.body : undefined,
-    query: process.env.NODE_ENV === 'development' ? req.query : undefined,
+    query: process.env.NODE_ENV === 'development' ? loggableQuery(req.query) : undefined,
     timestamp: new Date().toISOString(),
   };
 
