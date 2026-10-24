@@ -1,4 +1,3 @@
-// Update your operations file
 import { gql } from '@apollo/client';
 
 export const LOGIN_MUTATION = gql`
@@ -75,6 +74,15 @@ export const UPDATE_PROFILE_MUTATION = gql`
   }
 `;
 
+export const CHANGE_PASSWORD_MUTATION = gql`
+  mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+    changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
+      success
+      message
+    }
+  }
+`;
+
 export const GET_CHATS = gql`
   query GetChats($userId: ID!) {
     chats(userId: $userId) {
@@ -117,78 +125,6 @@ export const CREATE_CHAT = gql`
         createdAt
         updatedAt
       }
-    }
-  }
-`;
-
-// NEW: Add message with file support
-export const SEND_MESSAGE_WITH_RESPONSE = gql`
-  mutation SendMessageWithResponse(
-    $chatId: ID!
-    $content: String!
-    $imageUrl: String
-    $fileName: String
-    $fileUri: String
-    $fileMimeType: String
-  ) {
-    sendMessageWithResponse(
-      chatId: $chatId
-      content: $content
-      imageUrl: $imageUrl
-      fileName: $fileName
-      fileUri: $fileUri
-      fileMimeType: $fileMimeType
-    ) {
-      userMessage {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
-      aiMessage {
-        id
-        role
-        content
-        createdAt
-        updatedAt
-      }
-      usedCustomResponse
-    }
-  }
-`;
-
-// NEW: Chat history with pagination
-export const CHAT_HISTORY = gql`
-  query ChatHistory($chatId: ID!, $limit: Int, $offset: Int) {
-    chatHistory(chatId: $chatId, limit: $limit, offset: $offset) {
-      messages {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
-      hasMore
-    }
-  }
-`;
-
-
-
-export const REMOVE_FACE = gql`
-  mutation RemoveFace {
-    removeFace {
-      success
-      message
     }
   }
 `;
