@@ -8,6 +8,7 @@ import { AppContext } from "../types/context"; // Import the full AppContext
 import { VoiceCloningService } from "../../services/voiceCloningService";
 import { redisClient } from "../../lib/redis";
 import { logger } from "../../utils/logger";
+import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -139,6 +140,7 @@ export const authResolvers = {
       if (password.length < 8) {
         throw new UserInputError("Password must be at least 8 characters long");
       }
+      assertPasswordWithinByteLimit(password);
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new UserInputError("Invalid email format");
@@ -256,6 +258,7 @@ export const authResolvers = {
       if (newPassword.length < 8) {
         throw new UserInputError("New password must be at least 8 characters long");
       }
+      assertPasswordWithinByteLimit(newPassword);
 
       const dbUser = await context.prisma.user.findUnique({
         where: { id: user.userId},
