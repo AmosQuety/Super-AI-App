@@ -38,14 +38,14 @@ export default function NewChatScreen() {
   const [initialMessage, setInitialMessage] = useState('');
   const { user } = useAuth();
 
-  const [createChat, { loading }] = useMutation(CREATE_CHAT);
+  const [createChat, { loading }] = useMutation<{ createChat: { id: string } }>(CREATE_CHAT);
 
   const handleCreateChat = async () => {
     if (!initialMessage.trim()) {
       Alert.alert('Empty Message', 'Please enter a message to start the conversation');
       return;
     }
-    
+
     if (!user?.id) {
       Alert.alert('Authentication Required', 'Please sign in to create a chat');
       return;
@@ -76,49 +76,40 @@ export default function NewChatScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <ScrollView 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <ScrollView
           className="flex-1"
           contentContainerStyle={{ padding: 24 }}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View className="mb-8">
-            <View className="bg-blue-50 rounded-full w-16 h-16 justify-center items-center mb-4">
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-blue-50">
               <Ionicons name="sparkles" size={32} color="#3b82f6" />
             </View>
-            <Text className="text-3xl font-bold text-gray-900 mb-2">
-              New Conversation
-            </Text>
-            <Text className="text-gray-500 text-base">
-              Start chatting with AI assistant
-            </Text>
+            <Text className="mb-2 text-3xl font-bold text-gray-900">New Conversation</Text>
+            <Text className="text-base text-gray-500">Start chatting with AI assistant</Text>
           </View>
 
           {/* Title Input */}
           <View className="mb-6">
-            <View className="flex-row items-center mb-3">
+            <View className="mb-3 flex-row items-center">
               <Ionicons name="pricetag-outline" size={20} color="#6b7280" />
-              <Text className="text-gray-700 font-semibold ml-2 text-base">
-                Title (Optional)
-              </Text>
+              <Text className="ml-2 text-base font-semibold text-gray-700">Title (Optional)</Text>
             </View>
-            <View 
-              className="bg-white rounded-2xl overflow-hidden"
+            <View
+              className="overflow-hidden rounded-2xl bg-white"
               style={{
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.05,
                 shadowRadius: 4,
                 elevation: 2,
-              }}
-            >
+              }}>
               <TextInput
-                className="px-4 py-4 text-gray-800 text-base"
+                className="px-4 py-4 text-base text-gray-800"
                 placeholder="e.g., Project Ideas, Daily Chat..."
                 placeholderTextColor="#9ca3af"
                 value={title}
@@ -126,37 +117,32 @@ export default function NewChatScreen() {
                 maxLength={100}
               />
             </View>
-            <View className="flex-row justify-between items-center mt-2 px-1">
-              <Text className="text-gray-400 text-xs">
-                Give your conversation a memorable name
-              </Text>
-              <Text className="text-gray-400 text-xs">
-                {title.length}/100
-              </Text>
+            <View className="mt-2 flex-row items-center justify-between px-1">
+              <Text className="text-xs text-gray-400">Give your conversation a memorable name</Text>
+              <Text className="text-xs text-gray-400">{title.length}/100</Text>
             </View>
           </View>
 
           {/* Message Input */}
           <View className="mb-6">
-            <View className="flex-row items-center mb-3">
+            <View className="mb-3 flex-row items-center">
               <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6b7280" />
-              <Text className="text-gray-700 font-semibold ml-2 text-base">
+              <Text className="ml-2 text-base font-semibold text-gray-700">
                 Your Message <Text className="text-red-500">*</Text>
               </Text>
             </View>
-            <View 
-              className="bg-white rounded-2xl overflow-hidden"
+            <View
+              className="overflow-hidden rounded-2xl bg-white"
               style={{
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.05,
                 shadowRadius: 4,
                 elevation: 2,
-              }}
-            >
+              }}>
               <TextInput
-                className="px-4 py-4 text-gray-800 text-base"
-                style={{ 
+                className="px-4 py-4 text-base text-gray-800"
+                style={{
                   minHeight: 120,
                   textAlignVertical: 'top',
                 }}
@@ -168,13 +154,14 @@ export default function NewChatScreen() {
                 maxLength={1000}
               />
             </View>
-            <View className="flex-row justify-between items-center mt-2 px-1">
-              <Text className="text-gray-400 text-xs">
+            <View className="mt-2 flex-row items-center justify-between px-1">
+              <Text className="text-xs text-gray-400">
                 {initialMessage.trim() ? '✓ Ready to send' : 'Required to start'}
               </Text>
-              <Text className={`text-xs ${
-                initialMessage.length > 900 ? 'text-orange-500' : 'text-gray-400'
-              }`}>
+              <Text
+                className={`text-xs ${
+                  initialMessage.length > 900 ? 'text-orange-500' : 'text-gray-400'
+                }`}>
                 {initialMessage.length}/1000
               </Text>
             </View>
@@ -182,27 +169,19 @@ export default function NewChatScreen() {
 
           {/* Suggestions */}
           <View className="mb-6">
-            <Text className="text-gray-600 text-sm font-medium mb-3">
-              💡 Try asking about:
-            </Text>
+            <Text className="mb-3 text-sm font-medium text-gray-600">💡 Try asking about:</Text>
             <View className="flex-row flex-wrap">
-              {[
-                'Code help',
-                'Writing tips',
-                'Learning topics',
-                'Creative ideas',
-              ].map((suggestion, index) => (
-                <TouchableOpacity
-                  key={index}
-                  className="bg-blue-50 rounded-full px-4 py-2 mr-2 mb-2"
-                  onPress={() => setInitialMessage(suggestion)}
-                  activeOpacity={0.7}
-                >
-                  <Text className="text-blue-600 text-sm font-medium">
-                    {suggestion}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {['Code help', 'Writing tips', 'Learning topics', 'Creative ideas'].map(
+                (suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    className="mb-2 mr-2 rounded-full bg-blue-50 px-4 py-2"
+                    onPress={() => setInitialMessage(suggestion)}
+                    activeOpacity={0.7}>
+                    <Text className="text-sm font-medium text-blue-600">{suggestion}</Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           </View>
 
@@ -210,10 +189,8 @@ export default function NewChatScreen() {
           <View className="mt-4 space-y-3">
             {/* Create Button */}
             <TouchableOpacity
-              className={`rounded-2xl py-4 justify-center items-center ${
-                initialMessage.trim() && !loading
-                  ? 'bg-blue-500'
-                  : 'bg-gray-300'
+              className={`items-center justify-center rounded-2xl py-4 ${
+                initialMessage.trim() && !loading ? 'bg-blue-500' : 'bg-gray-300'
               }`}
               style={
                 initialMessage.trim() && !loading
@@ -228,28 +205,25 @@ export default function NewChatScreen() {
               }
               onPress={handleCreateChat}
               disabled={!initialMessage.trim() || loading}
-              activeOpacity={0.8}
-            >
+              activeOpacity={0.8}>
               {loading ? (
                 <View className="flex-row items-center">
-                  <Text className="text-white font-bold text-base mr-2">Creating</Text>
-                  <View className="w-2 h-2 rounded-full bg-white mr-1 opacity-100" />
-                  <View className="w-2 h-2 rounded-full bg-white mr-1 opacity-60" />
-                  <View className="w-2 h-2 rounded-full bg-white opacity-30" />
+                  <Text className="mr-2 text-base font-bold text-white">Creating</Text>
+                  <View className="mr-1 h-2 w-2 rounded-full bg-white opacity-100" />
+                  <View className="mr-1 h-2 w-2 rounded-full bg-white opacity-60" />
+                  <View className="h-2 w-2 rounded-full bg-white opacity-30" />
                 </View>
               ) : (
                 <View className="flex-row items-center">
                   <Ionicons name="paper-plane" size={20} color="white" />
-                  <Text className="text-white font-bold text-base ml-2">
-                    Start Conversation
-                  </Text>
+                  <Text className="ml-2 text-base font-bold text-white">Start Conversation</Text>
                 </View>
               )}
             </TouchableOpacity>
 
             {/* Cancel Button */}
             <TouchableOpacity
-              className="rounded-2xl py-4 justify-center items-center bg-white border-2 border-gray-200"
+              className="items-center justify-center rounded-2xl border-2 border-gray-200 bg-white py-4"
               onPress={() => router.back()}
               disabled={loading}
               activeOpacity={0.8}
@@ -259,11 +233,8 @@ export default function NewChatScreen() {
                 shadowOpacity: 0.05,
                 shadowRadius: 2,
                 elevation: 1,
-              }}
-            >
-              <Text className="text-gray-600 font-semibold text-base">
-                Cancel
-              </Text>
+              }}>
+              <Text className="text-base font-semibold text-gray-600">Cancel</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

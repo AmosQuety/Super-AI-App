@@ -10,7 +10,6 @@ interface FormFieldProps extends TextInputProps {
   rules?: any;
 }
 
-
 export function FormField({ control, name, label, rules, className, ...props }: FormFieldProps) {
   return (
     <Controller
@@ -20,7 +19,7 @@ export function FormField({ control, name, label, rules, className, ...props }: 
       render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
         <View className="mb-4">
           {label && (
-            <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               {label}
             </Text>
           )}
@@ -28,13 +27,10 @@ export function FormField({ control, name, label, rules, className, ...props }: 
             onBlur={onBlur}
             onChangeText={onChange}
             value={value}
-            hasError={!!error}
             className={className}
             {...props}
           />
-          {error && (
-            <Text className="text-red-500 text-xs mt-1">{error.message}</Text>
-          )}
+          {error && <Text className="mt-1 text-xs text-red-500">{error.message}</Text>}
         </View>
       )}
     />

@@ -96,7 +96,7 @@ export default function SignInScreen() {
 
           {/* Sign Up Link */}
           <View className="mt-6 flex-row justify-center border-t border-gray-200 pt-6 dark:border-gray-700">
-            <Text className="text-gray-600 dark:text-gray-400">Don't have an account?</Text>
+            <Text className="text-gray-600 dark:text-gray-400">Don&apos;t have an account?</Text>
             <Link href="/auth/sign-up" asChild>
               <TouchableOpacity className="mb-7 p-1">
                 <Text className="ml-1 font-semibold text-blue-500">Sign Up</Text>
