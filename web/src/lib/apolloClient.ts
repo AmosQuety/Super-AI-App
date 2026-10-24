@@ -24,6 +24,7 @@ import {
 import ErrorMonitor from "./ErrorMonitor";
 import { createUploadLink } from "./uploadLink";
 import { logger } from "../utils/logger";
+import { isPublicRoute, loginRedirectUrl } from "../utils/session";
 
 
 
@@ -32,7 +33,6 @@ import { logger } from "../utils/logger";
 const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4001/graphql";
 
 // ✅ DEFINE PUBLIC ROUTES - These should NEVER redirect to login
-const PUBLIC_ROUTES = ['/', '/login', '/register'];
 const PUBLIC_OPERATION_NAMES = new Set([
   'Login',
   'Register',
@@ -178,21 +178,20 @@ const errorLink = new ErrorLink(({ error, operation }) => {
             code: extensions?.code
         });
 
-      // ✅ FIXED: Only redirect to login if on a PROTECTED route
+      // The server no longer accepts this session (expired, revoked, account disabled).
+      // Drop it and go to login now, instead of leaving the user on a page where every action fails.
       if (extensions?.code === "UNAUTHENTICATED") {
         logger.warn("User authentication failed");
 
         if (typeof window !== "undefined") {
-          const currentPath = window.location.pathname;
-          
-          // ✅ Check if we're on a public route - if so, DON'T redirect
-          const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
-          
-          if (!isPublicRoute && !localStorage.getItem("authToken")) {
-            logger.log(`🔒 Redirecting from protected route ${currentPath} to login`);
-            window.location.href = `/login?returnTo=${encodeURIComponent(currentPath)}`;
-          } else if (isPublicRoute) {
-            logger.log(`✅ On public route ${currentPath}, not redirecting`);
+          const { pathname, search } = window.location;
+
+          // A failed login attempt answers UNAUTHENTICATED too, so public pages never redirect.
+          if (!isPublicRoute(pathname)) {
+            logger.log(`🔒 Session rejected on ${pathname}; redirecting to login`);
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("userData");
+            window.location.href = loginRedirectUrl(pathname, search);
           }
         }
       }
