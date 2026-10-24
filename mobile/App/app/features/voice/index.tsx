@@ -749,12 +749,12 @@ export default function VoiceScreen() {
           <TouchableOpacity
             onPress={isSpeaking ? stopSpeaking : speakText}
             disabled={!text.trim()}
-            className={`flex-row items-center justify-center rounded-2xl py-5 ${
+            className={`flex-row items-center justify-center rounded-2xl py-5 shadow-lg ${
               !text.trim()
-                ? 'bg-slate-300'
+                ? 'bg-slate-300 shadow-slate-300/30'
                 : isSpeaking
-                  ? 'bg-rose-500 shadow-lg shadow-rose-500/30'
-                  : 'bg-indigo-500 shadow-lg shadow-indigo-500/30'
+                  ? 'bg-rose-500 shadow-rose-500/30'
+                  : 'bg-indigo-500 shadow-indigo-500/30'
             }`}
             activeOpacity={0.8}>
             {isSpeaking ? (
@@ -784,8 +784,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={handleCopy}
               disabled={!text.trim()}
-              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 ${
-                !text.trim() ? 'bg-slate-300' : 'bg-blue-500 shadow-sm'
+              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
+                !text.trim() ? 'bg-slate-300' : 'bg-blue-500'
               }`}>
               <Copy size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">Copy</Text>
@@ -794,8 +794,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={handleSave}
               disabled={!text.trim()}
-              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 ${
-                !text.trim() ? 'bg-slate-300' : 'bg-emerald-500 shadow-sm'
+              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
+                !text.trim() ? 'bg-slate-300' : 'bg-emerald-500'
               }`}>
               <Save size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">Save</Text>
@@ -804,8 +804,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={handleShare}
               disabled={!text.trim()}
-              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 ${
-                !text.trim() ? 'bg-slate-300' : 'bg-purple-500 shadow-sm'
+              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
+                !text.trim() ? 'bg-slate-300' : 'bg-purple-500'
               }`}>
               <Share2 size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">Share</Text>
@@ -820,8 +820,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={() => translateText(AI_FEATURES.LANGUAGES[1])}
               disabled={isTranslating || !text.trim()}
-              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 ${
-                !text.trim() || isTranslating ? 'bg-slate-300' : 'bg-blue-500 shadow-sm'
+              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
+                !text.trim() || isTranslating ? 'bg-slate-300' : 'bg-blue-500'
               }`}>
               <Languages size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">
@@ -832,8 +832,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={() => enhanceTextWithAI('grammar')}
               disabled={isProcessing || !text.trim()}
-              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 ${
-                !text.trim() || isProcessing ? 'bg-slate-300' : 'bg-amber-500 shadow-sm'
+              className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
+                !text.trim() || isProcessing ? 'bg-slate-300' : 'bg-amber-500'
               }`}>
               <Sparkles size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">
