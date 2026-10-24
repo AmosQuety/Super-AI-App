@@ -120,12 +120,14 @@ function requireRoleFailsClosed() {
   assert.doesNotThrow(() => requireRoleAs("MODERATOR", UserRole.USER));
 }
 
+const activeAccount = async () => ({ role: "USER", isActive: true });
+
 async function webSocketContextReadsTokenFromConnectionParams() {
   const token = SecurityConfig.createToken({ userId: "owner_1", email: "owner@example.test", role: "USER" } as any);
-  const withToken = await createContext({ connection: { connectionParams: { authToken: token } } });
+  const withToken = await createContext({ connection: { connectionParams: { authToken: token } }, lookupAccount: activeAccount });
   assert.equal(withToken.user?.userId, "owner_1");
 
-  const withoutToken = await createContext({ connection: { connectionParams: {} } });
+  const withoutToken = await createContext({ connection: { connectionParams: {} }, lookupAccount: activeAccount });
   assert.equal(withoutToken.user, null);
 }
 

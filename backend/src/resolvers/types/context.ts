@@ -17,7 +17,8 @@ import { PushNotificationService } from "../../services/pushNotificationService"
 import { PollinationsService } from '../../services/pollinations.service'; 
 
 import prisma from "../../lib/db";
-import { JWTPayload, SecurityConfig } from "../../auth/security"; 
+import { JWTPayload } from "../../auth/security";
+import { authenticateToken, AccountLookup } from "../../auth/sessionUser"; 
 
 // ============================================
 // SINGLETON SERVICES (Created once, reused)
@@ -83,26 +84,24 @@ export const disconnectPrisma = async () => {
 // ============================================
 // CONTEXT CREATION
 // ============================================
-export async function createContext({ req, connection }: any): Promise<AppContext> {
+const lookupStoredAccount: AccountLookup = (userId) =>
+  prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+
+export async function createContext({
+  req,
+  connection,
+  lookupAccount = lookupStoredAccount,
+}: any): Promise<AppContext> {
   let token: string | undefined;
-  
+
   if (req) {
     token = req.headers.authorization?.replace("Bearer ", "");
-    
   } else if (connection?.connectionParams?.authToken) {
     // graphql-ws delivers the client's connection params here
     token = connection.connectionParams.authToken;
   }
-  
-  let user: JWTPayload | null = null;
-  if (token) {
-    try {
-      user = SecurityConfig.verifyToken(token);
-      logger.debug('[context] user authenticated');
-    } catch (error) {
-      logger.warn('[context] invalid or expired token');
-    }
-  }
+
+  const user: JWTPayload | null = await authenticateToken(token, lookupAccount);
 
   const requestServices = {
     chatService: new ChatService(prisma),
