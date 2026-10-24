@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +15,7 @@ import { Form, FormField } from '../../../components/ui/form';
 import { useToast } from '../../../components/ui/toast';
 import { useAuth } from '../../../hooks/use-auth';
 import { useZodForm } from '../../../hooks/use-form';
+import { ApiError } from '../../../services/api';
 import {
   changePasswordSchema,
   MIN_PASSWORD_LENGTH,
@@ -29,15 +30,30 @@ export default function ChangePasswordScreen() {
   const [showPasswords, setShowPasswords] = useState(false);
   const form = useZodForm(changePasswordSchema, EMPTY_FORM);
 
+  // Two quick taps can arrive before the button re-renders as disabled; only one request may run.
+  const isSubmittingRef = useRef(false);
+
   const onSubmit = async ({ currentPassword, newPassword }: ChangePasswordFormData) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
-      await changePassword(currentPassword, newPassword);
+      const result = await changePassword(currentPassword, newPassword);
+      if (!result.success) {
+        throw new Error(result.message || 'The password was not changed.');
+      }
       form.reset(EMPTY_FORM);
       showSuccess('Password changed', 'Use your new password the next time you sign in.');
-      router.back();
+      if (router.canGoBack()) router.back();
     } catch (error) {
+      // The server no longer accepts the session: the app is already taking the user to Sign In,
+      // so an error message about this form would only confuse.
+      if (error instanceof ApiError && error.code === 'UNAUTHENTICATED') return;
       // The server's message is specific ("Current password is incorrect"); show it as is.
+      // A wrong current password is the one thing to retype, so clear only that field.
+      form.setValue('currentPassword', '');
       showError('Could not change password', error instanceof Error ? error.message : undefined);
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -90,7 +106,7 @@ export default function ChangePasswordScreen() {
               accessibilityLabel="Change password"
               title="Change password"
               loading={form.formState.isSubmitting}
-              disabled={!form.formState.isValid || form.formState.isSubmitting}
+              disabled={form.formState.isSubmitting}
               onPress={form.handleSubmit(onSubmit)}
             />
           </Form>
@@ -122,6 +138,8 @@ function PasswordField({ control, name, label, hidden, autoComplete, hint }: Pas
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete={autoComplete}
+        // Keeps the keyboard from learning or suggesting a password that is shown on screen.
+        keyboardType={!hidden && Platform.OS === 'android' ? 'visible-password' : 'default'}
       />
       {hint ? <Text className="-mt-2 mb-2 text-xs text-gray-500">{hint}</Text> : null}
     </View>

@@ -96,3 +96,67 @@ test('change password rejects reusing the current password', () => {
   assert.equal(result.success, false);
   assert.match(String(firstMessage(result)), /different/i);
 });
+
+function firstIssue(result: {
+  success: boolean;
+  error?: { issues: { message: string; path: PropertyKey[] }[] };
+}) {
+  return result.success ? undefined : result.error?.issues[0];
+}
+
+test('change password accepts a short current password, because older accounts may have one', () => {
+  assert.equal(
+    changePasswordSchema.safeParse({ ...validChange, currentPassword: 'abc' }).success,
+    true
+  );
+});
+
+test('each change password error lands on the field the user has to fix', () => {
+  const mismatch = firstIssue(
+    changePasswordSchema.safeParse({ ...validChange, confirmPassword: 'other-password-3' })
+  );
+  assert.deepEqual(mismatch?.path, ['confirmPassword']);
+
+  const reused = firstIssue(
+    changePasswordSchema.safeParse({
+      currentPassword: 'same-password-1',
+      newPassword: 'same-password-1',
+      confirmPassword: 'same-password-1',
+    })
+  );
+  assert.deepEqual(reused?.path, ['newPassword']);
+
+  const tooShort = firstIssue(
+    changePasswordSchema.safeParse({
+      ...validChange,
+      newPassword: '1234567',
+      confirmPassword: '1234567',
+    })
+  );
+  assert.deepEqual(tooShort?.path, ['newPassword']);
+
+  const noConfirmation = firstIssue(
+    changePasswordSchema.safeParse({ ...validChange, confirmPassword: '' })
+  );
+  assert.deepEqual(noConfirmation?.path, ['confirmPassword']);
+  assert.match(String(noConfirmation?.message), /confirm/i);
+});
+
+test('passwords are not trimmed or capped on the client, matching what the backend accepts', () => {
+  for (const password of ['1234567 ', '        ', '😀😀😀😀', 'x'.repeat(1000)]) {
+    assert.equal(
+      signUpSchema.safeParse({ name: 'Ada', email: 'ada@example.test', password }).success,
+      true,
+      `sign-up with ${JSON.stringify(password.slice(0, 12))}`
+    );
+    assert.equal(
+      changePasswordSchema.safeParse({
+        currentPassword: 'old-password-1',
+        newPassword: password,
+        confirmPassword: password,
+      }).success,
+      true,
+      `change with ${JSON.stringify(password.slice(0, 12))}`
+    );
+  }
+});

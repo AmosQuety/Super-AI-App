@@ -2,6 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { AuthCredentials, User } from '../libs/types';
+import { isExpectedFailureCode } from '../libs/error-codes';
 import { isSessionExpired, msUntilExpiry } from '../libs/session';
 import { onSessionEnded } from '../libs/session-events';
 import { ApiError, apiService } from '../services/api';
@@ -25,7 +26,7 @@ interface AuthContextType {
 // A failure the server explained (wrong password, validation) is shown to the user by the
 // caller; only unexpected errors are logged, because console.error raises a banner in development.
 function logUnexpected(action: string, error: unknown) {
-  if (error instanceof ApiError) return;
+  if (error instanceof ApiError && isExpectedFailureCode(error.code)) return;
   console.error(`${action} failed:`, error);
 }
 

@@ -1,4 +1,5 @@
 // services/api.ts
+import { isExpectedFailureCode } from '../libs/error-codes';
 import axios from 'axios';
 import type { DocumentNode } from 'graphql';
 import type { OperationVariables } from '@apollo/client';
@@ -154,9 +155,9 @@ class ApiService {
       return result.data as T;
     } catch (error) {
       const apiError = toUserFacingError(error);
-      // A failure the server explained has a code and reaches the user through the caller;
-      // only the rest (network, unexpected) is logged, since console.error raises a dev banner.
-      if (!apiError.code) logOperationFailure(operationName, error);
+      // A failure the server explained reaches the user through the caller; only the rest
+      // (network, unexpected codes) is logged as an error.
+      if (!isExpectedFailureCode(apiError.code)) logOperationFailure(operationName, error);
       throw apiError;
     }
   }
@@ -173,9 +174,9 @@ class ApiService {
       return result.data as T;
     } catch (error) {
       const apiError = toUserFacingError(error);
-      // A failure the server explained has a code and reaches the user through the caller;
-      // only the rest (network, unexpected) is logged, since console.error raises a dev banner.
-      if (!apiError.code) logOperationFailure(operationName, error);
+      // A failure the server explained reaches the user through the caller; only the rest
+      // (network, unexpected codes) is logged as an error.
+      if (!isExpectedFailureCode(apiError.code)) logOperationFailure(operationName, error);
       throw apiError;
     }
   }

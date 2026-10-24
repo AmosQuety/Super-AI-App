@@ -15,6 +15,7 @@ import { createClient } from 'graphql-ws';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { storageService } from '../services/storage';
 import { config } from './environment';
+import { isExpectedFailureCode } from './error-codes';
 import { isRejectionForCurrentSession } from './session';
 import { notifySessionEnded } from './session-events';
 
@@ -83,17 +84,15 @@ if (config.FEATURE_FLAGS.enableSubscriptions) {
   usePollingFallback = true;
 }
 
-// These legitimately answer UNAUTHENTICATED for wrong credentials (a failed sign-in, or a
-// wrong current password), so they must not end the session.
+// These legitimately answer UNAUTHENTICATED for wrong credentials (a failed sign-in), so they
+// must not end the session. A wrong current password is BAD_USER_INPUT on the server, so
+// ChangePassword is not listed: UNAUTHENTICATED there really means the session is invalid.
 const OPERATIONS_WITH_EXPECTED_AUTH_ERRORS = new Set([
   'Login',
   'Register',
   'LoginWithFace',
   'LoginWithVoice',
-  'ChangePassword',
 ]);
-
-const EXPECTED_ERROR_CODES = new Set(['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN']);
 
 let isEndingSession = false;
 
@@ -142,7 +141,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
     error.errors.forEach(({ message, path, extensions }) => {
       // Errors the server meant for the user are routine; console.error would raise a
       // development banner over the screen that is already showing them.
-      const log = EXPECTED_ERROR_CODES.has(String(extensions?.code)) ? console.log : console.error;
+      const log = isExpectedFailureCode(extensions?.code) ? console.log : console.error;
       log(
         `[GraphQL error] ${operationName}: ${message}, Path: ${path?.join('.')}, Code: ${extensions?.code}`
       );
@@ -152,7 +151,8 @@ const errorLink = new ErrorLink(({ error, operation }) => {
   }
 
   if (isSessionRejection(error, operationName)) {
-    console.warn(`Session rejected by the server during ${operationName}; signing out`);
+    // An expected event, so not console.warn (that raises a development banner).
+    console.log(`Session rejected by the server during ${operationName}; signing out`);
     void endRejectedSession(operation.getContext().sentToken);
   }
 });
