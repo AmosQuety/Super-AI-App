@@ -29,7 +29,6 @@ class StorageService {
     }
   }
 
-  
   async setItem(key: string, value: string): Promise<void> {
     try {
       await SecureStore.setItemAsync(key, value);

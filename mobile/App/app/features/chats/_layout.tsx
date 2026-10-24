@@ -16,32 +16,31 @@ export default function ChatsLayout() {
         headerTintColor: '#1f2937',
         headerShadowVisible: true,
         animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen 
-        name="index" 
-        options={{ 
+      }}>
+      <Stack.Screen
+        name="index"
+        options={{
           title: 'Chats',
           headerShown: false, // We use custom header in the screen
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="[id]" 
-        options={{ 
+      <Stack.Screen
+        name="[id]"
+        options={{
           title: 'Conversation',
           headerShown: true,
           headerBackTitle: 'Back',
           headerTitleAlign: 'center',
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="new" 
-        options={{ 
+      <Stack.Screen
+        name="new"
+        options={{
           title: 'New Chat',
           headerShown: true,
           headerBackTitle: 'Cancel',
           presentation: Platform.OS === 'ios' ? 'modal' : 'card',
-        }} 
+        }}
       />
     </Stack>
   );

@@ -23,7 +23,7 @@ export function Input({
     <View className={className}>
       <TextInput
         className={cn(
-          'border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white bg-white dark:bg-gray-800',
+          'rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white',
           error && 'border-red-500'
         )}
         placeholder={placeholder}
@@ -32,7 +32,7 @@ export function Input({
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
       />
-      {error && <Text className="text-red-500 text-sm mt-1">{error}</Text>}
+      {error && <Text className="mt-1 text-sm text-red-500">{error}</Text>}
     </View>
   );
 }

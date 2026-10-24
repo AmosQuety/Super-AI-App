@@ -1,12 +1,5 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  Alert
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { RefreshCw, AlertTriangle } from 'lucide-react-native';
 
 interface Props {
@@ -35,16 +28,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('🚨 ErrorBoundary caught an error:', error, errorInfo);
-    
+
     this.setState({ errorInfo });
-    
+
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
   }
 
   componentDidUpdate(prevProps: Props) {
-    if (this.props.resetOnNavigate && this.state.hasError && this.props.children !== prevProps.children) {
+    if (
+      this.props.resetOnNavigate &&
+      this.state.hasError &&
+      this.props.children !== prevProps.children
+    ) {
       this.resetError();
     }
   }
@@ -56,7 +53,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   showErrorDetails = () => {
     const { error, errorInfo } = this.state;
-    
+
     Alert.alert(
       'Error Details',
       `Error: ${error?.message}\n\nComponent Stack: ${errorInfo?.componentStack || 'N/A'}`,
@@ -78,13 +75,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
       return (
         <View>
           {this.props.fallback}
-          <TouchableOpacity 
-            className="bg-red-600 rounded-lg px-6 py-4 mx-4 mt-4"
-            onPress={this.resetError}
-          >
-            <Text className="text-white font-semibold text-center text-lg">
-              Try Again
-            </Text>
+          <TouchableOpacity
+            className="mx-4 mt-4 rounded-lg bg-red-600 px-6 py-4"
+            onPress={this.resetError}>
+            <Text className="text-center text-lg font-semibold text-white">Try Again</Text>
           </TouchableOpacity>
         </View>
       );
@@ -92,45 +86,40 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <SafeAreaView className="flex-1 bg-white">
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          className="flex-1"
-        >
-          <View className="flex-1 justify-center items-center px-6 py-8">
+          className="flex-1">
+          <View className="flex-1 items-center justify-center px-6 py-8">
             {/* Error Icon */}
-            <View className="bg-red-50 p-4 rounded-full mb-6">
+            <View className="mb-6 rounded-full bg-red-50 p-4">
               <AlertTriangle size={64} color="#DC2626" />
             </View>
 
             {/* Error Title */}
-            <Text className="text-2xl font-bold text-gray-900 text-center mb-3">
+            <Text className="mb-3 text-center text-2xl font-bold text-gray-900">
               Oops! Something went wrong
             </Text>
-            
+
             {/* Error Message */}
-            <Text className="text-base text-gray-600 text-center mb-8 leading-6">
+            <Text className="mb-8 text-center text-base leading-6 text-gray-600">
               {this.state.error?.message || 'An unexpected error occurred. Please try again.'}
             </Text>
 
             {/* Action Buttons */}
             <View className="w-full gap-3">
               <TouchableOpacity
-                className="bg-red-600 rounded-xl px-6 py-4 flex-row items-center justify-center gap-3 shadow-lg"
-                onPress={this.resetError}
-              >
+                className="flex-row items-center justify-center gap-3 rounded-xl bg-red-600 px-6 py-4 shadow-lg"
+                onPress={this.resetError}>
                 <RefreshCw size={20} color="#FFFFFF" />
-                <Text className="text-white font-semibold text-lg">
-                  Try Again
-                </Text>
+                <Text className="text-lg font-semibold text-white">Try Again</Text>
               </TouchableOpacity>
 
               {this.props.showDetails && (
                 <TouchableOpacity
-                  className="bg-gray-100 border border-gray-300 rounded-xl px-6 py-4"
-                  onPress={this.showErrorDetails}
-                >
-                  <Text className="text-gray-700 font-medium text-center text-base">
+                  className="rounded-xl border border-gray-300 bg-gray-100 px-6 py-4"
+                  onPress={this.showErrorDetails}>
+                  <Text className="text-center text-base font-medium text-gray-700">
                     View Details
                   </Text>
                 </TouchableOpacity>
@@ -139,11 +128,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
             {/* Debug Info (only in development) */}
             {__DEV__ && this.state.errorInfo && (
-              <TouchableOpacity 
-                className="bg-amber-100 border border-amber-300 rounded-lg p-4 mt-8"
-                onPress={this.showErrorDetails}
-              >
-                <Text className="text-amber-800 text-sm text-center">
+              <TouchableOpacity
+                className="mt-8 rounded-lg border border-amber-300 bg-amber-100 p-4"
+                onPress={this.showErrorDetails}>
+                <Text className="text-center text-sm text-amber-800">
                   Tap to view technical details
                 </Text>
               </TouchableOpacity>
@@ -181,30 +169,22 @@ export const useErrorHandler = () => {
     handleError,
     clearError,
     ErrorBoundary: ({ children }: { children: React.ReactNode }) => (
-      <ErrorBoundary 
+      <ErrorBoundary
         onError={handleError}
-        fallback={error ? (
-          <View className="flex-1 justify-center items-center p-6 bg-white">
-            <View className="bg-red-50 p-4 rounded-full mb-4">
-              <AlertTriangle size={48} color="#DC2626" />
+        fallback={
+          error ? (
+            <View className="flex-1 items-center justify-center bg-white p-6">
+              <View className="mb-4 rounded-full bg-red-50 p-4">
+                <AlertTriangle size={48} color="#DC2626" />
+              </View>
+              <Text className="mb-2 text-center text-xl font-bold text-gray-900">Custom Error</Text>
+              <Text className="mb-6 text-center text-gray-600">{error.message}</Text>
+              <TouchableOpacity className="rounded-xl bg-red-600 px-6 py-3" onPress={clearError}>
+                <Text className="text-base font-semibold text-white">Clear Error</Text>
+              </TouchableOpacity>
             </View>
-            <Text className="text-xl font-bold text-gray-900 text-center mb-2">
-              Custom Error
-            </Text>
-            <Text className="text-gray-600 text-center mb-6">
-              {error.message}
-            </Text>
-            <TouchableOpacity
-              className="bg-red-600 rounded-xl px-6 py-3"
-              onPress={clearError}
-            >
-              <Text className="text-white font-semibold text-base">
-                Clear Error
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : undefined}
-      >
+          ) : undefined
+        }>
         {children}
       </ErrorBoundary>
     ),

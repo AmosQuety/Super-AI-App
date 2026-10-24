@@ -88,11 +88,9 @@ export function useToast() {
   };
 
   return {
-    showSuccess: (message: string, description?: string) => 
+    showSuccess: (message: string, description?: string) =>
       showToast('success', message, description),
-    showError: (message: string, description?: string) => 
-      showToast('error', message, description),
-    showInfo: (message: string, description?: string) => 
-      showToast('info', message, description),
+    showError: (message: string, description?: string) => showToast('error', message, description),
+    showInfo: (message: string, description?: string) => showToast('info', message, description),
   };
 }

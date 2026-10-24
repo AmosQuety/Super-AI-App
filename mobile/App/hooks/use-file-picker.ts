@@ -16,7 +16,7 @@ export const useFilePicker = () => {
 
   const pickFile = async (): Promise<FileInfo | null> => {
     if (isPicking) return null;
-    
+
     setIsPicking(true);
     try {
       // For simplicity, we'll use document picker for all files

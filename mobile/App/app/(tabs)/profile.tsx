@@ -12,12 +12,12 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View className="flex-1 p-6 bg-gray-50 dark:bg-gray-900">
+    <View className="flex-1 bg-gray-50 p-6 dark:bg-gray-900">
       <Card className="p-6">
-        <Text className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
+        <Text className="mb-6 text-center text-2xl font-bold text-gray-900 dark:text-white">
           Profile
         </Text>
-        
+
         <View className="space-y-4">
           <View>
             <Text className="text-gray-600 dark:text-gray-400">Name</Text>
@@ -26,21 +26,18 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-        <View>
-          <Text className="text-gray-600 dark:text-gray-400">ID</Text>
-          <Text className="text-lg text-gray-900 dark:text-white">
-            {user?.id || 'N/A'}
-          </Text>
-        </View>
-            
-          
+          <View>
+            <Text className="text-gray-600 dark:text-gray-400">ID</Text>
+            <Text className="text-lg text-gray-900 dark:text-white">{user?.id || 'N/A'}</Text>
+          </View>
+
           <View>
             <Text className="text-gray-600 dark:text-gray-400">Email</Text>
             <Text className="text-lg text-gray-900 dark:text-white">
               {user?.email || 'guest@example.com'}
             </Text>
           </View>
-          
+
           <View>
             <Text className="text-gray-600 dark:text-gray-400">Member Since</Text>
             <Text className="text-lg text-gray-900 dark:text-white">
@@ -48,13 +45,8 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
-        
-        <Button 
-          title="Sign Out" 
-          variant="outline" 
-          className="mt-6" 
-          onPress={signOut} 
-        />
+
+        <Button title="Sign Out" variant="outline" className="mt-6" onPress={signOut} />
       </Card>
     </View>
   );

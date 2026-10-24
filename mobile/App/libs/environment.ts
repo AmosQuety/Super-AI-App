@@ -42,7 +42,8 @@ const developmentConfig: AppConfig = {
 const stagingConfig: AppConfig = {
   API_URL: 'https://api-staging.example.com',
   GRAPHQL_URL: process.env.EXPO_PUBLIC_GRAPHQL_URL || 'https://api-staging.example.com/graphql',
-  FACE_SERVICE_URL: process.env.EXPO_PUBLIC_FACE_SERVICE_URL || 'https://api-staging.example.com/face-service',
+  FACE_SERVICE_URL:
+    process.env.EXPO_PUBLIC_FACE_SERVICE_URL || 'https://api-staging.example.com/face-service',
   APP_NAME: 'MyApp (Staging)',
   ENVIRONMENT: 'staging',
   LOG_LEVEL: 'info',
@@ -58,7 +59,8 @@ const stagingConfig: AppConfig = {
 const productionConfig: AppConfig = {
   API_URL: 'https://api.example.com',
   GRAPHQL_URL: process.env.EXPO_PUBLIC_GRAPHQL_URL || 'https://api.example.com/graphql',
-  FACE_SERVICE_URL: process.env.EXPO_PUBLIC_FACE_SERVICE_URL || 'https://api.example.com/face-service',
+  FACE_SERVICE_URL:
+    process.env.EXPO_PUBLIC_FACE_SERVICE_URL || 'https://api.example.com/face-service',
   APP_NAME: 'MyApp',
   ENVIRONMENT: 'production',
   LOG_LEVEL: 'error',
@@ -67,7 +69,7 @@ const productionConfig: AppConfig = {
     enableCrashReporting: true,
     enableGraphQL: true,
     enableFaceRecognition: false,
-    enableSubscriptions: true, 
+    enableSubscriptions: true,
   },
 };
 
