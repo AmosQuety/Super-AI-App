@@ -106,6 +106,16 @@ export const GET_CHATS = gql`
   }
 `;
 
+export const RECENT_CHATS = gql`
+  query RecentChats($userId: ID!) {
+    chats(userId: $userId) {
+      id
+      title
+      updatedAt
+    }
+  }
+`;
+
 export const CREATE_CHAT = gql`
   mutation CreateChat($userId: ID!, $title: String, $messages: [MessageInput!]!) {
     createChat(userId: $userId, title: $title, messages: $messages) {
