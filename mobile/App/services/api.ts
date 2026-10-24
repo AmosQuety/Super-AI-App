@@ -54,12 +54,34 @@ function operationNameOf(operation: DocumentNode): string {
     : 'AnonymousOperation';
 }
 
-// Turns an Apollo error into a message a user can act on.
-function toUserFacingError(error: unknown): Error {
-  if (CombinedGraphQLErrors.is(error)) {
-    return new Error(error.errors[0]?.message || 'GraphQL request failed');
+// An error with a message a user can act on, plus the server's error code when there is one,
+// so callers can tell a rejected session (UNAUTHENTICATED) from an outage.
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  return new Error('Network error: Unable to connect to server. Please check your connection.');
+}
+
+// Apollo cancels in-flight queries when a rejected session clears the cache.
+const STORE_RESET_MESSAGE = /store reset while query was in flight/i;
+
+// Turns an Apollo error into a message a user can act on.
+function toUserFacingError(error: unknown): ApiError {
+  if (CombinedGraphQLErrors.is(error)) {
+    const first = error.errors[0];
+    return new ApiError(
+      first?.message || 'GraphQL request failed',
+      first?.extensions?.code as string
+    );
+  }
+  if (error instanceof Error && STORE_RESET_MESSAGE.test(error.message)) {
+    return new ApiError('Your session has ended. Please sign in again.', 'UNAUTHENTICATED');
+  }
+  return new ApiError('Network error: Unable to connect to server. Please check your connection.');
 }
 
 // Logs the operation name and outcome only: variables and results can hold passwords and tokens.

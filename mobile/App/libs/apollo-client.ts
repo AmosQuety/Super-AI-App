@@ -15,6 +15,7 @@ import { createClient } from 'graphql-ws';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { storageService } from '../services/storage';
 import { config } from './environment';
+import { isRejectionForCurrentSession } from './session';
 import { notifySessionEnded } from './session-events';
 
 // Create HTTP link
@@ -28,6 +29,8 @@ const authLink = setContext(async (_, { headers }) => {
   const token = await storageService.getAuthToken();
 
   return {
+    // Remembered so a late rejection can be matched to the session that sent the request.
+    sentToken: token,
     headers: {
       ...headers,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -80,30 +83,48 @@ if (config.FEATURE_FLAGS.enableSubscriptions) {
   usePollingFallback = true;
 }
 
-// Failed sign-in attempts legitimately answer UNAUTHENTICATED, so they must not end the session.
-const SIGN_IN_OPERATION_NAMES = new Set(['Login', 'Register', 'LoginWithFace', 'LoginWithVoice']);
+// These legitimately answer UNAUTHENTICATED for wrong credentials (a failed sign-in, or a
+// wrong current password), so they must not end the session.
+const OPERATIONS_WITH_EXPECTED_AUTH_ERRORS = new Set([
+  'Login',
+  'Register',
+  'LoginWithFace',
+  'LoginWithVoice',
+  'ChangePassword',
+]);
 
 let isEndingSession = false;
 
-// The server no longer accepts this session (expired, revoked, account disabled):
-// drop the stored login and cached data, then tell the app to show sign-in.
-async function endRejectedSession() {
-  if (isEndingSession) return;
-  isEndingSession = true;
+// Drops the stored login and cached data. Failures are logged, not thrown: a stale cache
+// must not keep the user on protected screens.
+async function clearSessionData() {
   try {
     await storageService.clearAuth();
     await apolloClient?.clearStore();
   } catch (error) {
-    // Still sign the user out; a stale cache must not keep them on protected screens.
     console.error('Failed to fully clear the rejected session:', error);
+  }
+}
+
+// The server no longer accepts this session (expired, revoked, account disabled):
+// clear it, then tell the app to show sign-in.
+async function endRejectedSession(tokenSentWithRequest: string | null | undefined) {
+  if (isEndingSession) return;
+  isEndingSession = true;
+  try {
+    const currentToken = await storageService.getAuthToken();
+    // A slow request from before a new sign-in must not sign the new session out.
+    if (!isRejectionForCurrentSession(tokenSentWithRequest, currentToken)) return;
+
+    await clearSessionData();
+    notifySessionEnded();
   } finally {
     isEndingSession = false;
-    notifySessionEnded();
   }
 }
 
 function isSessionRejection(error: ErrorLike, operationName: string): boolean {
-  if (SIGN_IN_OPERATION_NAMES.has(operationName)) return false;
+  if (OPERATIONS_WITH_EXPECTED_AUTH_ERRORS.has(operationName)) return false;
   return (
     CombinedGraphQLErrors.is(error) &&
     error.errors.some(({ extensions }) => extensions?.code === 'UNAUTHENTICATED')
@@ -127,7 +148,7 @@ const errorLink = new ErrorLink(({ error, operation }) => {
 
   if (isSessionRejection(error, operationName)) {
     console.warn(`Session rejected by the server during ${operationName}; signing out`);
-    void endRejectedSession();
+    void endRejectedSession(operation.getContext().sentToken);
   }
 });
 

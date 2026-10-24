@@ -9,7 +9,7 @@ const EXPIRY_SKEW_MS = 30_000;
 const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 // Implemented by hand because atob is not guaranteed to exist on every React Native/Hermes version.
-function decodeBase64Url(input: string): string {
+export function decodeBase64Url(input: string): string {
   let bits = 0;
   let bitCount = 0;
   let percentEncoded = '';
@@ -54,4 +54,13 @@ export function isSessionExpired(token: string | null, nowMs: number = Date.now(
 export function msUntilExpiry(token: string | null, nowMs: number = Date.now()): number {
   const expiry = tokenExpiryMs(token);
   return expiry === null ? 0 : Math.max(0, expiry - nowMs);
+}
+
+// A rejection answers one request. If the stored token has changed since that request was
+// sent (the user signed in again, or out), it says nothing about the current session.
+export function isRejectionForCurrentSession(
+  tokenSentWithRequest: string | null | undefined,
+  currentToken: string | null
+): boolean {
+  return (tokenSentWithRequest ?? null) === currentToken;
 }

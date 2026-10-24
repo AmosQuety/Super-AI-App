@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { AuthCredentials, User } from '../libs/types';
 import { isSessionExpired, msUntilExpiry } from '../libs/session';
 import { onSessionEnded } from '../libs/session-events';
-import { apiService } from '../services/api';
+import { ApiError, apiService } from '../services/api';
 import { storageService } from '../services/storage';
 
 interface AuthContextType {
@@ -60,12 +60,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       await storageService.setUser(userData);
     } catch (error) {
-      // Keep the stored login: a network or server failure is not proof the session is invalid.
-      // A real rejection (UNAUTHENTICATED) is handled by the Apollo error link.
       console.error('Auth check failed:', error);
+      await restoreCachedUserAfterOutage(error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // A network or server failure is not proof the session is invalid, so an unexpired login
+  // stays usable from the cached user. A real rejection (UNAUTHENTICATED) was already
+  // handled by the Apollo error link, which cleared the stored login.
+  const restoreCachedUserAfterOutage = async (error: unknown) => {
+    if (error instanceof ApiError && error.code === 'UNAUTHENTICATED') return;
+
+    const token = await storageService.getAuthToken();
+    if (!token || isSessionExpired(token)) return;
+
+    const cachedUser = await storageService.getUser();
+    if (cachedUser) setUser(cachedUser);
   };
 
   const signIn = async (credentials: AuthCredentials) => {
@@ -165,6 +177,7 @@ function useSignOutAtExpiry(user: User | null, endExpiredSession: () => Promise<
     if (!user) return;
 
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
 
     const signOutIfExpired = async () => {
       const token = await storageService.getAuthToken();
@@ -173,6 +186,8 @@ function useSignOutAtExpiry(user: User | null, endExpiredSession: () => Promise<
 
     const scheduleExpiryCheck = async () => {
       const token = await storageService.getAuthToken();
+      // The user may have changed while the token was being read.
+      if (cancelled) return;
       clearTimeout(expiryTimer);
       // The callback re-checks, so a capped (early) timer never signs out a valid session.
       expiryTimer = setTimeout(signOutIfExpired, Math.min(msUntilExpiry(token), MAX_TIMER_MS));
@@ -184,6 +199,7 @@ function useSignOutAtExpiry(user: User | null, endExpiredSession: () => Promise<
     });
 
     return () => {
+      cancelled = true;
       clearTimeout(expiryTimer);
       appStateSubscription.remove();
     };
