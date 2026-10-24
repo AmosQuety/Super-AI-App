@@ -8,11 +8,13 @@ import { Form, FormField } from '../../components/ui/form';
 import { useToast } from '../../components/ui/toast';
 import { useAuth } from '../../hooks/use-auth';
 import { useZodForm } from '../../hooks/use-form';
+import { useScreenCaptureBlock } from '../../hooks/use-screen-capture-block';
 import { signInSchema, type SignInFormData } from '../../libs/validation-schemas';
 
 export default function SignInScreen() {
   const { showSuccess, showError } = useToast();
   const { signIn } = useAuth();
+  useScreenCaptureBlock('sign-in');
   const [showPassword, setShowPassword] = useState(false);
   const form = useZodForm(signInSchema, {});
 

@@ -15,6 +15,7 @@ import { Form, FormField } from '../../../components/ui/form';
 import { useToast } from '../../../components/ui/toast';
 import { useAuth } from '../../../hooks/use-auth';
 import { useZodForm } from '../../../hooks/use-form';
+import { useScreenCaptureBlock } from '../../../hooks/use-screen-capture-block';
 import { ApiError } from '../../../services/api';
 import {
   changePasswordSchema,
@@ -26,6 +27,7 @@ const EMPTY_FORM = { currentPassword: '', newPassword: '', confirmPassword: '' }
 
 export default function ChangePasswordScreen() {
   const { changePassword } = useAuth();
+  useScreenCaptureBlock('change-password');
   const { showSuccess, showError } = useToast();
   const [showPasswords, setShowPasswords] = useState(false);
   const form = useZodForm(changePasswordSchema, EMPTY_FORM);

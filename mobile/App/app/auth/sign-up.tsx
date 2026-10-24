@@ -7,11 +7,13 @@ import { Form, FormField } from '../../components/ui/form';
 import { useToast } from '../../components/ui/toast';
 import { useAuth } from '../../hooks/use-auth';
 import { useZodForm } from '../../hooks/use-form';
+import { useScreenCaptureBlock } from '../../hooks/use-screen-capture-block';
 import { PASSWORD_HINT, signUpSchema, type SignUpFormData } from '../../libs/validation-schemas';
 
 export default function SignUpScreen() {
   const { showSuccess, showError } = useToast();
   const { signUp } = useAuth();
+  useScreenCaptureBlock('sign-up');
   const [showPassword, setShowPassword] = useState(false);
   const form = useZodForm(signUpSchema);
 
