@@ -85,7 +85,7 @@ export const disconnectPrisma = async () => {
 // CONTEXT CREATION
 // ============================================
 const lookupStoredAccount: AccountLookup = (userId) =>
-  prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+  prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true } });
 
 export async function createContext({
   req,

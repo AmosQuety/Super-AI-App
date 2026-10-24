@@ -8,6 +8,8 @@ export interface JWTPayload {
   email: string;
   role: string;
   sessionId: string;
+  // Fingerprint of the password hash the token was issued against (see passwordFingerprint).
+  pwf?: string;
   iat?: number;
   exp?: number;
 }
@@ -72,12 +74,26 @@ export class SecurityConfig {
       : UserRole.USER;
   }
 
-  // This bridges the gap between Prisma User object and your JWT Payload
+  // A short, keyed digest of the stored password hash. Tokens carry it so that changing
+  // the password invalidates every token issued before the change, without a session
+  // table. It is keyed with the signing secret and truncated, so a token never exposes
+  // anything that helps guess the bcrypt hash. An account with no password hashes "".
+  static passwordFingerprint(passwordHash: string | null | undefined): string {
+    return crypto
+      .createHmac('sha256', this.getJWTConfig().secret)
+      .update(passwordHash ?? '')
+      .digest('hex')
+      .slice(0, 16);
+  }
+
+  // This bridges the gap between Prisma User object and your JWT Payload.
+  // `user` must be the full stored row: its password hash is what the token is bound to.
   static generateToken(user: any): string {
     return this.createToken({
       userId: user.id,
       email: user.email,
       role: this.roleForToken(user.role),
+      pwf: this.passwordFingerprint(user.password),
     });
   }
 

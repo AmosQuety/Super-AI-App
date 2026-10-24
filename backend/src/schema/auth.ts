@@ -9,6 +9,8 @@ export const authTypeDefs = gql`
   type ChangePasswordResponse {
     success: Boolean!
     message: String!
+    "A new session token for the caller. Changing the password ends all earlier sessions."
+    token: String
   }
 
   type DeleteAccountResponse {

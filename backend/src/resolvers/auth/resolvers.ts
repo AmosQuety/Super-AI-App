@@ -250,7 +250,7 @@ export const authResolvers = {
       _: any,
       args: { currentPassword: string; newPassword: string },
       context: AppContext
-    ): Promise<{ success: boolean; message: string }> => {
+    ): Promise<{ success: boolean; message: string; token: string }> => {
       const user = AuthorizationService.requireAuth(context);
 
       const { currentPassword, newPassword } = args;
@@ -291,9 +291,14 @@ export const authResolvers = {
         data: { password: hashedNewPassword },
       });
 
+      // Tokens are bound to the password, so every other session just ended. Hand the
+      // caller a fresh token so this device stays signed in.
+      const token = SecurityConfig.generateToken({ ...dbUser, password: hashedNewPassword });
+
       return {
         success: true,
         message: "Password updated successfully",
+        token,
       };
     },
 
