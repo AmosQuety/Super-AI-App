@@ -19,8 +19,6 @@ export default function ChatsLayout() {
         animation: 'slide_from_right',
         // Draws its own status-bar inset (see components/ui/screen-header.tsx).
         header: renderScreenHeader(),
-        // Dark icons over the white header; the library sets this per screen.
-        statusBarStyle: 'dark',
       }}>
       <Stack.Screen
         name="index"

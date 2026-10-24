@@ -1,11 +1,11 @@
 // app/_layout.tsx
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from 'hooks/use-auth';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { AppToast } from '../components/ui/toast';
 import { ApolloProvider } from '@apollo/client/react';
 import { apolloClient } from '../libs/apollo-client';
@@ -47,7 +47,8 @@ export default function RootLayout() {
               }}
               resetOnNavigate={true}
               showDetails={__DEV__}>
-              <StatusBar style="auto" />
+              {/* The app is light-only, so the status bar icons are dark on every screen. */}
+              <StatusBar style="dark" />
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="auth/sign-in" options={{ headerShown: false }} />

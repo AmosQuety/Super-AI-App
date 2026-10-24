@@ -13,9 +13,7 @@ const VoiceLayout: React.FC = () => {
         headerShown: true,
         title: 'Voice AI Tools',
         // Draws its own status-bar inset (see components/ui/screen-header.tsx).
-        header: renderScreenHeader({ background: '#10B981', foreground: '#ffffff' }),
-        // Light icons over the green header.
-        statusBarStyle: 'light',
+        header: renderScreenHeader({ background: '#10B981', foreground: '#064E3B' }),
       }}
     />
   );
