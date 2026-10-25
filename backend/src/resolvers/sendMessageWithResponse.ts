@@ -9,6 +9,7 @@ import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
 import { AIManager } from "../utils/aiManager"; // Import our new Manager
 import { DocumentRetrievalService } from "../services/ai/DocumentRetrievalService";
 import { logger } from "../utils/logger";
+import { invalidateChatHistory } from "../services/chatCache";
 
 const MAX_HISTORY_TURNS = 20; // cap to avoid blowing context window
 
@@ -275,6 +276,8 @@ export const sendMessageWithResponse = {
         },
       });
 
+      await invalidateChatHistory(userId, chatId);
+
       await context.taskService.updateProgress(task.id, userId, 35, {
         phase: "user-message-saved",
         chatId,
@@ -342,6 +345,8 @@ export const sendMessageWithResponse = {
       const aiMessage = await context.prisma.message.create({
         data: { chatId, role: "assistant", content: aiResponse },
       });
+
+      await invalidateChatHistory(userId, chatId);
 
       await context.taskService.updateProgress(task.id, userId, 95, {
         phase: "assistant-message-saved",

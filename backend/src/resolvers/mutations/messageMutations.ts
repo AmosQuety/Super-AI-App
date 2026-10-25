@@ -3,6 +3,7 @@ import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { Message } from "@prisma/client";
 import { AppContext } from "../types/context";
 import { pubsub } from '../subscriptionResolvers'; // ADD THIS IMPORT
+import { invalidateChatHistory } from "../../services/chatCache";
 
 export const messageMutations = {
   addMessage: async (
@@ -40,6 +41,8 @@ export const messageMutations = {
         content,
       },
     });
+
+    await invalidateChatHistory(context.user.userId, chatId);
 
     // ADD THIS: PUBLISH TO SUBSCRIPTION
     await pubsub.publish('MESSAGE_ADDED', {
@@ -82,6 +85,7 @@ export const messageMutations = {
       await context.prisma.message.delete({
         where: { id: messageId },
       });
+      await invalidateChatHistory(context.user.userId, message.chatId);
 
       return true;
     } catch (error: any) {

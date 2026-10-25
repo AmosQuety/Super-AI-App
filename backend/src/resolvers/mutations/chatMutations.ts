@@ -2,6 +2,7 @@
 import { AuthenticationError, ForbiddenError, UserInputError } from "apollo-server-express";
 import { Chat } from "@prisma/client";
 import { AppContext } from "../types/context";
+import { invalidateChatHistory, invalidateChatList } from "../../services/chatCache";
 
 export const chatMutations = {
   createChat: async (
@@ -30,7 +31,7 @@ export const chatMutations = {
       throw new UserInputError("User not found. Please sign up first.");
     }
 
-    return context.prisma.chat.create({
+    const chat = await context.prisma.chat.create({
       data: {
         userId: context.user.userId, // Always use the authenticated session ID, never args
         title: args.title,
@@ -42,6 +43,8 @@ export const chatMutations = {
         messages: true,
       },
     });
+    await invalidateChatList(context.user.userId);
+    return chat;
   },
 
   updateChat: async (
@@ -68,10 +71,12 @@ export const chatMutations = {
       throw new UserInputError("Chat not found");
     }
 
-    return context.prisma.chat.update({
+    const updated = await context.prisma.chat.update({
       where: { id: chatId },
       data: { title },
     });
+    await invalidateChatList(context.user.userId);
+    return updated;
   },
 
   deleteChat: async (
@@ -105,6 +110,10 @@ export const chatMutations = {
     await context.prisma.chat.delete({
       where: { id: chatId },
     });
+    await Promise.all([
+      invalidateChatList(context.user.userId),
+      invalidateChatHistory(context.user.userId, chatId),
+    ]);
 
     return true;
   },

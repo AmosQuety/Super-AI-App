@@ -1,5 +1,6 @@
 // src/resolvers/queries/chatQueries.ts
 import { AppContext } from "../types/context";
+import { chatHistoryCacheKey, chatListCacheKey } from "../../services/chatCache";
 import { redisClient } from "../../lib/redis";
 import { AuthorizationService } from "../../auth/authorization";
 import { requireChatAccess } from "../../auth/chatAccess";
@@ -9,7 +10,7 @@ export const chatQueries = {
     AuthorizationService.requireSelfOrAdmin(context, userId);
 
     if (redisClient) {
-      const cacheKey = `user:${userId}:chats`;
+      const cacheKey = chatListCacheKey(userId);
       const cached = await redisClient.get(cacheKey);
       if (cached) return JSON.parse(cached);
 
@@ -30,7 +31,7 @@ export const chatQueries = {
     const user = context.user!;
 
     if (redisClient) {
-      const cacheKey = `user:${user.userId}:chatHistory:${chatId}:limit:${limit}:offset:${offset}`;
+      const cacheKey = chatHistoryCacheKey(user.userId, chatId, limit, offset);
       const cached = await redisClient.get(cacheKey);
       if (cached) return JSON.parse(cached);
 
