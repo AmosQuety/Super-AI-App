@@ -15,6 +15,13 @@ const COLOURS: [number, number, number][] = [
   [234, 179, 8],
 ];
 
+// The guard script already refuses non-local databases; this makes the script safe on its own.
+const databaseUrl = process.env.DATABASE_URL ?? "";
+if (!/@(127\.0\.0\.1|localhost):/.test(databaseUrl)) {
+  console.error("Refusing to run: DATABASE_URL is not a local address. Use scripts/local-env.sh.");
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 
 function chunk(type: string, data: Buffer): Buffer {

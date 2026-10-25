@@ -99,19 +99,59 @@ function parseMetadata(metadata?: string | null): Record<string, unknown> {
   return {};
 }
 
+// Only inline image data is shown or saved: the provider returns base64, and a link would make
+// the phone contact whatever host the stored data names.
 function isUsableImageSource(value: unknown): value is string {
-  return typeof value === 'string' && (IMAGE_DATA_URI.test(value) || value.startsWith('https://'));
+  return typeof value === 'string' && IMAGE_DATA_URI.test(value);
 }
 
-// Images of a finished task, for restoring a result from the task list. Only inline image data
-// and https links are kept, whatever else the stored metadata holds.
-export function parseTaskImages(metadata?: string | null): string[] {
-  const images = parseMetadata(metadata).images;
+export function keepUsableImages(images: unknown): string[] {
   if (!Array.isArray(images)) return [];
   return images.filter(isUsableImageSource).slice(0, MAX_IMAGES);
+}
+
+// Images of a finished task, for restoring a result from the task list.
+export function parseTaskImages(metadata?: string | null): string[] {
+  return keepUsableImages(parseMetadata(metadata).images);
 }
 
 export function parseTaskPrompt(metadata?: string | null): string {
   const prompt = parseMetadata(metadata).prompt;
   return typeof prompt === 'string' ? prompt : '';
+}
+
+export type RestoreState = 'none' | 'loading' | 'missing' | 'running' | 'completed' | 'failed';
+
+// What the screen shows when it was opened for one task (from the AI tasks list, or because a
+// generation was still running). A task the server does not return (someone else's, deleted,
+// mistyped) is "missing", so the screen never waits for something that will not come.
+export function restoreState(input: {
+  taskId?: string;
+  task: { feature: string; status: string } | null;
+  error: boolean;
+  loading: boolean;
+}): RestoreState {
+  if (!input.taskId) return 'none';
+  if (!input.task) return input.loading && !input.error ? 'loading' : 'missing';
+  if (input.task.feature !== 'image_generation') return 'missing';
+  if (input.task.status === 'queued' || input.task.status === 'processing') return 'running';
+  if (input.task.status === 'completed') return 'completed';
+  return 'failed';
+}
+
+// A generation is slow but bounded (the provider timeout is two minutes); a task that claims to be
+// running and has not moved for longer is stuck, and must not block the user from trying again.
+const RUNNING_TASK_MAX_AGE_MS = 3 * 60_000;
+
+export function findRunningImageTaskId(
+  tasks: { id: string; feature: string; status: string; updatedAt: string }[] | null | undefined,
+  now: number = Date.now()
+): string | null {
+  const running = (tasks ?? []).find(
+    (task) =>
+      task.feature === 'image_generation' &&
+      (task.status === 'queued' || task.status === 'processing') &&
+      now - new Date(task.updatedAt).getTime() <= RUNNING_TASK_MAX_AGE_MS
+  );
+  return running?.id ?? null;
 }

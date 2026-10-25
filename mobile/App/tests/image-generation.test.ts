@@ -6,6 +6,9 @@ import {
   canGenerate,
   describeGenerationError,
   describeGenerationFailure,
+  findRunningImageTaskId,
+  keepUsableImages,
+  restoreState,
   imageExtension,
   imageFileName,
   parseTaskImages,
@@ -93,19 +96,30 @@ test('only base64 image data URIs yield data to save', () => {
   assert.equal(base64FromDataUri(''), null);
 });
 
-test('images are read back from a task, keeping only usable image sources', () => {
+test('images are read back from a task, keeping only inline image data', () => {
   const metadata = JSON.stringify({
     prompt: 'a red fox',
     images: [
       JPEG,
       'https://cdn.example.test/a.jpg',
+      'http://cdn.example.test/a.jpg',
       'javascript:alert(1)',
+      'file:///data/secret.jpg',
       42,
       null,
       'data:text/html;base64,PGg+',
     ],
   });
-  assert.deepEqual(parseTaskImages(metadata), [JPEG, 'https://cdn.example.test/a.jpg']);
+  assert.deepEqual(parseTaskImages(metadata), [JPEG]);
+});
+
+test('images returned by the server are filtered the same way as restored ones', () => {
+  assert.deepEqual(keepUsableImages([JPEG, 'https://x.test/a.jpg', 'javascript:1', 7, null]), [
+    JPEG,
+  ]);
+  assert.deepEqual(keepUsableImages(undefined), []);
+  assert.deepEqual(keepUsableImages(null), []);
+  assert.equal(keepUsableImages([JPEG, JPEG, JPEG, JPEG, JPEG]).length, 4);
 });
 
 test('a task with no usable images gives an empty list, never an error', () => {
@@ -151,4 +165,75 @@ test('an HTTP error is not reported as a lost connection', () => {
   const failure = describeGenerationError(Object.assign(new Error('502'), { statusCode: 502 }));
   assert.doesNotMatch(failure.message, /connection/i);
   assert.equal(failure.canRetry, true);
+});
+
+const task = (overrides: Record<string, unknown> = {}) => ({
+  id: 't1',
+  feature: 'image_generation',
+  status: 'completed',
+  ...overrides,
+});
+
+test('without a task id there is nothing to restore', () => {
+  assert.equal(
+    restoreState({ taskId: undefined, task: null, error: false, loading: false }),
+    'none'
+  );
+});
+
+test('a task that is still being fetched is loading, never missing', () => {
+  assert.equal(restoreState({ taskId: 't1', task: null, error: false, loading: true }), 'loading');
+});
+
+test('a task the server does not return is missing, so the screen stops waiting', () => {
+  // Another user's id, a deleted task and a mistyped id all come back as null.
+  assert.equal(restoreState({ taskId: 't1', task: null, error: false, loading: false }), 'missing');
+  assert.equal(restoreState({ taskId: 't1', task: null, error: true, loading: false }), 'missing');
+});
+
+test('a task of another kind is not restored as an image', () => {
+  assert.equal(
+    restoreState({
+      taskId: 't1',
+      task: task({ feature: 'chat_response' }),
+      error: false,
+      loading: false,
+    }),
+    'missing'
+  );
+});
+
+test('a running task is running, a finished one completed, an unsuccessful one failed', () => {
+  const state = (status: string) =>
+    restoreState({ taskId: 't1', task: task({ status }), error: false, loading: false });
+  assert.equal(state('queued'), 'running');
+  assert.equal(state('processing'), 'running');
+  assert.equal(state('completed'), 'completed');
+  assert.equal(state('failed'), 'failed');
+  assert.equal(state('canceled'), 'failed');
+});
+
+test('a generation that is still running is found when the screen is opened again', () => {
+  const now = Date.UTC(2026, 9, 25, 12, 0, 0);
+  const recent = new Date(now - 30_000).toISOString();
+  const tasks = [
+    { id: 'chat', feature: 'chat_response', status: 'processing', updatedAt: recent },
+    { id: 'done', feature: 'image_generation', status: 'completed', updatedAt: recent },
+    { id: 'running', feature: 'image_generation', status: 'processing', updatedAt: recent },
+  ];
+  assert.equal(findRunningImageTaskId(tasks, now), 'running');
+});
+
+test('a running image task that has not moved for minutes is stale and is ignored', () => {
+  const now = Date.UTC(2026, 9, 25, 12, 0, 0);
+  const stale = new Date(now - 10 * 60_000).toISOString();
+  assert.equal(
+    findRunningImageTaskId(
+      [{ id: 'stuck', feature: 'image_generation', status: 'processing', updatedAt: stale }],
+      now
+    ),
+    null
+  );
+  assert.equal(findRunningImageTaskId([], now), null);
+  assert.equal(findRunningImageTaskId(undefined, now), null);
 });

@@ -205,7 +205,11 @@ export const imageGenerationResolvers = {
           throw new Error('Rate limit exceeded for variants.');
         }
         
-        if (!prompt || typeof prompt !== 'string') throw new Error('Prompt is required');
+        if (!prompt || typeof prompt !== 'string' || !prompt.trim()) throw new Error('Prompt is required');
+        // Same limit as generateAIImage; checked before any allowance or task is spent.
+        if (prompt.trim().length > IMAGE_GENERATION_CONFIG.MAX_PROMPT_LENGTH) {
+          throw new Error(`Prompt exceeds max length of ${IMAGE_GENERATION_CONFIG.MAX_PROMPT_LENGTH}`);
+        }
 
         // Check global daily quota
         await AIManager.checkQuota(userId, 'image');

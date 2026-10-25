@@ -4,6 +4,7 @@ import { makeExecutableSchema } from "@graphql-tools/schema";
 import { graphql } from "graphql";
 import { typeDefs } from "../src/schema/schema";
 import { resolvers } from "../src/resolvers";
+import { withoutGeneratedImages } from "../src/services/taskMetadata";
 
 // Image tasks keep the generated images (base64, megabytes) in their metadata so a finished
 // result can be restored. The task LIST is polled every few seconds by the apps and must not
@@ -44,8 +45,11 @@ const context: any = {
   user: caller,
   taskService: {
     getRecentTasksByUser: async () => tasks,
-    getTaskByIdForUser: async (id: string) => tasks.find((task) => task.id === id) ?? null,
+    // Like the real service: only the owner's task is found.
+    getTaskByIdForUser: async (id: string, userId: string) =>
+      tasks.find((task) => task.id === id && task.userId === userId) ?? null,
   },
+  prisma: { task: { findMany: async () => tasks } },
 };
 
 async function run(source: string) {
@@ -73,7 +77,32 @@ async function theSingleTaskStillReturnsTheImagesForRestore() {
   assert.equal(JSON.parse(task.metadata).images.length, 4);
 }
 
+async function anotherUsersTaskIsNotReturnedNotEvenForRestore() {
+  const stranger = { ...context, user: { userId: "other_9", email: "o@example.test", role: "USER" } };
+  const result: any = await graphql({ schema, source: `{ task(id: "t_image") { metadata } }`, contextValue: stranger });
+  assert.equal(result.errors, undefined);
+  assert.equal(result.data.task, null);
+}
+
+// User.tasks is another way to list tasks and must not carry the images either.
+async function theTasksOfAUserDropGeneratedImagesToo() {
+  const listed = await (resolvers as any).User.tasks({ id: "me_1" }, {}, context);
+  const image = listed.find((task: any) => task.id === "t_image");
+  assert.equal("images" in JSON.parse(image.metadata), false);
+  assert.equal(JSON.parse(image.metadata).prompt, "a red fox");
+}
+
+async function nestedOrDifferentlyShapedMetadataIsLeftAlone() {
+  assert.equal(withoutGeneratedImages('["images"]'), '["images"]');
+  assert.equal(withoutGeneratedImages('"images"'), '"images"');
+  assert.equal(withoutGeneratedImages(undefined), undefined);
+  assert.equal(withoutGeneratedImages('{"prompt":"x"}'), '{"prompt":"x"}');
+}
+
 async function main() {
+  await anotherUsersTaskIsNotReturnedNotEvenForRestore();
+  await theTasksOfAUserDropGeneratedImagesToo();
+  await nestedOrDifferentlyShapedMetadataIsLeftAlone();
   await theListDropsGeneratedImagesButKeepsTheRest();
   await theSingleTaskStillReturnsTheImagesForRestore();
   console.log("taskListMetadata tests passed");

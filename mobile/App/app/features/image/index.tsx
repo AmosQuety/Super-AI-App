@@ -21,6 +21,7 @@ import {
 import {
   GENERATE_AI_IMAGE_VARIANTS,
   GET_AI_IMAGE_STATUS,
+  GET_MY_TASKS,
   GET_TASK,
 } from '../../../services/graphql/operations';
 import {
@@ -29,13 +30,16 @@ import {
   canGenerate,
   describeGenerationError,
   describeGenerationFailure,
+  findRunningImageTaskId,
   imageExtension,
   imageFileName,
+  keepUsableImages,
   parseTaskImages,
   parseTaskPrompt,
+  restoreState,
   type GenerationFailure,
 } from '../../../libs/image-generation';
-import { isActiveStatus } from '../../../libs/tasks';
+import type { TaskRecord } from '../../../libs/tasks';
 
 const TASK_POLL_MS = 2000;
 
@@ -68,6 +72,8 @@ export default function ImageScreen() {
   // and two taps must not start two generations (each one uses the daily allowance).
   const isMounted = useRef(true);
   const isGeneratingRef = useRef(false);
+  // Once the user starts a new generation, a restored result must not replace it.
+  const userStartedRef = useRef(false);
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -83,39 +89,57 @@ export default function ImageScreen() {
 
   const [generate] = useMutation<GenerateResult>(GENERATE_AI_IMAGE_VARIANTS);
 
-  // Restoring a result from the AI tasks list: poll the task until it is no longer running.
-  // skipToken, not `skip`: without a task id nothing may be requested at all.
+  // Opened without a task: is a generation from an earlier visit still running? Asked once, on
+  // arrival, so leaving mid-generation and coming back shows it instead of inviting a second
+  // paid one. skipToken, not `skip`: with a task id nothing extra may be requested.
+  const { data: recentTasksData } = useQuery<{ myTasks: TaskRecord[] }>(
+    GET_MY_TASKS,
+    taskId
+      ? skipToken
+      : { variables: { limit: 5, includeArchived: false }, fetchPolicy: 'network-only' }
+  );
+  const runningTaskId = findRunningImageTaskId(recentTasksData?.myTasks);
+  const activeTaskId = taskId ?? runningTaskId ?? undefined;
+
+  // Restoring a result: poll the task until it is no longer running. `no-cache` keeps the images
+  // (megabytes) out of the shared Apollo cache, where a later task-list response would overwrite
+  // them and where they would stay in memory.
   const {
     data: taskData,
     error: taskError,
+    loading: taskLoading,
     stopPolling,
   } = useQuery<TaskResult>(
     GET_TASK,
-    taskId
-      ? { variables: { id: taskId }, fetchPolicy: 'network-only', pollInterval: TASK_POLL_MS }
+    activeTaskId
+      ? { variables: { id: activeTaskId }, fetchPolicy: 'no-cache', pollInterval: TASK_POLL_MS }
       : skipToken
   );
   const restoredTask = taskData?.task ?? null;
-  const restoredTaskIsRunning = restoredTask
-    ? isActiveStatus(restoredTask.status)
-    : Boolean(taskId);
+  const restore = restoreState({
+    taskId: activeTaskId,
+    task: restoredTask,
+    error: Boolean(taskError),
+    loading: taskLoading,
+  });
 
   useEffect(() => {
-    if (restoredTask && !isActiveStatus(restoredTask.status)) stopPolling();
-    if (!restoredTask || restoredTask.feature !== 'image_generation') return;
-    if (restoredTask.status === 'completed') {
+    if (restore === 'missing' || restore === 'completed' || restore === 'failed') stopPolling();
+    if (userStartedRef.current || !restoredTask) return;
+    if (restore === 'completed') {
       setPrompt(parseTaskPrompt(restoredTask.metadata));
       setImages(parseTaskImages(restoredTask.metadata));
       setFailure(null);
-    } else if (restoredTask.status === 'failed' || restoredTask.status === 'canceled') {
+    } else if (restore === 'failed') {
       setPrompt(parseTaskPrompt(restoredTask.metadata));
       setFailure(describeGenerationFailure(null));
     }
-  }, [restoredTask, stopPolling]);
+  }, [restore, restoredTask, stopPolling]);
 
   const startGeneration = useCallback(async () => {
     if (isGeneratingRef.current || !canGenerate(prompt)) return;
     isGeneratingRef.current = true;
+    userStartedRef.current = true;
     setIsGenerating(true);
     setFailure(null);
     setImages([]);
@@ -124,14 +148,15 @@ export default function ImageScreen() {
       const { data } = await generate({ variables: { prompt: prompt.trim() } });
       if (!isMounted.current) return;
       const result = data?.generateAIImageVariants;
-      if (result?.success && result.images?.length) {
-        setImages(result.images);
+      const usable = keepUsableImages(result?.images);
+      if (result?.success && usable.length > 0) {
+        setImages(usable);
       } else {
         setFailure(describeGenerationFailure(result?.error));
       }
     } catch (error) {
       if (!isMounted.current) return;
-      console.warn('Image generation failed:', error);
+      console.warn('Image generation failed.');
       setFailure(describeGenerationError(error));
     } finally {
       isGeneratingRef.current = false;
@@ -153,18 +178,16 @@ export default function ImageScreen() {
         }
         const target = `${FileSystem.cacheDirectory}${imageFileName(prompt, index, imageExtension(source))}`;
         const base64 = base64FromDataUri(source);
-        if (base64) {
-          await FileSystem.writeAsStringAsync(target, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } else {
-          await FileSystem.downloadAsync(source, target);
-        }
+        if (!base64) throw new Error('not inline image data');
+        // Remembered before writing, so a half-written file is removed too.
         cacheFile = target;
+        await FileSystem.writeAsStringAsync(target, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
         await MediaLibrary.saveToLibraryAsync(target);
         if (isMounted.current) setSavedIndexes((previous) => new Set(previous).add(index));
-      } catch (error) {
-        console.warn('Saving an image failed:', error);
+      } catch {
+        console.warn('Saving an image failed.');
         Alert.alert('Could not save', 'The image could not be saved. Please try again.');
       } finally {
         if (cacheFile) await FileSystem.deleteAsync(cacheFile, { idempotent: true });
@@ -174,11 +197,13 @@ export default function ImageScreen() {
     [images, prompt, savingIndex]
   );
 
-  const generateDisabled =
-    isGenerating || !canGenerate(prompt) || (serviceKnown && !serviceAvailable);
   const showRestoring =
-    Boolean(taskId) && restoredTaskIsRunning && !taskError && images.length === 0;
-  const taskMissing = Boolean(taskId) && !restoredTask && Boolean(taskError);
+    (restore === 'loading' || restore === 'running') &&
+    !userStartedRef.current &&
+    images.length === 0;
+  const generateDisabled =
+    isGenerating || showRestoring || !canGenerate(prompt) || (serviceKnown && !serviceAvailable);
+  const taskMissing = restore === 'missing' && Boolean(taskId);
 
   return (
     <KeyboardAvoidingView
@@ -274,7 +299,7 @@ export default function ImageScreen() {
           </View>
         ) : null}
 
-        {restoredTask?.status === 'completed' && images.length === 0 && !isGenerating ? (
+        {restore === 'completed' && images.length === 0 && !isGenerating ? (
           <Text testID="image-task-empty" className="mt-6 text-center text-base text-gray-700">
             This task has no images to show.
           </Text>
