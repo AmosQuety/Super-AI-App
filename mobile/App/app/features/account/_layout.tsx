@@ -10,6 +10,8 @@ export default function AccountLayout() {
         header: renderScreenHeader(),
       }}>
       <Stack.Screen name="change-password" options={{ title: 'Change password' }} />
+      <Stack.Screen name="edit-name" options={{ title: 'Edit name' }} />
+      <Stack.Screen name="assistant-settings" options={{ title: 'Assistant settings' }} />
     </Stack>
   );
 }

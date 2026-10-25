@@ -73,7 +73,7 @@ export class ApiError extends Error {
 const STORE_RESET_MESSAGE = /store reset while query was in flight/i;
 
 // Turns an Apollo error into a message a user can act on.
-function toUserFacingError(error: unknown): ApiError {
+export function toUserFacingError(error: unknown): ApiError {
   if (CombinedGraphQLErrors.is(error)) {
     const first = error.errors[0];
     return new ApiError(

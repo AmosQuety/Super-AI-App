@@ -7,7 +7,7 @@
     "build": "cd ../packages/ai-orchestrator && npm install && npm run build && cd ../../backend && npm install && npx prisma migrate deploy && npx prisma generate && tsc",
     "start": "node dist/index.js",
     "seed": "ts-node prisma/seed.ts",
-    "test:tasks": "ts-node tests/taskLifecycle.test.ts && ts-node tests/taskEventPublisher.test.ts && ts-node tests/taskListMetadata.test.ts && ts-node tests/imageVariantsPrompt.test.ts && ts-node tests/voiceTask.test.ts",
+    "test:tasks": "ts-node tests/taskLifecycle.test.ts && ts-node tests/taskEventPublisher.test.ts && ts-node tests/taskListMetadata.test.ts && ts-node tests/imageVariantsPrompt.test.ts && ts-node tests/voiceTask.test.ts && ts-node tests/profileSettings.test.ts",
     "test:authz": "ts-node tests/usersQueryAuthorization.test.ts && ts-node tests/chatAuthorization.test.ts && ts-node tests/authorizationFollowups.test.ts && ts-node tests/tokenRole.test.ts && ts-node tests/jwtSecret.test.ts && ts-node tests/webhookAuth.test.ts && ts-node tests/sessionUser.test.ts && ts-node tests/changePassword.test.ts && ts-node tests/socketRegistry.test.ts && ts-node tests/passwordLength.test.ts && ts-node tests/passwordSessions.test.ts && ts-node tests/chatOwnershipErrors.test.ts && ts-node tests/chatCacheInvalidation.test.ts",
     "push:generate-vapid-keys": "ts-node scripts/generateVapidKeys.ts",
     "prisma:generate": "prisma generate",

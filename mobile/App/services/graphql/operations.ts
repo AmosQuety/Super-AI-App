@@ -216,3 +216,43 @@ export const PROCESS_VOICE_TASK = gql`
     }
   }
 `;
+
+export const PROFILE_DETAILS = gql`
+  query ProfileDetails {
+    me {
+      id
+      totalChats
+      totalMessages
+      totalVoiceJobs
+      totalDocuments
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
+    }
+  }
+`;
+
+export const UPDATE_PREFERENCES = gql`
+  mutation UpdatePreferences($preferences: PreferencesInput!) {
+    updatePreferences(preferences: $preferences) {
+      id
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
+    }
+  }
+`;

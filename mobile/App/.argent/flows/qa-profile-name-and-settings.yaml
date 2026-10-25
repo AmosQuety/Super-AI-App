@@ -1,0 +1,123 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline). The flow
+      renames the account and changes the assistant settings, then restores
+      both
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home. Open Profile; expect the original name Agent Test
+  - tap:
+      id: tab-profile
+  - await: { visible: { id: profile-edit-name } }
+  - await: { visible: { text: Agent Test } }
+  - await: { idle: true }
+  - echo: Profile shows Agent Test. Open Edit name; expect the name field
+  - tap:
+      id: profile-edit-name
+  - await: { visible: { id: edit-name-input }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: On Edit name. Focus the field and type a new name
+  - tap:
+      id: edit-name-input
+  - tool: keyboard
+    args:
+      text: Agent Flow
+  - await: { visible: { id: edit-name-input, text: Agent Flow } }
+  - echo: New name typed. Tap Save; expect Profile showing the new name and the
+      old one gone
+  - tap:
+      id: edit-name-save
+  - await: { visible: { id: profile-edit-name } }
+  - await: { visible: { text: Agent Flow } }
+  - await: { hidden: { text: Agent Test } }
+  - await: { hidden: { text: Your name was updated. }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: The new name is saved and shown. Rename back to the original to restore
+      the baseline
+  - tap:
+      id: profile-edit-name
+  - await: { visible: { id: edit-name-input }, timeout: 10000 }
+  - await: { idle: true }
+  - tap:
+      id: edit-name-input
+  - tool: keyboard
+    args:
+      text: Agent Test
+  - await: { visible: { id: edit-name-input, text: Agent Test } }
+  - tap:
+      id: edit-name-save
+  - await: { visible: { id: profile-assistant-settings } }
+  - await: { visible: { text: Agent Test } }
+  - await: { hidden: { text: Agent Flow } }
+  - await: { hidden: { text: Your name was updated. }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: Name restored. Open Assistant settings; expect the defaults, with an
+      empty role
+  - tap:
+      id: profile-assistant-settings
+  - await: { visible: { id: pref-language, text: English }, timeout: 10000 }
+  - await: { visible: { id: pref-role, text: For example product manager } }
+  - await: { idle: true }
+  - echo: On Assistant settings. Choose Formal and type a role
+  - tap:
+      id: pref-tone-formal
+  - tap:
+      id: pref-role
+  - tool: keyboard
+    args:
+      text: QA
+  - await: { visible: { id: pref-role, text: QA } }
+  - echo: Role typed. Tap Save; expect Profile again
+  - tap:
+      id: settings-save
+  - await: { visible: { id: profile-assistant-settings } }
+  - await: { hidden: { text: The assistant will use these settings in new replies. }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: Saved. Reopen Assistant settings; expect the saved role to persist
+  - tap:
+      id: profile-assistant-settings
+  - await: { visible: { id: pref-role, text: QA }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: The role persisted. Restore the defaults, choose Casual and clear the role
+  - tap:
+      id: pref-tone-casual
+  - tap:
+      id: pref-role
+  - tool: keyboard
+    args:
+      key: backspace
+  - tool: keyboard
+    args:
+      key: backspace
+  - await: { visible: { id: pref-role, text: For example product manager } }
+  - tap:
+      id: settings-save
+  - await: { visible: { id: profile-assistant-settings } }
+  - await: { hidden: { text: The assistant will use these settings in new replies. }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: Defaults restored. Sign out (restores the signed-out baseline)
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }

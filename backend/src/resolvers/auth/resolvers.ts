@@ -239,7 +239,13 @@ export const authResolvers = {
       const user = AuthorizationService.requireAuth(context);
 
       const updateData: any = {};
-      if (args.name !== undefined) updateData.name = args.name.trim();
+      if (args.name !== undefined) {
+        const name = (args.name ?? "").trim();
+        if (name.length < 1 || name.length > 100) {
+          throw new UserInputError("Name must be between 1 and 100 characters");
+        }
+        updateData.name = name;
+      }
       if (args.email !== undefined) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.email)) {
           throw new UserInputError("Invalid email format");

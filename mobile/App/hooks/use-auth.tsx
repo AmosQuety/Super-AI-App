@@ -15,7 +15,9 @@ interface AuthContextType {
   signIn: (credentials: AuthCredentials) => Promise<void>;
   signUp: (credentials: AuthCredentials & { name: string }) => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (updates: { name?: string; email?: string }) => Promise<void>;
+  // Resolves true when the update was applied to the current session, false when the user
+  // signed out (or switched accounts) while it was in flight.
+  updateProfile: (updates: { name?: string; email?: string }) => Promise<boolean>;
   changePassword: (
     currentPassword: string,
     newPassword: string
@@ -131,8 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = async (updates: { name?: string; email?: string }) => {
     try {
+      const tokenBefore = await storageService.getAuthToken();
       const updatedUser = await apiService.updateProfile(updates);
+      // Signing out during a slow request must not bring the signed-out user back.
+      if ((await storageService.getAuthToken()) !== tokenBefore) return false;
       setUser(updatedUser);
+      await storageService.setUser(updatedUser);
+      return true;
     } catch (error) {
       logUnexpected('Profile update', error);
       throw error;
