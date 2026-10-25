@@ -23,11 +23,7 @@ const GET_CHATS = gql`
       id
       title
       createdAt
-      messages {
-        id
-        content
-        fileName
-      }
+      updatedAt
     }
   }
 `;
@@ -42,11 +38,7 @@ type Chat = {
   id: string;
   title: string;
   createdAt: string;
-  messages: {
-    id: string;
-    content: string;
-    fileName?: string;
-  }[];
+  updatedAt: string;
 };
 
 const ChatListScreen: React.FC = () => {
@@ -72,10 +64,8 @@ const ChatListScreen: React.FC = () => {
     if (searchQuery.trim() === '') {
       setFilteredChats(chats);
     } else {
-      const filtered = chats.filter(
-        (chat) =>
-          chat.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          chat.messages[0]?.content?.toLowerCase().includes(searchQuery.toLowerCase())
+      const filtered = chats.filter((chat) =>
+        chat.title?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredChats(filtered);
     }
@@ -143,19 +133,6 @@ const ChatListScreen: React.FC = () => {
     });
   };
 
-  const getLastMessagePreview = (messages: Chat['messages']) => {
-    if (!messages || messages.length === 0) return 'No messages yet';
-    const lastMessage = messages[messages.length - 1];
-
-    if (lastMessage.fileName) {
-      return `📎 ${lastMessage.fileName}`;
-    }
-
-    return lastMessage.content.length > 60
-      ? lastMessage.content.substring(0, 60) + '...'
-      : lastMessage.content;
-  };
-
   const renderChatItem = ({ item }: { item: Chat }) => (
     <TouchableOpacity
       onPress={() => router.push(`/features/chats/${item.id}`)}
@@ -181,7 +158,7 @@ const ChatListScreen: React.FC = () => {
 
       <View className="flex-row items-center">
         <Text className="flex-1 text-sm text-gray-500" numberOfLines={2}>
-          {getLastMessagePreview(item.messages)}
+          Updated {formatDate(item.updatedAt)}
         </Text>
         {deletingChats.has(item.id) ? (
           <ActivityIndicator size="small" color="#3B82F6" className="ml-2" />

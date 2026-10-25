@@ -92,17 +92,6 @@ export const GET_CHATS = gql`
       userId
       createdAt
       updatedAt
-      messages {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
     }
   }
 `;
