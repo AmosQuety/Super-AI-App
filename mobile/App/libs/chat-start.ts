@@ -68,3 +68,21 @@ export function describeSendFailure(error: unknown): SendFailure {
   }
   return { message: 'Something went wrong. Please try again.', canRetry: true };
 }
+
+// Why a chat could not be opened (as opposed to why a message could not be sent). Server wording
+// is never shown here; only "no longer exists" is recognised, everything else is a fixed sentence.
+export function describeLoadFailure(error: unknown): SendFailure {
+  const serverError = error as ServerErrorLike | null;
+  const serverAnswer = Array.isArray(serverError?.errors) ? serverError?.errors : undefined;
+
+  if (serverAnswer) {
+    if (serverAnswer[0]?.message === 'Chat not found') {
+      return { message: 'This chat no longer exists.', canRetry: false };
+    }
+    return { message: 'This chat could not be opened. Please try again.', canRetry: true };
+  }
+  if (typeof serverError?.statusCode === 'number') {
+    return { message: 'This chat could not be opened. Please try again.', canRetry: true };
+  }
+  return { message: 'No connection. Check your internet and try again.', canRetry: true };
+}

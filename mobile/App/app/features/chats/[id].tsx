@@ -18,7 +18,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFilePicker } from '../../../hooks/use-file-picker';
 import { FileProcessor } from '../../../services/file-processor';
-import { claimFirstMessage, describeSendFailure, type SendFailure } from '../../../libs/chat-start';
+import {
+  claimFirstMessage,
+  describeLoadFailure,
+  describeSendFailure,
+  type SendFailure,
+} from '../../../libs/chat-start';
 
 // GraphQL operations
 const GET_CHAT_HISTORY = gql`
@@ -124,7 +129,7 @@ function ChatDetailScreen() {
   const { pickFile } = useFilePicker();
 
   // Get initial messages
-  const { data, loading, error, fetchMore } = useQuery<{
+  const { data, loading, error, refetch, fetchMore } = useQuery<{
     chatHistory: { messages: Message[]; hasMore: boolean };
   }>(GET_CHAT_HISTORY, {
     variables: { chatId, limit: 50, offset: 0 },
@@ -149,6 +154,11 @@ function ChatDetailScreen() {
   }>(SEND_MESSAGE_WITH_RESPONSE);
 
   const hasMore = data?.chatHistory?.hasMore || false;
+
+  // Why the chat could not be opened, if it could not. A chat that no longer exists has nothing
+  // to send to, so its composer is hidden; any other failure offers Try again.
+  const loadFailure = error && allMessages.length === 0 ? describeLoadFailure(error) : null;
+  const chatIsGone = loadFailure !== null && !loadFailure.canRetry;
 
   // Auto-scroll when new messages arrive
   useEffect(() => {
@@ -489,12 +499,27 @@ function ChatDetailScreen() {
                 }}>
                 <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
               </View>
-              {error ? (
-                <Text
-                  testID="chat-load-error"
-                  className="px-8 text-center text-lg font-semibold text-gray-500">
-                  {describeSendFailure(error).message}
-                </Text>
+              {loadFailure ? (
+                <>
+                  <Text
+                    testID="chat-load-error"
+                    accessibilityRole="alert"
+                    className="px-8 text-center text-lg font-semibold text-gray-600">
+                    {loadFailure.message}
+                  </Text>
+                  {loadFailure.canRetry ? (
+                    <TouchableOpacity
+                      testID="chat-load-retry"
+                      accessibilityRole="button"
+                      accessibilityLabel="Try opening the chat again"
+                      onPress={() => {
+                        refetch().catch(() => undefined);
+                      }}
+                      className="mt-4 min-h-[44px] items-center justify-center rounded-2xl bg-blue-500 px-8">
+                      <Text className="font-semibold text-white">Try again</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <Text className="text-center text-lg font-semibold text-gray-400">
@@ -597,71 +622,73 @@ function ChatDetailScreen() {
         </View>
       )}
 
-      {/* Input Area - FIXED FOR KEYBOARD */}
-      <View
-        className="mb-12 border-t border-gray-200 bg-white px-4 py-3"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
-          elevation: 8,
-        }}>
-        <View className="flex-row items-end">
-          {/* Attach Button */}
-          <TouchableOpacity
-            onPress={handleAttachFile}
-            disabled={isSending || isProcessingFile}
-            className="mb-2 mr-2">
-            {isProcessingFile ? (
-              <ActivityIndicator size="small" color="#3b82f6" />
-            ) : (
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                <Ionicons name="add" size={24} color={isSending ? '#9ca3af' : '#6b7280'} />
-              </View>
-            )}
-          </TouchableOpacity>
+      {/* Input Area - FIXED FOR KEYBOARD. Not shown for a chat that no longer exists. */}
+      {chatIsGone ? null : (
+        <View
+          className="mb-12 border-t border-gray-200 bg-white px-4 py-3"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 8,
+          }}>
+          <View className="flex-row items-end">
+            {/* Attach Button */}
+            <TouchableOpacity
+              onPress={handleAttachFile}
+              disabled={isSending || isProcessingFile}
+              className="mb-2 mr-2">
+              {isProcessingFile ? (
+                <ActivityIndicator size="small" color="#3b82f6" />
+              ) : (
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Ionicons name="add" size={24} color={isSending ? '#9ca3af' : '#6b7280'} />
+                </View>
+              )}
+            </TouchableOpacity>
 
-          {/* Text Input */}
-          <View className="mr-2 flex-1">
-            <TextInput
-              className="max-h-24 rounded-3xl bg-gray-100 px-4 py-3 text-gray-800"
-              placeholder={attachedFile ? 'Add a caption...' : 'Message AI...'}
-              placeholderTextColor="#9ca3af"
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              maxLength={1000}
-              editable={!isSending}
+            {/* Text Input */}
+            <View className="mr-2 flex-1">
+              <TextInput
+                className="max-h-24 rounded-3xl bg-gray-100 px-4 py-3 text-gray-800"
+                placeholder={attachedFile ? 'Add a caption...' : 'Message AI...'}
+                placeholderTextColor="#9ca3af"
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                maxLength={1000}
+                editable={!isSending}
+                style={{
+                  fontSize: 15,
+                  fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                }}
+              />
+            </View>
+
+            {/* Send Button */}
+            <TouchableOpacity
+              onPress={sendMessage}
+              disabled={(!message.trim() && !attachedFile) || isSending}
+              className={`mb-2 h-10 w-10 items-center justify-center rounded-full ${
+                (message.trim() || attachedFile) && !isSending ? 'bg-blue-500' : 'bg-gray-300'
+              }`}
               style={{
-                fontSize: 15,
-                fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-              }}
-            />
+                shadowColor: '#3b82f6',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: (message.trim() || attachedFile) && !isSending ? 0.3 : 0,
+                shadowRadius: 4,
+                elevation: (message.trim() || attachedFile) && !isSending ? 4 : 0,
+              }}>
+              {isSending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons name="arrow-up" size={20} color="white" />
+              )}
+            </TouchableOpacity>
           </View>
-
-          {/* Send Button */}
-          <TouchableOpacity
-            onPress={sendMessage}
-            disabled={(!message.trim() && !attachedFile) || isSending}
-            className={`mb-2 h-10 w-10 items-center justify-center rounded-full ${
-              (message.trim() || attachedFile) && !isSending ? 'bg-blue-500' : 'bg-gray-300'
-            }`}
-            style={{
-              shadowColor: '#3b82f6',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: (message.trim() || attachedFile) && !isSending ? 0.3 : 0,
-              shadowRadius: 4,
-              elevation: (message.trim() || attachedFile) && !isSending ? 4 : 0,
-            }}>
-            {isSending ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons name="arrow-up" size={20} color="white" />
-            )}
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

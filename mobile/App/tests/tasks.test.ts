@@ -7,6 +7,7 @@ import {
   progressPercent,
   statusLabel,
   taskDestination,
+  taskSummary,
   timeAgo,
   type TaskRecord,
 } from '../libs/tasks';
@@ -101,4 +102,32 @@ test('age is stated in plain units and never negative', () => {
     'Just now',
     'a clock a little ahead is not a negative age'
   );
+});
+
+test('the spoken summary of a task has kind, status, progress while active, and age', () => {
+  const now = Date.UTC(2026, 9, 25, 12, 0, 0);
+  const updatedAt = new Date(now - 5 * 60_000).toISOString();
+  assert.equal(
+    taskSummary(task({ status: 'completed', updatedAt }), now),
+    'Chat task, Done, 5 min ago'
+  );
+  assert.equal(
+    taskSummary(
+      task({ feature: 'image_generation', status: 'processing', progress: 40, updatedAt }),
+      now
+    ),
+    'Image task, Working, 40 percent, 5 min ago'
+  );
+  assert.equal(
+    taskSummary(task({ status: 'queued', progress: 0, updatedAt }), now),
+    'Chat task, Waiting, 0 percent, 5 min ago'
+  );
+  assert.equal(
+    taskSummary(task({ status: 'failed', updatedAt }), now),
+    'Chat task, Did not finish, 5 min ago'
+  );
+});
+
+test('an unparsable date does not produce a broken age', () => {
+  assert.equal(timeAgo('not a date'), '');
 });

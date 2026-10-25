@@ -74,6 +74,7 @@ export function taskDestination(task: Pick<TaskRecord, 'feature' | 'metadata'>):
 
 // Plain-language age ("2 min ago"). Tasks are recent by definition, so days are the largest unit.
 export function timeAgo(isoDate: string, now: number = Date.now()): string {
+  if (Number.isNaN(new Date(isoDate).getTime())) return '';
   const seconds = Math.max(0, Math.round((now - new Date(isoDate).getTime()) / 1000));
   if (seconds < 60) return 'Just now';
   const minutes = Math.floor(seconds / 60);
@@ -81,4 +82,14 @@ export function timeAgo(isoDate: string, now: number = Date.now()): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} h ago`;
   return `${Math.floor(hours / 24)} d ago`;
+}
+
+// What a screen reader says for one task row. A row is one accessible element, so the progress
+// of a running task has to be part of this text; the nested progress bar is not reached.
+export function taskSummary(task: TaskRecord, now: number = Date.now()): string {
+  const parts = [`${featureLabel(task.feature)} task`, statusLabel(task.status)];
+  if (isActiveStatus(task.status)) parts.push(`${progressPercent(task)} percent`);
+  const age = timeAgo(task.updatedAt, now);
+  if (age) parts.push(age);
+  return parts.join(', ');
 }

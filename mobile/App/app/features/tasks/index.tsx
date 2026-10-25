@@ -2,8 +2,8 @@
 import { useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, type Href } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { GET_MY_TASKS } from '../../../services/graphql/operations';
 import {
   featureLabel,
@@ -11,6 +11,7 @@ import {
   progressPercent,
   statusLabel,
   taskDestination,
+  taskSummary,
   timeAgo,
   type TaskRecord,
 } from '../../../libs/tasks';
@@ -73,10 +74,7 @@ function TaskRow({ task }: { task: TaskRecord }) {
 
   if (!destination) {
     return (
-      <View
-        testID="task-row"
-        accessible
-        accessibilityLabel={`${label} task, ${status}, ${timeAgo(task.updatedAt)}`}>
+      <View testID="task-row" accessible accessibilityLabel={taskSummary(task)}>
         {content}
       </View>
     );
@@ -87,7 +85,7 @@ function TaskRow({ task }: { task: TaskRecord }) {
       testID="task-row"
       onPress={() => router.push(destination as Href)}
       accessibilityRole="button"
-      accessibilityLabel={`${label} task, ${status}, ${timeAgo(task.updatedAt)}. Open`}
+      accessibilityLabel={`${taskSummary(task)}. Open`}
       activeOpacity={0.7}>
       {content}
     </TouchableOpacity>
@@ -104,12 +102,32 @@ export default function TasksScreen() {
     notifyOnNetworkStatusChange: false,
   });
 
-  // Poll only while this screen is in front, so a hidden screen does not keep the radio awake.
+  // Poll only while this screen is in front and the app is in the foreground, so a hidden
+  // screen or a backgrounded app does not keep the radio awake. Coming back shows fresh data
+  // at once instead of waiting for the next tick.
+  const hasBeenFocused = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      const refreshNow = () => {
+        refetch().catch(() => undefined);
+      };
       startPolling(POLL_INTERVAL_MS);
-      return () => stopPolling();
-    }, [startPolling, stopPolling])
+      if (hasBeenFocused.current) refreshNow();
+      hasBeenFocused.current = true;
+
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          startPolling(POLL_INTERVAL_MS);
+          refreshNow();
+        } else {
+          stopPolling();
+        }
+      });
+      return () => {
+        subscription.remove();
+        stopPolling();
+      };
+    }, [refetch, startPolling, stopPolling])
   );
 
   const onRefresh = useCallback(async () => {
@@ -129,8 +147,10 @@ export default function TasksScreen() {
     return (
       <View
         testID="tasks-loading"
-        className="flex-1 items-center justify-center bg-gray-50"
-        accessibilityLabel="Loading your tasks">
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel="Loading your tasks"
+        className="flex-1 items-center justify-center bg-gray-50">
         <ActivityIndicator size="large" color="#3B82F6" />
       </View>
     );
@@ -138,7 +158,11 @@ export default function TasksScreen() {
 
   if (error && tasks.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-8">
+      <View
+        testID="tasks-error"
+        accessibilityRole="alert"
+        accessibilityLiveRegion="polite"
+        className="flex-1 items-center justify-center bg-gray-50 px-8">
         <Text className="mb-4 text-center text-base text-gray-700">
           Could not load your tasks. Check your connection and try again.
         </Text>
@@ -166,8 +190,8 @@ export default function TasksScreen() {
       onRefresh={onRefresh}
       ListEmptyComponent={
         <View testID="tasks-empty" className="flex-1 items-center justify-center py-20">
-          <Text className="text-center text-lg font-semibold text-gray-500">No tasks yet</Text>
-          <Text className="mt-2 text-center text-sm text-gray-400">
+          <Text className="text-center text-lg font-semibold text-gray-700">No tasks yet</Text>
+          <Text className="mt-2 text-center text-sm text-gray-600">
             Things the AI works on for you will appear here.
           </Text>
         </View>

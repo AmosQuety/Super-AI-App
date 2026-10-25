@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import {
   claimFirstMessage,
+  describeLoadFailure,
   describeSendFailure,
   releaseFirstMessage,
   titleFromMessage,
@@ -100,4 +101,31 @@ test('anything unexpected still gives a retryable generic message', () => {
   const failure = describeSendFailure('boom');
   assert.equal(failure.canRetry, true);
   assert.ok(failure.message.length > 0);
+});
+
+test('opening a chat that no longer exists cannot be retried', () => {
+  const missing = Object.assign(new Error('Chat not found'), {
+    errors: [{ message: 'Chat not found', extensions: { code: 'BAD_USER_INPUT' } }],
+  });
+  const failure = describeLoadFailure(missing);
+  assert.equal(failure.canRetry, false);
+  assert.match(failure.message, /no longer exists/i);
+});
+
+test('opening a chat without a connection can be retried', () => {
+  const failure = describeLoadFailure(new TypeError('Network request failed'));
+  assert.equal(failure.canRetry, true);
+  assert.match(failure.message, /connection/i);
+});
+
+test('opening a chat never shows the raw text of any other server answer', () => {
+  const validation = Object.assign(new Error('Variable "$limit" got invalid value'), {
+    errors: [
+      { message: 'Variable "$limit" got invalid value', extensions: { code: 'BAD_USER_INPUT' } },
+    ],
+  });
+  const failure = describeLoadFailure(validation);
+  assert.equal(failure.canRetry, true);
+  assert.doesNotMatch(failure.message, /limit|variable/i);
+  assert.match(failure.message, /could not be opened/i);
 });
