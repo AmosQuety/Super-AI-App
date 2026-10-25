@@ -1,0 +1,84 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline)
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 60000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home, signed in. Open Chat; expect the chat list
+  - tap:
+      text: "Open Chat: Text conversations"
+  - await: { visible: { text: Search conversations... } }
+  - await: { idle: true }
+  - echo: On the chat list. Tap New chat; expect the New Conversation form
+  - tap:
+      id: chats-new
+  - await: { visible: { text: Start Conversation } }
+  - await: { idle: true }
+  - echo: On New Conversation. Focus Your Message and type a fixed prompt (it
+      becomes the chat title)
+  - tap:
+      text: What would you like to discuss? Ask questions, share ideas, or request
+        help with anything...
+  - tool: keyboard
+    args:
+      text: "Reply with the single word: ping"
+  - echo: Message entered, Start Conversation enabled. Tap it; expect the chat
+      screen, then the assistant reply
+  - tap:
+      text: Start Conversation
+  - await: { visible: { id: chat-avatar-assistant }, timeout: 60000 }
+  - await: { visible: { id: chat-avatar-user } }
+  - await: { visible: { text: "Reply with the single word: ping" } }
+  - await: { idle: true }
+  - echo: Reply received. Go back to the chat list; expect the new chat, titled with
+      the prompt
+  - tap:
+      text: Go back
+  - await: { visible: { text: Search conversations... } }
+  - await: { visible: { text: "Reply with the single word: ping" } }
+  - await: { idle: true }
+  - echo: The new chat is listed. Long-press it to delete it (restores the baseline
+      for the next run); expect a Delete Chat confirmation
+  - long-press:
+      text: "Reply with the single word: ping"
+  - await: { visible: { id: "com.xemora.app:id/alert_title", text: Delete Chat } }
+  - echo: Confirmation shown. Tap DELETE; expect the ping chat to leave the list
+  - tap:
+      id: android:id/button1
+  - await: { hidden: { text: "Reply with the single word: ping" } }
+  - await: { idle: true }
+  - tool: button
+    args:
+      button: back
+  - await: { visible: { text: Recent chats } }
+  - await: { idle: true }
+  - echo: Back on Home. Open the Profile tab and sign out (restores the signed-out
+      baseline)
+  - tap:
+      id: tab-profile
+  - await: { visible: { text: Sign Out } }
+  - await: { idle: true }
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }
