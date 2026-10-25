@@ -286,10 +286,15 @@ export const authResolvers = {
 
       const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-      await context.prisma.user.update({
-        where: { id: user.userId},
+      // Conditional on the hash that was just verified, so two simultaneous changes cannot
+      // both report success while only one password is stored.
+      const { count } = await context.prisma.user.updateMany({
+        where: { id: user.userId, password: dbUser.password },
         data: { password: hashedNewPassword },
       });
+      if (count === 0) {
+        throw new UserInputError("Your password was just changed from another session. Please try again.");
+      }
 
       // Tokens are bound to the password, so every other session just ended. Hand the
       // caller a fresh token so this device stays signed in.

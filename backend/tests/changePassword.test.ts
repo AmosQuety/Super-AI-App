@@ -13,7 +13,7 @@ const MUTATION = `mutation($c: String!, $n: String!) {
 
 const signedIn = { userId: "user_1", email: "u1@example.test", role: "USER" };
 
-function makeContext(options: { user: typeof signedIn | null; storedUser: boolean }) {
+function makeContext(options: { user: typeof signedIn | null; storedUser: boolean; rowChangedMeanwhile?: boolean }) {
   const updates: unknown[] = [];
   const stored = { id: "user_1", password: bcrypt.hashSync(CURRENT, 4) };
   const context = {
@@ -21,9 +21,10 @@ function makeContext(options: { user: typeof signedIn | null; storedUser: boolea
     prisma: {
       user: {
         findUnique: async () => (options.storedUser ? stored : null),
-        update: async (args: unknown) => {
+        // Conditional write: it matches only while the stored hash is still the one that was verified.
+        updateMany: async (args: unknown) => {
           updates.push(args);
-          return stored;
+          return { count: options.rowChangedMeanwhile ? 0 : 1 };
         },
       },
     },
@@ -79,7 +80,25 @@ async function aValidChangeStoresOnlyAHashOfTheNewPassword() {
   assert.equal(await bcrypt.compare("brand-new-password", stored), true);
 }
 
+// Two simultaneous changes must not both report success: the loser's new password would
+// not be stored and the token it was handed would already be dead.
+async function aChangeRacingAnotherOneIsRefusedNotReportedAsSuccess() {
+  const { result } = await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true, rowChangedMeanwhile: true });
+  assert.equal(code(result), "BAD_USER_INPUT");
+  assert.match(String(message(result)), /changed.*another/i);
+  assert.equal(result.data, null);
+}
+
+async function theWriteIsConditionalOnTheVerifiedHash() {
+  const { updates } = await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  const where = (updates[0] as any).where;
+  assert.equal(where.id, "user_1");
+  assert.equal(typeof where.password, "string", "the old hash is part of the write condition");
+}
+
 async function main() {
+  await aChangeRacingAnotherOneIsRefusedNotReportedAsSuccess();
+  await theWriteIsConditionalOnTheVerifiedHash();
   await aWrongCurrentPasswordIsAnInputErrorNotASessionError();
   await aMissingSessionOrDeletedUserIsUnauthenticated();
   await newPasswordRulesAreInputErrors();

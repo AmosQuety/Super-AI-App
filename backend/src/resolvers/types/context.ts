@@ -84,8 +84,13 @@ export const disconnectPrisma = async () => {
 // ============================================
 // CONTEXT CREATION
 // ============================================
-const lookupStoredAccount: AccountLookup = (userId) =>
-  prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true } });
+// `password` (the hash) is read only to compare the token's password fingerprint.
+export const accountLookupFor =
+  (db: Pick<PrismaClient, "user">): AccountLookup =>
+  (userId) =>
+    db.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true } });
+
+const lookupStoredAccount = accountLookupFor(prisma);
 
 export async function createContext({
   req,

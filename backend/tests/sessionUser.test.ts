@@ -2,7 +2,7 @@ import "./support/testEnvironment";
 import assert from "node:assert/strict";
 import { SecurityConfig } from "../src/auth/security";
 import { authenticateToken, StoredAccount } from "../src/auth/sessionUser";
-import { createContext } from "../src/resolvers/types/context";
+import { accountLookupFor, createContext } from "../src/resolvers/types/context";
 
 const STORED_HASH = "stored-password-hash-1";
 
@@ -71,7 +71,18 @@ async function contextUsesTheLiveAccountForHttpAndWebSocket() {
   assert.equal(refused.user, null);
 }
 
+// Every token is checked against the stored hash; if this select ever drops `password`,
+// every session is refused and everyone is signed out, so pin it.
+async function theProductionLookupReadsTheRoleTheActiveFlagAndThePasswordHash() {
+  const queries: any[] = [];
+  const prisma: any = { user: { findUnique: async (query: any) => (queries.push(query), account("USER")) } };
+  await accountLookupFor(prisma)("u1");
+  assert.deepEqual(queries[0].where, { id: "u1" });
+  assert.deepEqual(queries[0].select, { role: true, isActive: true, password: true });
+}
+
 async function main() {
+  await theProductionLookupReadsTheRoleTheActiveFlagAndThePasswordHash();
   await theStoredRoleOverridesTheRoleInTheToken();
   await anUnknownStoredRoleBecomesUser();
   await aDisabledOrDeletedAccountHasNoSession();

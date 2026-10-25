@@ -27,7 +27,12 @@ function fakeDatabase(initialPassword = OLD_PASSWORD) {
   const prisma = {
     user: {
       findUnique: async ({ where }: any) => copyOf(users.get(where.id) ?? [...users.values()].find((u) => u.email === where.email)),
-      update: async ({ where, data }: any) => Object.assign(users.get(where.id), data),
+      updateMany: async ({ where, data }: any) => {
+        const row = users.get(where.id);
+        if (!row || (where.password !== undefined && row.password !== where.password)) return { count: 0 };
+        Object.assign(row, data);
+        return { count: 1 };
+      },
     },
     securityAuditLog: { create: async () => undefined },
   };

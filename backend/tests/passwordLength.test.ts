@@ -41,7 +41,7 @@ async function register(password: string) {
 async function changePassword(current: string, next: string) {
   const writes: unknown[] = [];
   const stored = { id: "u1", email: "u1@example.test", role: "USER", password: bcrypt.hashSync(current, 4) };
-  const prisma = { user: { findUnique: async () => stored, update: async (args: unknown) => (writes.push(args), stored) } };
+  const prisma = { user: { findUnique: async () => stored, updateMany: async (args: unknown) => (writes.push(args), { count: 1 }) } };
   const user = { userId: "u1", email: "u1@example.test", role: "USER" };
   const result: any = await graphql({ schema, source: CHANGE, variableValues: { c: current, n: next }, contextValue: { prisma, user } });
   return { result, writes };
