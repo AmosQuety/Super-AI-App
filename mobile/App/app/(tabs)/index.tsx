@@ -1,7 +1,7 @@
 // app/(tabs)/index.tsx
 import { useQuery } from '@apollo/client/react';
 import { router, type Href } from 'expo-router';
-import { ChevronRight, Image, MessageSquare, Mic } from 'lucide-react-native';
+import { ChevronRight, Image, ListChecks, MessageSquare, Mic } from 'lucide-react-native';
 import type { ComponentType } from 'react';
 import {
   ActivityIndicator,
@@ -191,6 +191,21 @@ export default function HomeScreen() {
           hasError={Boolean(error)}
           onRetry={retry}
         />
+
+        <TouchableOpacity
+          testID="home-tasks"
+          onPress={() => router.push('/features/tasks')}
+          accessibilityRole="button"
+          accessibilityLabel="Open AI tasks"
+          className="mt-8 min-h-[44px] flex-row items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+          <View className="flex-row items-center">
+            <ListChecks size={20} color="#6B7280" />
+            <Text className="ml-3 text-base font-semibold text-gray-900 dark:text-white">
+              AI tasks
+            </Text>
+          </View>
+          <ChevronRight size={18} color="#6B7280" />
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

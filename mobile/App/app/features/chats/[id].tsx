@@ -124,7 +124,7 @@ function ChatDetailScreen() {
   const { pickFile } = useFilePicker();
 
   // Get initial messages
-  const { data, loading, fetchMore } = useQuery<{
+  const { data, loading, error, fetchMore } = useQuery<{
     chatHistory: { messages: Message[]; hasMore: boolean };
   }>(GET_CHAT_HISTORY, {
     variables: { chatId, limit: 50, offset: 0 },
@@ -489,12 +489,22 @@ function ChatDetailScreen() {
                 }}>
                 <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
               </View>
-              <Text className="text-center text-lg font-semibold text-gray-400">
-                No messages yet
-              </Text>
-              <Text className="mt-2 text-center text-sm text-gray-400">
-                Start the conversation with AI!
-              </Text>
+              {error ? (
+                <Text
+                  testID="chat-load-error"
+                  className="px-8 text-center text-lg font-semibold text-gray-500">
+                  {describeSendFailure(error).message}
+                </Text>
+              ) : (
+                <>
+                  <Text className="text-center text-lg font-semibold text-gray-400">
+                    No messages yet
+                  </Text>
+                  <Text className="mt-2 text-center text-sm text-gray-400">
+                    Start the conversation with AI!
+                  </Text>
+                </>
+              )}
             </View>
           )
         }

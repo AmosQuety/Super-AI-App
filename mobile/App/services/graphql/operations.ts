@@ -160,3 +160,17 @@ export const LOGIN_WITH_FACE = gql`
     }
   }
 `;
+
+export const GET_MY_TASKS = gql`
+  query GetMyTasks($limit: Int, $includeArchived: Boolean) {
+    myTasks(limit: $limit, includeArchived: $includeArchived) {
+      id
+      feature
+      status
+      progress
+      metadata
+      createdAt
+      updatedAt
+    }
+  }
+`;
