@@ -1,0 +1,60 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline). Makes
+      one real image generation per run (1 of the 10 daily images and about
+      0.008 pollen)
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home. Open Image; expect the AI images screen
+  - tap:
+      text: "Open Image: Visual AI"
+  - await: { visible: { id: image-prompt }, timeout: 15000 }
+  - await: { idle: true }
+  - echo: On AI images. Focus the prompt and type a short fixed description
+  - tap:
+      id: image-prompt
+  - tool: keyboard
+    args:
+      text: A red fox in a snowy forest
+  - echo: Prompt entered. Tap Create images; expect four images (the progress card
+      is too short-lived at about 5 seconds to wait for reliably)
+  - tap:
+      text: Create images
+  - await: { visible: { id: image-result }, timeout: 120000 }
+  - await: { visible: { text: Image 4 of 4 } }
+  - await: { idle: true }
+  - echo: Four images shown. Go back to Home, then sign out (restores the signed-out
+      baseline)
+  - tap:
+      text: Go back
+  - await: { visible: { text: Recent chats } }
+  - await: { idle: true }
+  - tap:
+      id: tab-profile
+  - await: { visible: { text: Sign Out } }
+  - await: { idle: true }
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }
