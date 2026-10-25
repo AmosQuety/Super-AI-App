@@ -22,6 +22,7 @@ import { createContext, disconnectPrisma } from "./resolvers/types/context";
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws'; 
+import { trackUserSocket } from './auth/socketRegistry';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { RateLimitService } from './auth/rate-limiting';
 import { SecurityConfig } from './auth/security';
@@ -256,7 +257,10 @@ const corsOptions: cors.CorsOptions = {
       {
         schema,
         context: async (ctx) => {
-          return createContext({ connection: ctx });
+          const context = await createContext({ connection: ctx });
+          // Remember the socket so a password change can end this subscription (see socketRegistry).
+          if (context.user) trackUserSocket(context.user.userId, ctx.extra.socket);
+          return context;
         },
         onConnect: () => {
           logger.info('🔌 WebSocket client connected');
