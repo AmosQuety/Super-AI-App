@@ -9,6 +9,7 @@ import { VoiceCloningService } from "../../services/voiceCloningService";
 import { redisClient } from "../../lib/redis";
 import { logger } from "../../utils/logger";
 import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
+import { closeUserSockets } from "../../auth/socketRegistry";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -30,6 +31,25 @@ type UserResponse = {
   isActive?: boolean;
   updatedAt?: Date;
 };
+
+// The password is already changed when this runs, so a broken audit store is logged loudly
+// but does not turn a successful change into a failure. Never put a password or hash in here.
+async function recordPasswordChange(context: AppContext, userId: string, userEmail: string): Promise<void> {
+  try {
+    await context.prisma.securityAuditLog.create({
+      data: {
+        userId,
+        userEmail,
+        event: "PASSWORD_CHANGED",
+        ipAddress: context.req?.ip,
+        userAgent: context.req?.headers?.["user-agent"],
+        details: JSON.stringify({ otherSessionsEnded: true }),
+      },
+    });
+  } catch (error: any) {
+    logger.error("[audit] could not record a password change", { userId, message: error.message });
+  }
+}
 
 export const authResolvers = {
   Query: {
@@ -299,6 +319,10 @@ export const authResolvers = {
       // Tokens are bound to the password, so every other session just ended. Hand the
       // caller a fresh token so this device stays signed in.
       const token = SecurityConfig.generateToken({ ...dbUser, password: hashedNewPassword });
+
+      // Live subscriptions were authenticated with an old token; close them so they reconnect.
+      closeUserSockets(user.userId);
+      await recordPasswordChange(context, dbUser.id, dbUser.email);
 
       return {
         success: true,

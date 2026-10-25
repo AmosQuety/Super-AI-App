@@ -5,6 +5,7 @@ import { makeExecutableSchema } from "@graphql-tools/schema";
 import { graphql } from "graphql";
 import { typeDefs } from "../src/schema/schema";
 import { resolvers } from "../src/resolvers";
+import { closeUserSockets, trackUserSocket } from "../src/auth/socketRegistry";
 
 const CURRENT = "current-password-1";
 const MUTATION = `mutation($c: String!, $n: String!) {
@@ -13,12 +14,23 @@ const MUTATION = `mutation($c: String!, $n: String!) {
 
 const signedIn = { userId: "user_1", email: "u1@example.test", role: "USER" };
 
+const auditRecords: any[] = [];
+let auditShouldFail = false;
+
 function makeContext(options: { user: typeof signedIn | null; storedUser: boolean; rowChangedMeanwhile?: boolean }) {
   const updates: unknown[] = [];
-  const stored = { id: "user_1", password: bcrypt.hashSync(CURRENT, 4) };
+  const stored = { id: "user_1", email: "u1@example.test", password: bcrypt.hashSync(CURRENT, 4) };
   const context = {
     user: options.user,
+    req: { ip: "10.1.2.3", headers: { "user-agent": "test-agent/1.0" } },
     prisma: {
+      securityAuditLog: {
+        create: async (args: any) => {
+          if (auditShouldFail) throw new Error("audit store unavailable");
+          auditRecords.push(args.data);
+          return args.data;
+        },
+      },
       user: {
         findUnique: async () => (options.storedUser ? stored : null),
         // Conditional write: it matches only while the stored hash is still the one that was verified.
@@ -96,7 +108,71 @@ async function theWriteIsConditionalOnTheVerifiedHash() {
   assert.equal(typeof where.password, "string", "the old hash is part of the write condition");
 }
 
+class FakeSocket {
+  closedWith: number | null = null;
+  close(code: number) {
+    this.closedWith = code;
+  }
+  once() {}
+}
+
+async function aChangeEndsTheUsersOpenSubscriptionsButNotAnotherUsers() {
+  const mine = new FakeSocket();
+  const theirs = new FakeSocket();
+  trackUserSocket("user_1", mine as any);
+  trackUserSocket("user_2", theirs as any);
+  await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  assert.equal(mine.closedWith, 4401);
+  assert.equal(theirs.closedWith, null);
+  closeUserSockets("user_2");
+}
+
+async function aFailedChangeLeavesSubscriptionsOpen() {
+  const mine = new FakeSocket();
+  trackUserSocket("user_1", mine as any);
+  await run({ c: "not-the-password", n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  assert.equal(mine.closedWith, null);
+  closeUserSockets("user_1");
+}
+
+// The audit trail says who changed what and from where, and never holds a password or a hash.
+async function aChangeIsWrittenToTheAuditLogWithoutAnySecret() {
+  auditRecords.length = 0;
+  await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  assert.equal(auditRecords.length, 1);
+  const record = auditRecords[0];
+  assert.equal(record.event, "PASSWORD_CHANGED");
+  assert.equal(record.userId, "user_1");
+  assert.equal(record.userEmail, "u1@example.test");
+  assert.equal(record.ipAddress, "10.1.2.3");
+  assert.equal(record.userAgent, "test-agent/1.0");
+  const everything = JSON.stringify(record);
+  assert.equal(everything.includes("brand-new-password"), false);
+  assert.equal(everything.includes(CURRENT), false);
+  assert.equal(/\$2[aby]\$/.test(everything), false, "no bcrypt hash");
+}
+
+async function aRefusedChangeIsNotWrittenAsAChange() {
+  auditRecords.length = 0;
+  await run({ c: "not-the-password", n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  assert.equal(auditRecords.length, 0);
+}
+
+// The password has already changed by then, so a broken audit store must not report a failure.
+async function anAuditFailureDoesNotUndoOrFailTheChange() {
+  auditShouldFail = true;
+  const { result } = await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true });
+  auditShouldFail = false;
+  assert.equal(result.errors, undefined);
+  assert.equal(result.data.changePassword.success, true);
+}
+
 async function main() {
+  await aChangeEndsTheUsersOpenSubscriptionsButNotAnotherUsers();
+  await aFailedChangeLeavesSubscriptionsOpen();
+  await aChangeIsWrittenToTheAuditLogWithoutAnySecret();
+  await aRefusedChangeIsNotWrittenAsAChange();
+  await anAuditFailureDoesNotUndoOrFailTheChange();
   await aChangeRacingAnotherOneIsRefusedNotReportedAsSuccess();
   await theWriteIsConditionalOnTheVerifiedHash();
   await aWrongCurrentPasswordIsAnInputErrorNotASessionError();
