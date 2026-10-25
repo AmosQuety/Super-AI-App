@@ -77,8 +77,8 @@ export const LOGIN = gql`
 `;
 
 export const UPDATE_PROFILE = gql`
-  mutation UpdateProfile($name: String, $email: String) {
-    updateProfile(name: $name, email: $email) {
+  mutation UpdateProfile($name: String, $email: String, $currentPassword: String) {
+    updateProfile(name: $name, email: $email, currentPassword: $currentPassword) {
       id
       email
       name

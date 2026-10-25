@@ -49,6 +49,8 @@ export default function SettingsPage() {
   // Form States
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  // Changing the email asks for the current password, so a signed-in session alone cannot take over the account.
+  const [emailPassword, setEmailPassword] = useState("");
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
 
   useEffect(() => {
@@ -58,13 +60,27 @@ export default function SettingsPage() {
     }
   }, [data]);
 
+  const emailChanged = email.trim().toLowerCase() !== (data?.me?.email ?? "").trim().toLowerCase();
+
+  // Reverting the email must not leave the typed password in memory for the next edit.
+  useEffect(() => {
+    if (!emailChanged) setEmailPassword("");
+  }, [emailChanged]);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (emailChanged && !emailPassword) {
+      return addToast({ type: 'error', title: 'Password needed', message: 'Enter your current password to change your email.' });
+    }
     try {
-      await updateProfile({ variables: { name, email } });
+      await updateProfile({
+        variables: { name, email, currentPassword: emailChanged ? emailPassword : undefined },
+      });
+      setEmailPassword("");
       addToast({ type: 'success', title: 'Updated', message: 'Account details saved.' });
       if (refetch) refetch();
     } catch (err: unknown) {
+      setEmailPassword("");
       const msg = err instanceof Error ? err.message : 'Error updating profile';
       addToast({ type: 'error', title: 'Error', message: msg });
     }
@@ -157,8 +173,9 @@ export default function SettingsPage() {
                 <h2 className="text-xl font-bold text-white mb-6">Personal Information</h2>
                 <form onSubmit={handleUpdateProfile} className="max-w-xl space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Display Name</label>
+                    <label htmlFor="profile-name" className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Display Name</label>
                     <input
+                      id="profile-name"
                       type="text"
                       value={name}
                       onChange={e => setName(e.target.value)}
@@ -166,14 +183,33 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Email Address</label>
+                    <label htmlFor="profile-email" className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Email Address</label>
                     <input
+                      id="profile-email"
                       type="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
+                  {emailChanged && (
+                    <div>
+                      <label htmlFor="profile-email-password" className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Current Password</label>
+                      <input
+                        id="profile-email-password"
+                        type="password"
+                        value={emailPassword}
+                        onChange={e => setEmailPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                        aria-describedby="email-password-hint"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <p id="email-password-hint" className="mt-2 text-xs text-slate-400">
+                        Enter your current password to confirm the new email address.
+                      </p>
+                    </div>
+                  )}
                   <button
                     disabled={updating}
                     className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all disabled:opacity-50"
