@@ -155,7 +155,12 @@ async function aChangeIsWrittenToTheAuditLogWithoutAnySecret() {
 async function aRefusedChangeIsNotWrittenAsAChange() {
   auditRecords.length = 0;
   await run({ c: "not-the-password", n: "brand-new-password" }, { user: signedIn, storedUser: true });
-  assert.equal(auditRecords.length, 0);
+  // The wrong guess is recorded as a failed check, never as a password change.
+  assert.deepEqual(
+    auditRecords.map((record) => record.event),
+    ["PASSWORD_CHECK_FAILED"]
+  );
+  assert.equal(JSON.stringify(auditRecords).includes("not-the-password"), false);
 }
 
 // The password has already changed by then, so a broken audit store must not report a failure.

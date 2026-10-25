@@ -5,6 +5,7 @@ import { makeExecutableSchema } from "@graphql-tools/schema";
 import { graphql } from "graphql";
 import { typeDefs } from "../src/schema/schema";
 import { resolvers } from "../src/resolvers";
+import { resetAllFailedAttempts } from "../src/auth/passwordAttempts";
 
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 const caller = { userId: "me_1", email: "me@example.test", role: "USER" };
@@ -79,6 +80,7 @@ function makeContext(options: Options = {}) {
 }
 
 async function run(source: string, options: Options = {}) {
+  resetAllFailedAttempts();
   const { context, writes, audits } = makeContext(options);
   const result: any = await graphql({ schema, source, contextValue: context });
   return {
@@ -108,7 +110,10 @@ async function anEmailChangeNeedsTheCurrentPassword() {
   assert.equal(wrong.code, "BAD_USER_INPUT");
   assert.match(String(wrong.message), /current password is incorrect/i);
   assert.deepEqual(wrong.writes, []);
-  assert.deepEqual(wrong.audits, []);
+  assert.deepEqual(
+    wrong.audits.map((a) => a.event),
+    ["PASSWORD_CHECK_FAILED"],
+  );
 
   const right = await run(changeEmail("  New@Example.test ", PASSWORD));
   assert.equal(right.result.errors, undefined);

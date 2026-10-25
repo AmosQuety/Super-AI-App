@@ -11,6 +11,7 @@ import { logger } from "../../utils/logger";
 import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
 import { closeUserSockets } from "../../auth/socketRegistry";
 import { recordAccountEvent } from "../../auth/accountAudit";
+import { verifyCurrentPassword } from "../../auth/currentPassword";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -46,11 +47,12 @@ async function validatedNewEmail(
   }
   if (email === account.email.toLowerCase().trim()) return email;
 
-  if (!args.currentPassword) {
-    throw new UserInputError("Enter your current password to change your email");
-  }
-  if (!account.password || !(await bcrypt.compare(args.currentPassword, account.password))) {
-    throw new UserInputError("Current password is incorrect");
+  // An account with no password (none are known to exist) has nothing to confirm.
+  if (account.password) {
+    if (!args.currentPassword) {
+      throw new UserInputError("Enter your current password to change your email");
+    }
+    await verifyCurrentPassword(context, { ...account, password: account.password }, args.currentPassword, "change_email");
   }
 
   const existingUser = await context.prisma.user.findUnique({ where: { email } });
@@ -315,11 +317,7 @@ export const authResolvers = {
         throw new AuthenticationError("No password set for this account");
       }
 
-      const isValidPassword = await bcrypt.compare(currentPassword, dbUser.password);
-      // Wrong input, not a bad session: clients sign the user out on UNAUTHENTICATED.
-      if (!isValidPassword) {
-        throw new UserInputError("Current password is incorrect");
-      }
+      await verifyCurrentPassword(context, { ...dbUser, password: dbUser.password }, currentPassword, "change_password");
 
       // Prevent reusing the same password
       const isSamePassword = await bcrypt.compare(newPassword, dbUser.password);
