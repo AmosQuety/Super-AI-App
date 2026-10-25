@@ -4,8 +4,9 @@ import { useCallback } from 'react';
 
 // Blocks screenshots, screen recording and the app-switcher preview (Android FLAG_SECURE)
 // while the screen is focused, for screens where a password can be on display.
-// Each screen passes its own key: when one screen blurs and the next focuses, the shared
-// protection is only released once every key is released, so there is no unprotected gap.
+// Each screen passes its own key, and the protection is only released once every key is
+// released, so moving between these screens normally keeps it on. If a blur were ever
+// handled before the next focus, the flag is cleared for an instant and set again.
 // A failure to apply the block must not stop the user from signing in, so it is only logged.
 export function useScreenCaptureBlock(screenKey: string) {
   useFocusEffect(

@@ -241,7 +241,13 @@ class ApiService {
     // The token in use was just revoked by the server, so swap in the fresh one before
     // anything else makes a request.
     if (data.changePassword.success && data.changePassword.token) {
-      await storageService.setAuthToken(data.changePassword.token);
+      try {
+        await storageService.setAuthToken(data.changePassword.token);
+      } catch (error) {
+        // The password did change, so this is not a failed change. The old token is dead, so the
+        // next request sends the user to Sign In, where the new password works.
+        console.warn('Could not store the new session after a password change:', error);
+      }
     }
     return data.changePassword;
   }
