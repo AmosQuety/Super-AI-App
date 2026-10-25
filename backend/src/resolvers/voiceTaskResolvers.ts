@@ -1,6 +1,11 @@
 import { AuthenticationError } from "apollo-server-express";
 import { AppContext } from "./types/context";
 
+const MAX_TEXT_LENGTH = 5000;
+// A language name is interpolated into the model's instructions, so it is limited to what a
+// language name looks like: letters, spaces, hyphens and brackets, a short length, no line breaks.
+const LANGUAGE_NAME = /^[\p{L}][\p{L} ()\-]{0,39}$/u;
+
 export const voiceTaskResolvers = {
   Mutation: {
     processVoiceTask: async (_: any, { input }: any, context: AppContext) => {
@@ -13,6 +18,12 @@ export const voiceTaskResolvers = {
       
       if (!text || text.trim() === "") {
         return { success: false, error: "No text provided." };
+      }
+      if (text.trim().length > MAX_TEXT_LENGTH) {
+        return { success: false, error: `Text exceeds the maximum of ${MAX_TEXT_LENGTH} characters.` };
+      }
+      if (targetLanguage != null && !LANGUAGE_NAME.test(targetLanguage)) {
+        return { success: false, error: "Invalid target language." };
       }
 
       try {
@@ -90,9 +101,10 @@ export const voiceTaskResolvers = {
             },
           });
         }
+        // The task keeps the real reason; the caller gets a fixed sentence, never internal wording.
         return {
             success: false,
-            error: error.message || "Failed to process voice task."
+            error: "The text could not be processed. Please try again."
         };
       }
     },

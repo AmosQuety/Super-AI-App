@@ -1,5 +1,6 @@
 // app/features/voice/index.tsx
-import React, { useState, useCallback, useEffect } from 'react';
+import { useMutation } from '@apollo/client/react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,32 +10,32 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  Platform,
   Clipboard,
-  Dimensions,
 } from 'react-native';
 import * as Speech from 'expo-speech';
+import { PROCESS_VOICE_TASK } from '../../../services/graphql/operations';
+import {
+  MAX_TEXT_LENGTH,
+  canProcessText,
+  describeVoiceError,
+  describeVoiceFailure,
+  type VoiceFailure,
+} from '../../../libs/voice-tools';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import {
-  Play,
   Square,
   Save,
   Share2,
   Copy,
   Sparkles,
-  Globe,
   Brain,
-  Zap,
   Check,
-  AlertCircle,
   Volume2,
   Settings,
   Languages,
   Mic,
 } from 'lucide-react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 // Types and Configuration remain the same...
 interface Voice {
@@ -122,44 +123,6 @@ const AI_FEATURES = {
   ] as Emotion[],
 };
 
-// Real translation service (same as before)
-const translateTextAPI = async (text: string, targetLang: string, sourceLang: string = 'auto') => {
-  try {
-    const response = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Translation failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.responseStatus === 200 && data.responseData?.translatedText) {
-      return data.responseData.translatedText;
-    } else {
-      throw new Error('Translation quality too low');
-    }
-  } catch (error) {
-    console.error('Translation API error:', error);
-
-    const mockTranslations: Record<string, string> = {
-      en: `[English Translation] ${text}`,
-      es: `[Traducción al Español] ${text}`,
-      fr: `[Traduction Française] ${text}`,
-      de: `[Deutsche Übersetzung] ${text}`,
-      ja: `[日本語訳] ${text}`,
-      zh: `[中文翻译] ${text}`,
-      ar: `[الترجمة العربية] ${text}`,
-      pt: `[Tradução Portuguesa] ${text}`,
-      ru: `[Русский перевод] ${text}`,
-      hi: `[हिंदी अनुवाद] ${text}`,
-    };
-
-    return mockTranslations[targetLang] || `[Translated] ${text}`;
-  }
-};
-
 export default function VoiceScreen() {
   // State Management (same as before)
   const [text, setText] = useState('');
@@ -170,9 +133,18 @@ export default function VoiceScreen() {
   const [selectedVoice, setSelectedVoice] = useState(AI_FEATURES.VOICE_CLONES[0]);
   const [detectedEmotion, setDetectedEmotion] = useState(AI_FEATURES.EMOTIONS[0]);
   const [showAIModal, setShowAIModal] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [translationError, setTranslationError] = useState<string | null>(null);
+  // Translate and summarize run on our server (processVoiceTask); the text leaves the phone only
+  // through it. One at a time, and the previous text is kept so a result can be undone.
+  const [processVoiceTask] = useMutation<{
+    processVoiceTask: { success: boolean; result?: string | null; error?: string | null };
+  }>(PROCESS_VOICE_TASK);
+  const [busyAction, setBusyAction] = useState<'TRANSLATE' | 'SUMMARIZE' | null>(null);
+  const isBusyRef = useRef(false);
+  const [previousText, setPreviousText] = useState<string | null>(null);
+  const [processFailure, setProcessFailure] = useState<VoiceFailure | null>(null);
+  const [resultNote, setResultNote] = useState<string | null>(null);
+  const isTranslating = busyAction === 'TRANSLATE';
+  const isProcessing = busyAction === 'SUMMARIZE';
   const [availableVoices, setAvailableVoices] = useState<Speech.Voice[]>([]);
   const [speechProgress, setSpeechProgress] = useState(0);
 
@@ -311,109 +283,61 @@ export default function VoiceScreen() {
     setSpeechPitch(voice.pitch);
   }, []);
 
-  // Real Translation Function (same as before)
-  const translateText = useCallback(
-    async (targetLang: Language) => {
+  const runTextTask = useCallback(
+    async (action: 'TRANSLATE' | 'SUMMARIZE', targetLanguage?: Language) => {
+      if (isBusyRef.current) return;
       if (!text.trim()) {
-        Alert.alert('No Text', 'Please enter text to translate.');
+        Alert.alert('No Text', 'Please enter some text first.');
+        return;
+      }
+      if (!canProcessText(text)) {
+        setProcessFailure(describeVoiceFailure('Text exceeds the maximum'));
         return;
       }
 
-      if (text.length > 5000) {
-        Alert.alert('Text Too Long', 'Please limit text to 5000 characters for translation.');
-        return;
-      }
-
-      setIsTranslating(true);
-      setTranslationError(null);
-
+      isBusyRef.current = true;
+      setBusyAction(action);
+      setProcessFailure(null);
+      setResultNote(null);
       try {
-        const translatedText = await translateTextAPI(text, targetLang.translateCode);
-
-        if (translatedText) {
-          setText(translatedText);
-          setSelectedLanguage(targetLang);
-
-          setTimeout(() => {
-            const newEmotion = detectEmotionFromText(translatedText);
-            setDetectedEmotion(newEmotion);
-          }, 100);
+        const { data } = await processVoiceTask({
+          variables: {
+            input: { text: text.trim(), action, targetLanguage: targetLanguage?.name },
+          },
+        });
+        const outcome = data?.processVoiceTask;
+        if (outcome?.success && outcome.result) {
+          setPreviousText(text);
+          setText(outcome.result);
+          setResultNote(targetLanguage ? `Translated to ${targetLanguage.name}` : 'Summarized');
+          if (targetLanguage) setSelectedLanguage(targetLanguage);
         } else {
-          throw new Error('No translation received');
+          setProcessFailure(describeVoiceFailure(outcome?.error));
         }
-      } catch (error: any) {
-        console.error('Translation error:', error);
-        const errorMsg =
-          error.message ||
-          'Translation service unavailable. Please check your internet connection.';
-        setTranslationError(errorMsg);
-
-        Alert.alert('Translation Error', errorMsg, [
-          { text: 'OK', onPress: () => setTranslationError(null) },
-        ]);
-      } finally {
-        setIsTranslating(false);
-      }
-    },
-    [text, detectEmotionFromText]
-  );
-
-  // Text Enhancement Functions (same as before)
-  const enhanceTextWithAI = useCallback(
-    async (type: string) => {
-      if (!text.trim()) {
-        Alert.alert('No Text', 'Please enter text to enhance.');
-        return;
-      }
-
-      setIsProcessing(true);
-
-      try {
-        let enhancedText = text;
-
-        switch (type) {
-          case 'grammar':
-            enhancedText = text.replace(/\bi\b/g, 'I');
-            enhancedText = enhancedText.replace(/\bdont\b/g, "don't");
-            enhancedText = enhancedText.replace(/\bwont\b/g, "won't");
-            enhancedText = enhancedText.replace(/\bcant\b/g, "can't");
-            break;
-
-          case 'professional':
-            enhancedText = text
-              .replace(/\bhey\b/gi, 'Hello')
-              .replace(/\bthanks\b/gi, 'Thank you')
-              .replace(/\bplease\b/gi, 'Kindly')
-              .replace(/\bbut\b/gi, 'However')
-              .replace(/\bso\b/gi, 'Therefore');
-            break;
-
-          case 'concise':
-            enhancedText =
-              text.split('.').slice(0, 2).join('.') + (text.split('.').length > 2 ? '...' : '');
-            break;
-
-          case 'emotion':
-            const emotion = detectEmotionFromText(text);
-            enhancedText = `[${emotion.name} Mode] ${text}`;
-            break;
-
-          default:
-            enhancedText = text;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setText(enhancedText);
-
-        Alert.alert('Enhanced', `Text has been ${type} enhanced!`);
       } catch (error) {
-        Alert.alert('Error', 'Failed to enhance text');
+        console.warn('Voice text task failed.');
+        setProcessFailure(describeVoiceError(error));
       } finally {
-        setIsProcessing(false);
+        isBusyRef.current = false;
+        setBusyAction(null);
       }
     },
-    [text, detectEmotionFromText]
+    [processVoiceTask, text]
   );
+
+  const translateText = useCallback(
+    (targetLang: Language) => runTextTask('TRANSLATE', targetLang),
+    [runTextTask]
+  );
+  const summarizeText = useCallback(() => runTextTask('SUMMARIZE'), [runTextTask]);
+
+  const undoLastChange = useCallback(() => {
+    if (previousText === null) return;
+    setText(previousText);
+    setPreviousText(null);
+    setResultNote(null);
+    setProcessFailure(null);
+  }, [previousText]);
 
   // Enhanced Text-to-Speech (same as before)
   const speakText = useCallback(async () => {
@@ -661,7 +585,7 @@ export default function VoiceScreen() {
               <Text className="text-center text-xs font-medium text-slate-700">
                 {detectedEmotion.name}
               </Text>
-              <Text className="text-center text-xs text-slate-400">Tone</Text>
+              <Text className="text-center text-xs text-slate-400">Tone (guess)</Text>
             </View>
 
             <View className="flex-1 items-center">
@@ -682,7 +606,7 @@ export default function VoiceScreen() {
             <Text className="text-xl font-bold text-slate-800">Your Text</Text>
             <View className="flex-row items-center rounded-full bg-slate-50 px-3 py-1.5">
               <Text className="text-xs font-medium text-slate-600">
-                {wordCount} words • {charCount} chars
+                {wordCount} words • {charCount}/{MAX_TEXT_LENGTH} chars
               </Text>
             </View>
           </View>
@@ -693,7 +617,13 @@ export default function VoiceScreen() {
             placeholder="Type or paste your text here... Let AI bring it to life with natural speech! 🎯"
             placeholderTextColor="#94A3B8"
             value={text}
-            onChangeText={setText}
+            onChangeText={(value) => {
+              setText(value);
+              setPreviousText(null);
+              setResultNote(null);
+            }}
+            testID="voice-text"
+            accessibilityLabel="Text to speak, translate or summarize"
             className="min-h-[160px] rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 text-base leading-6 text-slate-800"
             style={{ textAlignVertical: 'top' }}
           />
@@ -702,7 +632,8 @@ export default function VoiceScreen() {
             <View className="mt-4 flex-row items-center rounded-xl border border-emerald-200 bg-emerald-50 p-3">
               <Check size={16} color="#059669" />
               <Text className="ml-2 flex-1 text-sm text-emerald-700">
-                Ready • ~{estimatedDuration()}s • {detectedEmotion.name} tone detected
+                Ready • ~{estimatedDuration()}s • {detectedEmotion.name} tone (a guess from the
+                words)
               </Text>
             </View>
           )}
@@ -816,72 +747,65 @@ export default function VoiceScreen() {
         {/* Quick Actions */}
         <View className="mx-5 mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <Text className="mb-4 text-xl font-bold text-slate-800">Quick Actions</Text>
+          {resultNote ? (
+            <Text
+              testID="voice-result-note"
+              accessibilityRole="alert"
+              className="mb-3 text-sm font-medium text-indigo-700">
+              {resultNote}. You can undo it below.
+            </Text>
+          ) : null}
+
+          {processFailure ? (
+            <View
+              testID="voice-error"
+              accessibilityRole="alert"
+              className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
+              <Text className="text-sm text-red-800">{processFailure.message}</Text>
+            </View>
+          ) : null}
+
           <View className="flex-row gap-3">
             <TouchableOpacity
-              onPress={() => translateText(AI_FEATURES.LANGUAGES[1])}
+              onPress={() => setShowAIModal(true)}
               disabled={isTranslating || !text.trim()}
               className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
                 !text.trim() || isTranslating ? 'bg-slate-300' : 'bg-blue-500'
               }`}>
               <Languages size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">
-                {isTranslating ? 'Translating...' : 'Translate'}
+                {isTranslating ? 'Translating...' : 'Translate…'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => enhanceTextWithAI('grammar')}
+              onPress={summarizeText}
               disabled={isProcessing || !text.trim()}
               className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
                 !text.trim() || isProcessing ? 'bg-slate-300' : 'bg-amber-500'
               }`}>
               <Sparkles size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">
-                {isProcessing ? 'Enhancing...' : 'Enhance'}
+                {isProcessing ? 'Summarizing...' : 'Summarize'}
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Features Showcase */}
-        <View className="mx-5 mb-8 mt-6">
-          <Text className="mb-4 text-xl font-bold text-slate-800">AI Superpowers</Text>
-          <View className="flex-row flex-wrap gap-3">
-            {[
-              {
-                icon: '🌍',
-                title: '10+ Languages',
-                desc: 'AI Translation',
-                color: 'bg-blue-50 border-blue-100',
-              },
-              {
-                icon: '🎭',
-                title: '6 Voice Types',
-                desc: 'Emotion Aware',
-                color: 'bg-purple-50 border-purple-100',
-              },
-              {
-                icon: '⚡',
-                title: 'Real-time',
-                desc: 'Fast Processing',
-                color: 'bg-amber-50 border-amber-100',
-              },
-              {
-                icon: '🔊',
-                title: 'HD Audio',
-                desc: 'Crystal Clear',
-                color: 'bg-emerald-50 border-emerald-100',
-              },
-            ].map((feature, index) => (
-              <View
-                key={index}
-                className="w-[48%] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Text className="mb-3 text-2xl">{feature.icon}</Text>
-                <Text className="mb-1 text-sm font-bold text-slate-800">{feature.title}</Text>
-                <Text className="text-xs text-slate-500">{feature.desc}</Text>
-              </View>
-            ))}
-          </View>
+          <Text className="mt-3 text-xs text-slate-500">
+            Translate and Summarize send this text to our server. Speaking it aloud stays on your
+            phone.
+          </Text>
+
+          {previousText !== null ? (
+            <TouchableOpacity
+              testID="voice-undo"
+              onPress={undoLastChange}
+              accessibilityRole="button"
+              accessibilityLabel="Undo the last change to the text"
+              className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white">
+              <Text className="text-sm font-semibold text-slate-700">Undo</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -899,13 +823,17 @@ export default function VoiceScreen() {
               </View>
               <Text className="ml-3 flex-1 text-xl font-bold text-slate-800">AI Voice Studio</Text>
               <TouchableOpacity
+                testID="voice-modal-close"
+                accessibilityRole="button"
+                accessibilityLabel="Close AI Voice Studio"
                 onPress={() => setShowAIModal(false)}
-                className="h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                 <Text className="font-bold text-slate-600">✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+            {/* flexShrink, not flex-1: inside a height-limited parent a flex-1 scroll area collapses to nothing */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
               {/* Voice Presets */}
               <Text className="mb-4 text-lg font-bold text-slate-800">Voice Presets</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
@@ -958,12 +886,26 @@ export default function VoiceScreen() {
                     ))}
                   </View>
                 </ScrollView>
+                {processFailure && !isTranslating ? (
+                  <Text
+                    testID="voice-modal-error"
+                    accessibilityRole="alert"
+                    className="mt-3 text-center text-sm font-semibold text-red-700">
+                    {processFailure.message}
+                  </Text>
+                ) : null}
+                {resultNote && !isTranslating ? (
+                  <Text
+                    testID="voice-modal-result"
+                    accessibilityRole="alert"
+                    className="mt-3 text-center text-sm font-semibold text-indigo-700">
+                    {resultNote}
+                  </Text>
+                ) : null}
                 {isTranslating && (
                   <View className="mt-3 flex-row items-center justify-center py-2">
                     <ActivityIndicator size="small" color="#4F46E5" />
-                    <Text className="ml-2 text-sm font-medium text-indigo-600">
-                      AI Translating...
-                    </Text>
+                    <Text className="ml-2 text-sm font-medium text-indigo-600">Translating...</Text>
                   </View>
                 )}
               </View>

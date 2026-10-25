@@ -1,0 +1,87 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline).
+      Translating makes one real model call through the backend
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home. Open Voice; expect the Voice AI tools screen
+  - tap:
+      text: "Open Voice: Spoken conversations"
+  - await: { visible: { id: voice-text }, timeout: 15000 }
+  - await: { idle: true }
+  - echo: On Voice AI tools. Focus the text box and type a short English sentence
+  - tap:
+      id: voice-text
+  - tool: keyboard
+    args:
+      text: Good morning. Please send me the report today.
+  - await: { visible: { id: voice-text, text: "Good morning. Please send me the report today." } }
+  - echo: Text entered. Bring Translate… into view and tap it; expect the AI Voice
+      Studio with a language list
+  - scroll-to:
+      target:
+        text: Translate…
+  - tap:
+      text: Translate…
+  - await: { visible: { id: voice-modal-close } }
+  - await: { idle: true }
+  - echo: The studio lists languages. Tap Spanish; expect the text to be translated
+      by the backend
+  - tap:
+      text: Spanish
+  - await: { visible: { text: Translated to Spanish }, timeout: 90000 }
+  - echo: The backend answered. Close the studio
+  - tap:
+      id: voice-modal-close
+  - await: { hidden: { id: voice-modal-close } }
+  - await: { idle: true }
+  - scroll-to:
+      target:
+        id: voice-undo
+  - await: { visible: { id: voice-undo } }
+  - echo: The text was translated and Undo is offered. Tap Undo; expect the original
+      English sentence back and Undo gone
+  - tap:
+      id: voice-undo
+  - await: { hidden: { id: voice-undo } }
+  - scroll-to:
+      target:
+        id: voice-text
+      direction: up
+  - await: { visible: { id: voice-text, text: "Good morning. Please send me the report today." } }
+  - await: { idle: true }
+  - echo: Original text restored. Go back to Home, then sign out (restores the
+      signed-out baseline)
+  - tap:
+      text: Go back
+  - await: { visible: { text: Recent chats } }
+  - await: { idle: true }
+  - tap:
+      id: tab-profile
+  - await: { visible: { text: Sign Out } }
+  - await: { idle: true }
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }

@@ -206,3 +206,13 @@ export const GET_TASK = gql`
     }
   }
 `;
+
+export const PROCESS_VOICE_TASK = gql`
+  mutation ProcessVoiceTask($input: ProcessVoiceTaskInput!) {
+    processVoiceTask(input: $input) {
+      success
+      result
+      error
+    }
+  }
+`;
