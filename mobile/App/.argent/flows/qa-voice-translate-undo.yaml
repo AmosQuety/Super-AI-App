@@ -37,13 +37,13 @@ steps:
     args:
       text: Good morning. Please send me the report today.
   - await: { visible: { id: voice-text, text: "Good morning. Please send me the report today." } }
-  - echo: Text entered. Bring Translate… into view and tap it; expect the AI Voice
+  - echo: Text entered. Bring Translate into view and tap it; expect the AI Voice
       Studio with a language list
   - scroll-to:
       target:
-        text: Translate…
+        id: voice-translate-open
   - tap:
-      text: Translate…
+      id: voice-translate-open
   - await: { visible: { id: voice-modal-close } }
   - await: { idle: true }
   - echo: The studio lists languages. Tap Spanish; expect the text to be translated

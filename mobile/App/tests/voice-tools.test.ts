@@ -5,6 +5,8 @@ import {
   canProcessText,
   describeVoiceError,
   describeVoiceFailure,
+  shouldApplyResult,
+  textTooLong,
 } from '../libs/voice-tools';
 
 test('the text limit matches the backend', () => {
@@ -63,5 +65,40 @@ test('an error the server answered with is classified, never shown raw', () => {
 test('an HTTP error is not reported as a lost connection', () => {
   const failure = describeVoiceError(Object.assign(new Error('429'), { statusCode: 429 }));
   assert.doesNotMatch(failure.message, /connection/i);
+  assert.equal(failure.canRetry, true);
+});
+
+test('a result is applied only if the text is still exactly what was sent', () => {
+  assert.equal(shouldApplyResult('Good morning', 'Good morning'), true);
+  assert.equal(shouldApplyResult('Good morning', 'Good morning, team'), false);
+  assert.equal(shouldApplyResult('Good morning', ''), false);
+  assert.equal(
+    shouldApplyResult('  Good morning  ', 'Good morning'),
+    false,
+    'spaces count as an edit'
+  );
+});
+
+test('an expired session is explained and cannot be retried', () => {
+  const failure = describeVoiceError(
+    Object.assign(new Error('x'), {
+      errors: [{ message: 'Login required', extensions: { code: 'UNAUTHENTICATED' } }],
+    })
+  );
+  assert.equal(failure.canRetry, false);
+  assert.match(failure.message, /sign in/i);
+});
+
+test('the too-long message is available without faking a server answer', () => {
+  const failure = textTooLong();
+  assert.equal(failure.canRetry, false);
+  assert.match(failure.message, /too long/i);
+});
+
+test('a rate limit answer says to wait', () => {
+  const failure = describeVoiceFailure(
+    'You are going too fast. Please wait a minute and try again.'
+  );
+  assert.match(failure.message, /wait/i);
   assert.equal(failure.canRetry, true);
 });

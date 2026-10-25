@@ -19,6 +19,8 @@ import {
   canProcessText,
   describeVoiceError,
   describeVoiceFailure,
+  shouldApplyResult,
+  textTooLong,
   type VoiceFailure,
 } from '../../../libs/voice-tools';
 import * as FileSystem from 'expo-file-system';
@@ -141,6 +143,10 @@ export default function VoiceScreen() {
   const [busyAction, setBusyAction] = useState<'TRANSLATE' | 'SUMMARIZE' | null>(null);
   const isBusyRef = useRef(false);
   const [previousText, setPreviousText] = useState<string | null>(null);
+  const [previousLanguage, setPreviousLanguage] = useState<Language | null>(null);
+  // The latest text, readable inside an async callback: a result must not replace later edits.
+  const textRef = useRef(text);
+  textRef.current = text;
   const [processFailure, setProcessFailure] = useState<VoiceFailure | null>(null);
   const [resultNote, setResultNote] = useState<string | null>(null);
   const isTranslating = busyAction === 'TRANSLATE';
@@ -291,10 +297,11 @@ export default function VoiceScreen() {
         return;
       }
       if (!canProcessText(text)) {
-        setProcessFailure(describeVoiceFailure('Text exceeds the maximum'));
+        setProcessFailure(textTooLong());
         return;
       }
 
+      const sentText = text;
       isBusyRef.current = true;
       setBusyAction(action);
       setProcessFailure(null);
@@ -306,8 +313,15 @@ export default function VoiceScreen() {
           },
         });
         const outcome = data?.processVoiceTask;
-        if (outcome?.success && outcome.result) {
-          setPreviousText(text);
+        if (outcome?.success && outcome.result && !shouldApplyResult(sentText, textRef.current)) {
+          // The user typed while the server worked: their text wins, the result is dropped.
+          setProcessFailure({
+            message: 'Your text changed while it was being processed, so the result was not used.',
+            canRetry: true,
+          });
+        } else if (outcome?.success && outcome.result) {
+          setPreviousText(sentText);
+          setPreviousLanguage(selectedLanguage);
           setText(outcome.result);
           setResultNote(targetLanguage ? `Translated to ${targetLanguage.name}` : 'Summarized');
           if (targetLanguage) setSelectedLanguage(targetLanguage);
@@ -322,7 +336,7 @@ export default function VoiceScreen() {
         setBusyAction(null);
       }
     },
-    [processVoiceTask, text]
+    [processVoiceTask, selectedLanguage, text]
   );
 
   const translateText = useCallback(
@@ -334,10 +348,12 @@ export default function VoiceScreen() {
   const undoLastChange = useCallback(() => {
     if (previousText === null) return;
     setText(previousText);
+    if (previousLanguage) setSelectedLanguage(previousLanguage);
     setPreviousText(null);
+    setPreviousLanguage(null);
     setResultNote(null);
     setProcessFailure(null);
-  }, [previousText]);
+  }, [previousText, previousLanguage]);
 
   // Enhanced Text-to-Speech (same as before)
   const speakText = useCallback(async () => {
@@ -430,7 +446,7 @@ export default function VoiceScreen() {
 
   const insertSampleText = () => {
     const samples = [
-      'Hello! Welcome to VoiceAI Pro - the most advanced text-to-speech platform powered by artificial intelligence. Our system intelligently analyzes your text and generates natural, expressive speech in multiple languages.',
+      'Hello! This is a sample sentence for the text-to-speech voice on your phone. You can change the speed and pitch, or translate and summarize the text.',
       "I'm absolutely thrilled to share this amazing news with you! We've just launched incredible new features that will revolutionize how you interact with voice technology. This is truly fantastic!",
       "In today's business meeting, we will discuss the quarterly performance metrics and strategic initiatives for the upcoming fiscal year. The report indicates positive growth trends across all departments.",
       'Take a deep breath and relax. Imagine yourself in a peaceful garden, surrounded by beautiful flowers and the gentle sound of a flowing stream. This is your moment of calm and serenity.',
@@ -526,12 +542,14 @@ export default function VoiceScreen() {
               <Mic size={24} color="white" />
             </View>
             <View className="ml-3">
-              <Text className="text-2xl font-bold text-slate-800">VoiceAI Pro</Text>
-              <Text className="text-sm text-slate-500">Premium AI Speech Studio</Text>
+              <Text className="text-2xl font-bold text-slate-800">Voice tools</Text>
+              <Text className="text-sm text-slate-500">Speak, translate and summarize</Text>
             </View>
           </View>
           <TouchableOpacity
             onPress={() => setShowAIModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Voice settings"
             className="h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100"
             activeOpacity={0.7}>
             <Settings size={20} color="#475569" />
@@ -546,10 +564,10 @@ export default function VoiceScreen() {
             </View>
             <View className="ml-3 flex-1">
               <Text className="text-sm font-semibold text-indigo-800">
-                Welcome to your AI Studio!
+                Your text, spoken or reworked
               </Text>
               <Text className="mt-1 text-xs text-indigo-600">
-                Transform your text into natural speech with advanced AI technology
+                Type or paste text, then listen to it, translate it or summarize it.
               </Text>
             </View>
           </View>
@@ -560,11 +578,7 @@ export default function VoiceScreen() {
         {/* AI Status Card */}
         <View className="mx-5 mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <View className="mb-4 flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-slate-800">AI Status</Text>
-            <View className="flex-row items-center rounded-full bg-emerald-50 px-3 py-1.5">
-              <View className="mr-2 h-2 w-2 rounded-full bg-emerald-500" />
-              <Text className="text-xs font-semibold text-emerald-700">ACTIVE & READY</Text>
-            </View>
+            <Text className="text-lg font-bold text-slate-800">Current settings</Text>
           </View>
 
           <View className="flex-row justify-between">
@@ -585,7 +599,7 @@ export default function VoiceScreen() {
               <Text className="text-center text-xs font-medium text-slate-700">
                 {detectedEmotion.name}
               </Text>
-              <Text className="text-center text-xs text-slate-400">Tone (guess)</Text>
+              <Text className="text-center text-xs text-slate-600">Tone (guess)</Text>
             </View>
 
             <View className="flex-1 items-center">
@@ -614,15 +628,17 @@ export default function VoiceScreen() {
           <TextInput
             multiline
             numberOfLines={6}
-            placeholder="Type or paste your text here... Let AI bring it to life with natural speech! 🎯"
+            placeholder="Type or paste your text here..."
             placeholderTextColor="#94A3B8"
             value={text}
             onChangeText={(value) => {
               setText(value);
               setPreviousText(null);
+              setPreviousLanguage(null);
               setResultNote(null);
             }}
             testID="voice-text"
+            editable={busyAction === null}
             accessibilityLabel="Text to speak, translate or summarize"
             className="min-h-[160px] rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 text-base leading-6 text-slate-800"
             style={{ textAlignVertical: 'top' }}
@@ -664,6 +680,8 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={clearText}
               disabled={!text}
+              accessibilityRole="button"
+              accessibilityLabel="Clear the text"
               className={`h-14 w-14 items-center justify-center rounded-xl border-2 ${
                 text ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-100'
               }`}
@@ -696,7 +714,7 @@ export default function VoiceScreen() {
             ) : (
               <>
                 <Volume2 size={24} color="white" />
-                <Text className="ml-3 text-base font-bold text-white">Start AI Speech</Text>
+                <Text className="ml-3 text-base font-bold text-white">Speak</Text>
               </>
             )}
           </TouchableOpacity>
@@ -705,7 +723,7 @@ export default function VoiceScreen() {
             <View className="mt-4 flex-row items-center rounded-xl border border-emerald-300 bg-emerald-50 p-4">
               <View className="mr-3 h-3 w-3 rounded-full bg-emerald-500" />
               <Text className="flex-1 text-sm font-semibold text-emerald-700">
-                🔊 Speaking in {selectedLanguage.name} with {detectedEmotion.name} tone
+                🔊 Speaking in {selectedLanguage.name} (tone guess: {detectedEmotion.name})
               </Text>
             </View>
           )}
@@ -751,6 +769,7 @@ export default function VoiceScreen() {
             <Text
               testID="voice-result-note"
               accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
               className="mb-3 text-sm font-medium text-indigo-700">
               {resultNote}. You can undo it below.
             </Text>
@@ -760,6 +779,7 @@ export default function VoiceScreen() {
             <View
               testID="voice-error"
               accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
               className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
               <Text className="text-sm text-red-800">{processFailure.message}</Text>
             </View>
@@ -769,6 +789,9 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={() => setShowAIModal(true)}
               disabled={isTranslating || !text.trim()}
+              testID="voice-translate-open"
+              accessibilityRole="button"
+              accessibilityLabel="Translate"
               className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
                 !text.trim() || isTranslating ? 'bg-slate-300' : 'bg-blue-500'
               }`}>
@@ -780,9 +803,12 @@ export default function VoiceScreen() {
 
             <TouchableOpacity
               onPress={summarizeText}
+              testID="voice-summarize"
+              accessibilityRole="button"
+              accessibilityLabel="Summarize"
               disabled={isProcessing || !text.trim()}
               className={`flex-1 flex-row items-center justify-center rounded-xl py-3.5 shadow-sm ${
-                !text.trim() || isProcessing ? 'bg-slate-300' : 'bg-amber-500'
+                !text.trim() || isProcessing ? 'bg-slate-300' : 'bg-amber-700'
               }`}>
               <Sparkles size={18} color="white" />
               <Text className="ml-2 text-sm font-semibold text-white">
@@ -821,13 +847,13 @@ export default function VoiceScreen() {
               <View className="h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
                 <Brain size={20} color="#4F46E5" />
               </View>
-              <Text className="ml-3 flex-1 text-xl font-bold text-slate-800">AI Voice Studio</Text>
+              <Text className="ml-3 flex-1 text-xl font-bold text-slate-800">Voice settings</Text>
               <TouchableOpacity
                 testID="voice-modal-close"
                 accessibilityRole="button"
-                accessibilityLabel="Close AI Voice Studio"
+                accessibilityLabel="Close voice settings"
                 onPress={() => setShowAIModal(false)}
-                className="h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                className="h-11 w-11 items-center justify-center rounded-full bg-slate-100">
                 <Text className="font-bold text-slate-600">✕</Text>
               </TouchableOpacity>
             </View>
@@ -858,7 +884,7 @@ export default function VoiceScreen() {
               </ScrollView>
 
               {/* Translation Section */}
-              <Text className="mb-4 text-lg font-bold text-slate-800">AI Translation</Text>
+              <Text className="mb-4 text-lg font-bold text-slate-800">Translation</Text>
               <View className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
                 <Text className="mb-3 text-sm text-slate-600">
                   Select a language to translate your text
@@ -870,7 +896,9 @@ export default function VoiceScreen() {
                         key={lang.code}
                         onPress={() => translateText(lang)}
                         disabled={isTranslating || !text.trim()}
-                        className={`flex-row items-center rounded-full px-4 py-2.5 ${
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: selectedLanguage.code === lang.code }}
+                        className={`min-h-[44px] flex-row items-center rounded-full px-4 py-2.5 ${
                           selectedLanguage.code === lang.code
                             ? 'bg-indigo-500'
                             : 'border border-slate-200 bg-white'
@@ -890,6 +918,7 @@ export default function VoiceScreen() {
                   <Text
                     testID="voice-modal-error"
                     accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
                     className="mt-3 text-center text-sm font-semibold text-red-700">
                     {processFailure.message}
                   </Text>
@@ -898,6 +927,7 @@ export default function VoiceScreen() {
                   <Text
                     testID="voice-modal-result"
                     accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
                     className="mt-3 text-center text-sm font-semibold text-indigo-700">
                     {resultNote}
                   </Text>
