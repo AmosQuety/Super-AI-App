@@ -174,3 +174,35 @@ export const GET_MY_TASKS = gql`
     }
   }
 `;
+
+export const GET_AI_IMAGE_STATUS = gql`
+  query GetAIImageStatus {
+    aiImageGenerationStatus {
+      available
+      message
+    }
+  }
+`;
+
+export const GENERATE_AI_IMAGE_VARIANTS = gql`
+  mutation GenerateAIImageVariants($prompt: String!) {
+    generateAIImageVariants(prompt: $prompt) {
+      success
+      images
+      error
+      generationTime
+    }
+  }
+`;
+
+export const GET_TASK = gql`
+  query GetTask($id: ID!) {
+    task(id: $id) {
+      id
+      feature
+      status
+      progress
+      metadata
+    }
+  }
+`;

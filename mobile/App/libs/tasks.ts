@@ -63,9 +63,14 @@ export function parseTaskMetadata(metadata?: string | null): Record<string, unkn
   return {};
 }
 
-// Where tapping a task goes. Only chat tasks have a screen on mobile so far; the others open
-// nothing until their feature screens exist, rather than leading to a placeholder.
-export function taskDestination(task: Pick<TaskRecord, 'feature' | 'metadata'>): string | null {
+// Where tapping a task goes. Chat tasks open their chat and image tasks open the image screen on
+// that task, to restore its result. The other kinds open nothing until their screens exist.
+export function taskDestination(
+  task: Pick<TaskRecord, 'id' | 'feature' | 'metadata'>
+): string | null {
+  if (task.feature === 'image_generation') {
+    return `/features/image?taskId=${encodeURIComponent(task.id)}`;
+  }
   if (task.feature !== 'chat_response') return null;
   const chatId = parseTaskMetadata(task.metadata).chatId;
   if (typeof chatId !== 'string' || chatId === '') return null;

@@ -81,8 +81,15 @@ test('a chat task without a usable chat id opens nothing', () => {
   assert.equal(taskDestination(task({ metadata: JSON.stringify({ chatId: '' }) })), null);
 });
 
+test('an image task opens the image screen on that task, to restore its result', () => {
+  assert.equal(
+    taskDestination(task({ id: 'task 9', feature: 'image_generation' })),
+    '/features/image?taskId=task%209'
+  );
+});
+
 test('tasks of features that have no mobile screen yet open nothing', () => {
-  for (const feature of ['image_generation', 'voice_processing', 'face_processing', 'unknown']) {
+  for (const feature of ['voice_processing', 'face_processing', 'unknown']) {
     assert.equal(taskDestination(task({ feature })), null, feature);
   }
 });
