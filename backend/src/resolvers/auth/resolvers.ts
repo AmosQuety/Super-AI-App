@@ -10,6 +10,7 @@ import { redisClient } from "../../lib/redis";
 import { logger } from "../../utils/logger";
 import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
 import { closeUserSockets } from "../../auth/socketRegistry";
+import { recordAccountEvent } from "../../auth/accountAudit";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -32,22 +33,41 @@ type UserResponse = {
   updatedAt?: Date;
 };
 
-// The password is already changed when this runs, so a broken audit store is logged loudly
-// but does not turn a successful change into a failure. Never put a password or hash in here.
-async function recordPasswordChange(context: AppContext, userId: string, userEmail: string): Promise<void> {
+// A new email address changes how the account is recovered, so a stolen session alone must not be
+// enough: the current password is required. Sending the address already on file changes nothing.
+async function validatedNewEmail(
+  context: AppContext,
+  account: User,
+  args: { email?: string | null; currentPassword?: string | null }
+): Promise<string> {
+  const email = (args.email ?? "").toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new UserInputError("Invalid email format");
+  }
+  if (email === account.email.toLowerCase().trim()) return email;
+
+  if (!args.currentPassword) {
+    throw new UserInputError("Enter your current password to change your email");
+  }
+  if (!account.password || !(await bcrypt.compare(args.currentPassword, account.password))) {
+    throw new UserInputError("Current password is incorrect");
+  }
+
+  const existingUser = await context.prisma.user.findUnique({ where: { email } });
+  if (existingUser && existingUser.id !== account.id) {
+    throw new UserInputError("Email is already taken");
+  }
+  return email;
+}
+
+// Two accounts claiming one address at the same moment both pass the check above; the unique
+// index lets only one win, and the loser gets the same answer as a normal clash.
+async function saveProfile(context: AppContext, userId: string, data: object) {
   try {
-    await context.prisma.securityAuditLog.create({
-      data: {
-        userId,
-        userEmail,
-        event: "PASSWORD_CHANGED",
-        ipAddress: context.req?.ip,
-        userAgent: context.req?.headers?.["user-agent"],
-        details: JSON.stringify({ otherSessionsEnded: true }),
-      },
-    });
+    return await context.prisma.user.update({ where: { id: userId }, data });
   } catch (error: any) {
-    logger.error("[audit] could not record a password change", { userId, message: error.message });
+    if (error?.code === "P2002") throw new UserInputError("Email is already taken");
+    throw error;
   }
 }
 
@@ -233,40 +253,37 @@ export const authResolvers = {
 
     updateProfile: async (
       _: any,
-      args: { name?: string; email?: string },
+      args: { name?: string | null; email?: string | null; currentPassword?: string | null },
       context: AppContext
     ): Promise<UserResponse> => {
       const user = AuthorizationService.requireAuth(context);
+      const account = await context.prisma.user.findUnique({ where: { id: user.userId } });
+      if (!account) throw new AuthenticationError("User not found");
 
       const updateData: any = {};
+      const changed: string[] = [];
       if (args.name !== undefined) {
         const name = (args.name ?? "").trim();
         if (name.length < 1 || name.length > 100) {
           throw new UserInputError("Name must be between 1 and 100 characters");
         }
         updateData.name = name;
-      }
-      if (args.email !== undefined) {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.email)) {
-          throw new UserInputError("Invalid email format");
-        }
-        
-        // Check if email is already taken by another user
-        const existingUser = await context.prisma.user.findUnique({
-          where: { email: args.email.toLowerCase().trim() },
-        });
-        
-        if (existingUser && existingUser.id !== user.userId) {
-          throw new UserInputError("Email is already taken");
-        }
-        
-        updateData.email = args.email.toLowerCase().trim();
+        if (name !== account.name) changed.push("name");
       }
 
-      const updatedUser = await context.prisma.user.update({
-        where: { id: user.userId},
-        data: updateData,
-      });
+      const newEmail = args.email === undefined ? undefined : await validatedNewEmail(context, account, args);
+      if (newEmail !== undefined && newEmail !== account.email.toLowerCase().trim()) {
+        updateData.email = newEmail;
+      }
+
+      const updatedUser = await saveProfile(context, user.userId, updateData);
+
+      if (changed.length > 0) {
+        await recordAccountEvent(context, account, "PROFILE_UPDATED", { changed });
+      }
+      if (updateData.email) {
+        await recordAccountEvent(context, account, "EMAIL_CHANGED", { changed: ["email"] });
+      }
 
       const { password, ...userWithoutPassword } = updatedUser;
       return userWithoutPassword;
@@ -328,7 +345,7 @@ export const authResolvers = {
 
       // Live subscriptions were authenticated with an old token; close them so they reconnect.
       closeUserSockets(user.userId);
-      await recordPasswordChange(context, dbUser.id, dbUser.email);
+      await recordAccountEvent(context, dbUser, "PASSWORD_CHANGED", { otherSessionsEnded: true });
 
       return {
         success: true,

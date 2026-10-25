@@ -23,15 +23,27 @@ function makeContext(user: typeof caller | null = caller) {
   };
   const prisma = {
     user: {
-      findUnique: async () => null,
+      findUnique: async ({ where }: any) =>
+        where.id === stored.id ? { ...stored } : null,
       update: async ({ where, data }: any) => (
         writeTargets.push(where.id),
         writes.push(data),
         { ...stored, ...data }
       ),
+      updateMany: async ({ where, data }: any) => (
+        writeTargets.push(where.id),
+        writes.push(data),
+        Object.assign(stored, data),
+        { count: 1 }
+      ),
     },
   };
-  return { context: { user, prisma } as any, writes, writeTargets };
+  const audit = { create: async () => ({}) };
+  return {
+    context: { user, prisma: { ...prisma, securityAuditLog: audit } } as any,
+    writes,
+    writeTargets,
+  };
 }
 
 async function run(source: string, user: typeof caller | null = caller) {

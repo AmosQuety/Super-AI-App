@@ -268,7 +268,7 @@ export const typeDefs = gql`
     # Auth mutations (from authTypeDefs)
     register(email: String!, password: String!, name: String): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
-    updateProfile(name: String, email: String): User!
+    updateProfile(name: String, email: String, currentPassword: String): User!
     changePassword(currentPassword: String!, newPassword: String!): ChangePasswordResponse!
     deleteAccount(password: String!): DeleteAccountResponse!
     
