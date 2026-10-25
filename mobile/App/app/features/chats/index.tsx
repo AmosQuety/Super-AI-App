@@ -369,6 +369,9 @@ const ChatListScreen: React.FC = () => {
           elevation: 8,
         }}
         onPress={() => router.push('/features/chats/new')}
+        testID="chats-new"
+        accessibilityRole="button"
+        accessibilityLabel="New chat"
         activeOpacity={0.8}>
         <Ionicons name="add" size={28} color="white" />
       </TouchableOpacity>

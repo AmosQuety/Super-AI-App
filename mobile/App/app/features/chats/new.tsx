@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../hooks/use-auth';
 import { Ionicons } from '@expo/vector-icons';
+import { titleFromMessage } from '../../../libs/chat-start';
 
 const CREATE_CHAT = gql`
   mutation CreateChat($userId: ID!, $title: String, $messages: [MessageInput!]!) {
@@ -51,22 +52,26 @@ export default function NewChatScreen() {
       return;
     }
 
+    const firstMessage = initialMessage.trim();
+
     try {
+      // The chat is created empty on purpose: the chat screen sends the first message through
+      // sendMessageWithResponse, which saves it and asks for the reply. Seeding it here as well
+      // would store the message twice and show it to the model twice.
       const result = await createChat({
         variables: {
           userId: user.id,
-          title: title.trim() || undefined,
-          messages: [
-            {
-              role: 'user',
-              content: initialMessage.trim(),
-            },
-          ],
+          title: title.trim() || titleFromMessage(firstMessage),
+          messages: [],
         },
+        refetchQueries: ['GetChats', 'RecentChats'],
       });
 
       if (result.data?.createChat) {
-        router.replace(`/features/chats/${result.data.createChat.id}`);
+        router.replace({
+          pathname: '/features/chats/[id]',
+          params: { id: result.data.createChat.id, firstMessage },
+        });
       }
     } catch (error: any) {
       console.error('Error creating chat:', error);

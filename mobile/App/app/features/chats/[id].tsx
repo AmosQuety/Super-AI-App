@@ -18,6 +18,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFilePicker } from '../../../hooks/use-file-picker';
 import { FileProcessor } from '../../../services/file-processor';
+import { claimFirstMessage, describeSendFailure, type SendFailure } from '../../../libs/chat-start';
 
 // GraphQL operations
 const GET_CHAT_HISTORY = gql`
@@ -103,13 +104,21 @@ interface ProcessedFile {
 }
 
 function ChatDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, firstMessage: firstMessageParam } = useLocalSearchParams();
   const chatId = Array.isArray(id) ? id[0] : id;
+  const firstMessage = Array.isArray(firstMessageParam) ? firstMessageParam[0] : firstMessageParam;
   const [message, setMessage] = useState('');
   const [attachedFile, setAttachedFile] = useState<FileInfo | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
+  // Synchronous twin of isSending: two taps can arrive before a re-render disables the button.
+  const isSendingRef = useRef(false);
+  const [failedSend, setFailedSend] = useState<{
+    text: string;
+    file: FileInfo | null;
+    failure: SendFailure;
+  } | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   const { pickFile } = useFilePicker();
@@ -125,7 +134,8 @@ function ChatDetailScreen() {
   });
 
   useEffect(() => {
-    if (data?.chatHistory?.messages) {
+    // History that arrives while a message is in flight would erase it from the screen.
+    if (data?.chatHistory?.messages && !isSendingRef.current) {
       setAllMessages(data.chatHistory.messages);
     }
   }, [data?.chatHistory?.messages]);
@@ -196,6 +206,94 @@ function ChatDetailScreen() {
     console.log('🗑️ File attachment removed');
   };
 
+  // Sends one message and shows the reply. Used for typed messages, for the first message of a
+  // new chat and for Retry, so there is a single place that talks to the server.
+  const deliver = useCallback(
+    async (userMessage: string, currentFile: FileInfo | null) => {
+      if (!chatId || isSendingRef.current) return;
+      isSendingRef.current = true;
+      setIsSending(true);
+      setFailedSend(null);
+
+      const tempId = `temp-${Date.now()}`;
+      try {
+        const tempUserMessage: Message = {
+          id: tempId,
+          role: 'user',
+          content: userMessage || `📎 ${currentFile?.name}`,
+          createdAt: new Date().toISOString(),
+          ...(currentFile && {
+            fileName: currentFile.name,
+            fileMimeType: currentFile.type,
+          }),
+        };
+
+        setAllMessages((prev) => [...prev, tempUserMessage]);
+
+        let processedFile: ProcessedFile | null = null;
+
+        if (currentFile) {
+          try {
+            console.log('🔄 Processing file...');
+            processedFile = await FileProcessor.processFileForAI(currentFile);
+            console.log('✅ File processed:', processedFile);
+          } catch (fileError: any) {
+            console.error('❌ File processing error:', fileError);
+            Alert.alert(
+              'File Processing Failed',
+              'The file could not be processed, but your message will still be sent.'
+            );
+          }
+        }
+
+        const messagePayload = {
+          chatId,
+          content: userMessage || '',
+          ...(processedFile &&
+            processedFile.fileUrl && {
+              imageUrl: processedFile.type === 'image' ? processedFile.fileUrl : undefined,
+              fileName: processedFile.metadata.fileName,
+              fileUri: processedFile.fileUrl,
+              fileMimeType: processedFile.metadata.mimeType,
+            }),
+        };
+
+        const { data: responseData } = await sendMessageWithResponse({
+          variables: messagePayload,
+        });
+
+        if (responseData?.sendMessageWithResponse) {
+          const {
+            userMessage: realUserMsg,
+            aiMessage,
+            usedCustomResponse,
+          } = responseData.sendMessageWithResponse;
+
+          console.log(usedCustomResponse ? '✅ Used custom response' : '🤖 Used Gemini AI');
+
+          setAllMessages((prev) => {
+            const withoutTemp = prev.filter((msg) => msg.id !== tempId);
+            return [...withoutTemp, realUserMsg, aiMessage];
+          });
+        }
+      } catch (error: unknown) {
+        // The failure is shown in the chat with a Retry, so the user is told what happened
+        // without losing the message. A retry sends it again, which is the only way it is resent.
+        console.warn('Sending a message failed:', error);
+        setAllMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        setFailedSend({
+          text: userMessage,
+          file: currentFile,
+          failure: describeSendFailure(error),
+        });
+      } finally {
+        isSendingRef.current = false;
+        setIsSending(false);
+      }
+    },
+    [chatId, sendMessageWithResponse]
+  );
+
   const sendMessage = useCallback(async () => {
     const hasMessage = message.trim().length > 0;
     const hasFile = attachedFile !== null;
@@ -205,90 +303,30 @@ function ChatDetailScreen() {
       return;
     }
 
-    if (!chatId || isSending) return;
+    if (!chatId || isSendingRef.current) return;
 
     const userMessage = message.trim();
     const currentFile = attachedFile;
 
     setMessage('');
     setAttachedFile(null);
-    setIsSending(true);
+    await deliver(userMessage, currentFile);
+  }, [message, chatId, attachedFile, deliver]);
 
-    try {
-      const tempId = `temp-${Date.now()}`;
-      const tempUserMessage: Message = {
-        id: tempId,
-        role: 'user',
-        content: userMessage || `📎 ${currentFile?.name}`,
-        createdAt: new Date().toISOString(),
-        ...(currentFile && {
-          fileName: currentFile.name,
-          fileMimeType: currentFile.type,
-        }),
-      };
+  const retryFailedSend = useCallback(() => {
+    if (!failedSend) return;
+    void deliver(failedSend.text, failedSend.file);
+  }, [failedSend, deliver]);
 
-      setAllMessages((prev) => [...prev, tempUserMessage]);
-
-      let processedFile: ProcessedFile | null = null;
-
-      if (currentFile) {
-        try {
-          console.log('🔄 Processing file...');
-          processedFile = await FileProcessor.processFileForAI(currentFile);
-          console.log('✅ File processed:', processedFile);
-        } catch (fileError: any) {
-          console.error('❌ File processing error:', fileError);
-          Alert.alert(
-            'File Processing Failed',
-            'The file could not be processed, but your message will still be sent.'
-          );
-        }
-      }
-
-      const messagePayload = {
-        chatId,
-        content: userMessage || '',
-        ...(processedFile &&
-          processedFile.fileUrl && {
-            imageUrl: processedFile.type === 'image' ? processedFile.fileUrl : undefined,
-            fileName: processedFile.metadata.fileName,
-            fileUri: processedFile.fileUrl,
-            fileMimeType: processedFile.metadata.mimeType,
-          }),
-      };
-
-      const { data: responseData } = await sendMessageWithResponse({
-        variables: messagePayload,
-      });
-
-      if (responseData?.sendMessageWithResponse) {
-        const {
-          userMessage: realUserMsg,
-          aiMessage,
-          usedCustomResponse,
-        } = responseData.sendMessageWithResponse;
-
-        console.log(usedCustomResponse ? '✅ Used custom response' : '🤖 Used Gemini AI');
-
-        setAllMessages((prev) => {
-          const withoutTemp = prev.filter((msg) => msg.id !== tempId);
-          return [...withoutTemp, realUserMsg, aiMessage];
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Error sending message:', error);
-      const errorMessage = error.message || 'Failed to send message';
-      Alert.alert('Error', errorMessage);
-
-      setAllMessages((prev) => prev.filter((msg) => !msg.id.startsWith('temp-')));
-      setMessage(userMessage);
-      if (currentFile) {
-        setAttachedFile(currentFile);
-      }
-    } finally {
-      setIsSending(false);
-    }
-  }, [message, chatId, isSending, attachedFile, sendMessageWithResponse]);
+  // A new chat arrives with its first message in the route. It is sent here, once.
+  const deliverRef = useRef(deliver);
+  deliverRef.current = deliver;
+  useEffect(() => {
+    const text = firstMessage?.trim();
+    if (!chatId || !text) return;
+    if (!claimFirstMessage(chatId)) return;
+    void deliverRef.current(text, null);
+  }, [chatId, firstMessage]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
@@ -298,7 +336,11 @@ function ChatDetailScreen() {
       <View className={`mx-4 my-2 flex-row text-lg ${isUser ? 'justify-end' : 'justify-start'}`}>
         {/* AI Avatar */}
         {!isUser && (
-          <View className="mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
+          <View
+            testID="chat-avatar-assistant"
+            accessible
+            accessibilityLabel="Assistant"
+            className="mr-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
             <Ionicons name="sparkles" size={16} color="white" />
           </View>
         )}
@@ -380,7 +422,11 @@ function ChatDetailScreen() {
 
         {/* User Avatar */}
         {isUser && (
-          <View className="ml-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-blue-500">
+          <View
+            testID="chat-avatar-user"
+            accessible
+            accessibilityLabel="You"
+            className="ml-2 mt-1 h-8 w-8 items-center justify-center rounded-full bg-blue-500">
             <Ionicons name="person" size={16} color="white" />
           </View>
         )}
@@ -412,26 +458,77 @@ function ChatDetailScreen() {
           paddingBottom: 16,
           flexGrow: 1,
         }}
-        ListEmptyComponent={
-          <View className="flex-1 items-center justify-center py-20">
+        ListFooterComponent={
+          isSending ? (
             <View
-              className="mb-4 rounded-full bg-white p-6"
-              style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-                elevation: 3,
-              }}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
+              testID="chat-thinking"
+              accessible
+              accessibilityLabel="Assistant is thinking"
+              className="mx-4 my-2 flex-row items-center">
+              <View className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-purple-500">
+                <Ionicons name="sparkles" size={16} color="white" />
+              </View>
+              <View className="flex-row items-center rounded-2xl rounded-bl-md border border-gray-200 bg-gray-100 px-4 py-3">
+                <ActivityIndicator size="small" color="#6b7280" />
+                <Text className="ml-2 text-sm text-gray-500">Thinking…</Text>
+              </View>
             </View>
-            <Text className="text-center text-lg font-semibold text-gray-400">No messages yet</Text>
-            <Text className="mt-2 text-center text-sm text-gray-400">
-              Start the conversation with AI!
-            </Text>
-          </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          isSending ? null : (
+            <View className="flex-1 items-center justify-center py-20">
+              <View
+                className="mb-4 rounded-full bg-white p-6"
+                style={{
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 8,
+                  elevation: 3,
+                }}>
+                <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
+              </View>
+              <Text className="text-center text-lg font-semibold text-gray-400">
+                No messages yet
+              </Text>
+              <Text className="mt-2 text-center text-sm text-gray-400">
+                Start the conversation with AI!
+              </Text>
+            </View>
+          )
         }
       />
+
+      {/* Failed send: say what happened and offer Retry */}
+      {failedSend && (
+        <View
+          testID="chat-send-error"
+          accessibilityRole="alert"
+          className="mx-4 mb-2 flex-row items-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <Ionicons name="alert-circle" size={20} color="#ef4444" />
+          <Text className="ml-2 flex-1 text-sm text-red-700">{failedSend.failure.message}</Text>
+          {failedSend.failure.canRetry ? (
+            <TouchableOpacity
+              testID="chat-retry"
+              accessibilityRole="button"
+              accessibilityLabel="Retry sending"
+              onPress={retryFailedSend}
+              disabled={isSending}
+              className="ml-2 min-h-[44px] justify-center px-2">
+              <Text className="text-sm font-semibold text-red-700">Retry</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+              onPress={() => setFailedSend(null)}
+              className="ml-2 min-h-[44px] justify-center px-2">
+              <Text className="text-sm font-semibold text-red-700">Dismiss</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* File Attachment Preview */}
       {attachedFile && (
