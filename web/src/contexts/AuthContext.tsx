@@ -22,6 +22,7 @@ interface AuthContextType {
   signIn: (data: SignInFormData) => Promise<void>;
   signUp: (data: SignUpFormData) => Promise<void>;
   signOut: () => Promise<void>;
+  updateSessionToken: (token: string) => void;
   loginWithFace: (file: File) => Promise<string>;
   loginWithVoice: (email: string, challengeCode: string, audio: File) => Promise<string>;
 }
@@ -236,6 +237,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // A password change makes the server revoke the old token and return a new one. Keep the
+  // stored copy and the expiry timer (which follows `token`) in step with it.
+  const updateSessionToken = (newToken: string) => {
+    localStorage.setItem('authToken', newToken);
+    setToken(newToken);
+  };
+
   const signOut = async () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
@@ -337,6 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signUp,
     signOut,
+    updateSessionToken,
     loginWithFace,
     loginWithVoice,
   };

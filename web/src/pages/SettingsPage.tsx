@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_ME, UPDATE_PROFILE, CHANGE_PASSWORD } from "../graphql/users";
 import { newPasswordSchema, PASSWORD_HINT } from "../lib/validation-schemas";
+import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../components/ui/toastContext";
 import { useTheme } from "../contexts/useTheme";
 import FaceSettings from "../components/settings/FaceSettings";
@@ -35,6 +36,7 @@ interface UserData {
 export default function SettingsPage() {
   const { addToast } = useToast();
   const { theme, toggleTheme } = useTheme();
+  const { updateSessionToken } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("account");
 
   const { data, loading, refetch } = useQuery<UserData>(GET_ME, {
@@ -83,7 +85,7 @@ export default function SettingsPage() {
       });
       // The server ended every earlier session, including this one; keep this tab signed in.
       const freshToken = result?.changePassword?.token;
-      if (freshToken) localStorage.setItem('authToken', freshToken);
+      if (freshToken) updateSessionToken(freshToken);
       addToast({ type: 'success', title: 'Success', message: 'Password changed successfully.' });
       setPasswords({ current: "", new: "", confirm: "" });
     } catch (err: unknown) {

@@ -109,6 +109,8 @@ const authLink = new ApolloLink((operation, forward) => {
   }
 
   operation.setContext(({ headers = {} }) => ({
+    // Remembered so a late rejection can be matched to the session that sent the request.
+    sentToken: token,
     headers: {
       ...headers,
       "apollo-require-preflight": "true",
@@ -181,6 +183,11 @@ const errorLink = new ErrorLink(({ error, operation }) => {
       // The server no longer accepts this session (expired, revoked, account disabled).
       // Drop it and go to login now, instead of leaving the user on a page where every action fails.
       if (extensions?.code === "UNAUTHENTICATED") {
+        // A request sent before a password change is refused after it; that must not end the
+        // session that now holds the new token.
+        const sentToken = operation.getContext().sentToken;
+        if (sentToken && sentToken !== localStorage.getItem("authToken")) return;
+
         logger.warn("User authentication failed");
 
         if (typeof window !== "undefined") {
