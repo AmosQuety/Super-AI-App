@@ -68,6 +68,34 @@ test('a chat that no longer exists cannot be retried', () => {
   assert.match(failure.message, /no longer exists/i);
 });
 
+test('a server that failed internally gets fixed plain wording, never its raw text', () => {
+  const internal = Object.assign(new Error('prisma: connection pool timeout'), {
+    errors: [
+      {
+        message: 'prisma: connection pool timeout',
+        extensions: { code: 'INTERNAL_SERVER_ERROR' },
+      },
+    ],
+  });
+  const failure = describeSendFailure(internal);
+  assert.equal(failure.canRetry, true);
+  assert.doesNotMatch(failure.message, /prisma|pool/i);
+  assert.match(failure.message, /server/i);
+});
+
+test('an HTTP error from the server is not reported as a lost connection', () => {
+  const rateLimited = Object.assign(
+    new Error('Response not successful: Received status code 429'),
+    {
+      statusCode: 429,
+    }
+  );
+  const failure = describeSendFailure(rateLimited);
+  assert.equal(failure.canRetry, true);
+  assert.doesNotMatch(failure.message, /connection/i);
+  assert.match(failure.message, /try again/i);
+});
+
 test('anything unexpected still gives a retryable generic message', () => {
   const failure = describeSendFailure('boom');
   assert.equal(failure.canRetry, true);

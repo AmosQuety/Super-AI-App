@@ -88,7 +88,7 @@ async function otherChatMutationsReportNotFoundWithoutWriting() {
 
 async function deletingSomeoneElsesMessageDoesNotSignTheUserOut() {
   const { error, writes } = await run(`mutation { deleteMessage(messageId: "their_message") }`);
-  assert.notEqual(code(error), "UNAUTHENTICATED");
+  assert.equal(code(error), "BAD_USER_INPUT");
   assert.equal(error.message, "Message not found");
   assert.deepEqual(writes, []);
 }

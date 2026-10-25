@@ -158,7 +158,7 @@ const ChatListScreen: React.FC = () => {
 
       <View className="flex-row items-center">
         <Text className="flex-1 text-sm text-gray-500" numberOfLines={2}>
-          Updated {formatDate(item.updatedAt)}
+          Created {formatDate(item.createdAt)}
         </Text>
         {deletingChats.has(item.id) ? (
           <ActivityIndicator size="small" color="#3B82F6" className="ml-2" />

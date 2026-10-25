@@ -1,5 +1,5 @@
 // app/features/chats/new.tsx - PROFESSIONAL STYLED VERSION
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,8 @@ export default function NewChatScreen() {
   const [title, setTitle] = useState('');
   const [initialMessage, setInitialMessage] = useState('');
   const { user } = useAuth();
+  // Two quick taps can arrive before the button re-renders as disabled; only one chat may be created.
+  const isCreatingRef = useRef(false);
 
   const [createChat, { loading }] = useMutation<{ createChat: { id: string } }>(CREATE_CHAT);
 
@@ -52,6 +54,8 @@ export default function NewChatScreen() {
       return;
     }
 
+    if (isCreatingRef.current) return;
+    isCreatingRef.current = true;
     const firstMessage = initialMessage.trim();
 
     try {
@@ -72,8 +76,12 @@ export default function NewChatScreen() {
           pathname: '/features/chats/[id]',
           params: { id: result.data.createChat.id, firstMessage },
         });
+      } else {
+        isCreatingRef.current = false;
       }
     } catch (error: any) {
+      // Nothing was created, so let the user try again.
+      isCreatingRef.current = false;
       console.error('Error creating chat:', error);
       Alert.alert('Error', error.message || 'Failed to create chat');
     }

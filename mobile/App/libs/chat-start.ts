@@ -36,6 +36,7 @@ export interface SendFailure {
 
 interface ServerErrorLike {
   message?: string;
+  statusCode?: number;
   errors?: { message?: string; extensions?: { code?: string } }[];
 }
 
@@ -50,7 +51,16 @@ export function describeSendFailure(error: unknown): SendFailure {
     if (first?.message === 'Chat not found') {
       return { message: 'This chat no longer exists.', canRetry: false };
     }
+    // An unexpected server failure carries internal wording that is no use to the user.
+    if (first?.extensions?.code === 'INTERNAL_SERVER_ERROR') {
+      return { message: 'The server had a problem. Please try again.', canRetry: true };
+    }
     return { message: first?.message || 'The reply could not be created.', canRetry: true };
+  }
+
+  // The server answered with an HTTP error (rate limit, gateway, outage): not a lost connection.
+  if (typeof serverError?.statusCode === 'number') {
+    return { message: 'The server could not handle that. Please try again.', canRetry: true };
   }
 
   if (error instanceof Error) {

@@ -1,5 +1,5 @@
 // src/resolvers/mutations/messageMutations.ts
-import { AuthenticationError, UserInputError } from "apollo-server-express";
+import { ApolloError, AuthenticationError, UserInputError } from "apollo-server-express";
 import { Message } from "@prisma/client";
 import { AppContext } from "../types/context";
 import { pubsub } from '../subscriptionResolvers'; // ADD THIS IMPORT
@@ -89,6 +89,8 @@ export const messageMutations = {
 
       return true;
     } catch (error: any) {
+      // Errors that already carry a code (not found, not allowed) must reach the client as they are.
+      if (error instanceof ApolloError) throw error;
       console.error("Error deleting message:", error);
       throw new Error(error.message || "Failed to delete message");
     }
