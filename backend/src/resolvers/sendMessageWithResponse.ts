@@ -1,5 +1,5 @@
 // src/resolvers/sendMessageWithResponse.ts
-import { AuthenticationError, ApolloError } from "apollo-server-express";
+import { AuthenticationError, ApolloError, UserInputError } from "apollo-server-express";
 import { AppContext } from "./types/context";
 import { IntelligentMatcher, createIntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
@@ -168,7 +168,8 @@ export const sendMessageWithResponse = {
         select: { name: true, email: true, preferences: true },
       }),
     ]);
-    if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
+    // Not UNAUTHENTICATED: clients sign the user out on that code, and the session is fine.
+    if (!chat || chat.userId !== userId) throw new UserInputError("Chat not found");
 
     let task: any = null;
 

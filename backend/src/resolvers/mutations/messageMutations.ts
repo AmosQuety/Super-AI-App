@@ -27,8 +27,9 @@ export const messageMutations = {
       throw new UserInputError("Chat not found");
     }
 
+    // Not UNAUTHENTICATED: clients sign the user out on that code, and the session is fine.
     if (chat.userId !== context.user.userId) {
-      throw new AuthenticationError("You can only add messages to your own chats");
+      throw new UserInputError("Chat not found");
     }
 
     // Create the message
@@ -74,7 +75,7 @@ export const messageMutations = {
       }
 
       if (message.chat.userId !== context.user.userId) {
-        throw new AuthenticationError("You can only delete your own messages");
+        throw new UserInputError("Message not found");
       }
 
       // Delete the message
