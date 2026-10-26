@@ -11,7 +11,8 @@ import { logger } from "../../utils/logger";
 import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
 import { closeUserSockets } from "../../auth/socketRegistry";
 import { recordAccountEvent } from "../../auth/accountAudit";
-import { verifyCurrentPassword } from "../../auth/currentPassword";
+import { recordWrongPassword, signInKey, verifyCurrentPassword } from "../../auth/currentPassword";
+import { clearFailedAttempts, reserveAttempt } from "../../auth/passwordAttempts";
 
 const voiceCloningService = new VoiceCloningService();
 
@@ -227,6 +228,14 @@ export const authResolvers = {
         throw new UserInputError("Email and password are required");
       }
 
+      // Every email, real or not, is limited the same way, so the lockout reveals nothing about
+      // which accounts exist. The attempt is reserved before the password is compared.
+      const attempt = reserveAttempt(signInKey(email));
+      if (!attempt.allowed) {
+        const minutes = Math.ceil(attempt.retryAfterMs / 60_000);
+        throw new UserInputError(`Too many sign-in attempts. Try again in ${minutes} minutes.`);
+      }
+
       const user = await context.prisma.user.findUnique({
         where: { email: email.toLowerCase().trim() },
       });
@@ -237,8 +246,12 @@ export const authResolvers = {
       );
       // A disabled account gets the same generic failure, after the password check so timing is unchanged.
       if (!user || !user.password || !isValidPassword || !user.isActive) {
+        // Not awaited: an audit write only for real accounts would make them slower to refuse.
+        if (user) void recordWrongPassword(context, user, "login", attempt.isLastAllowed);
         throw new AuthenticationError("Invalid email or password");
       }
+
+      clearFailedAttempts(signInKey(email));
 
       const token = SecurityConfig.generateToken(user);
 
@@ -349,6 +362,33 @@ export const authResolvers = {
         success: true,
         message: "Password updated successfully",
         token,
+      };
+    },
+
+    // Ends every session except this one without asking for a password: this is how someone who
+    // suspects a stolen session takes control back, so it must work even while the password
+    // checks are locked. The caller gets a fresh token and stays signed in.
+    signOutOtherSessions: async (
+      _: any,
+      __: any,
+      context: AppContext
+    ): Promise<{ success: boolean; message: string; token: string }> => {
+      const user = AuthorizationService.requireAuth(context);
+
+      // One atomic increment: every token issued under the old value stops working.
+      const account = await context.prisma.user.update({
+        where: { id: user.userId },
+        data: { sessionVersion: { increment: 1 } },
+      });
+
+      // Live subscriptions were authenticated with an old token; close them so they reconnect.
+      closeUserSockets(user.userId);
+      await recordAccountEvent(context, account, "OTHER_SESSIONS_ENDED", {});
+
+      return {
+        success: true,
+        message: "You were signed out everywhere else",
+        token: SecurityConfig.generateToken(account),
       };
     },
 

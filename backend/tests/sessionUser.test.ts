@@ -78,7 +78,7 @@ async function theProductionLookupReadsTheRoleTheActiveFlagAndThePasswordHash() 
   const prisma: any = { user: { findUnique: async (query: any) => (queries.push(query), account("USER")) } };
   await accountLookupFor(prisma)("u1");
   assert.deepEqual(queries[0].where, { id: "u1" });
-  assert.deepEqual(queries[0].select, { role: true, isActive: true, password: true });
+  assert.deepEqual(queries[0].select, { role: true, isActive: true, password: true, sessionVersion: true });
 }
 
 async function main() {

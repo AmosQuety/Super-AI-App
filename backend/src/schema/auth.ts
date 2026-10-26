@@ -13,6 +13,13 @@ export const authTypeDefs = gql`
     token: String
   }
 
+  type SessionsEndedResponse {
+    success: Boolean!
+    message: String!
+    "A new session token for the caller, who stays signed in. Every other session has ended."
+    token: String!
+  }
+
   type DeleteAccountResponse {
     success: Boolean!
     message: String!
@@ -30,6 +37,7 @@ export const authTypeDefs = gql`
     loginWithVoice(email: String!, challengeCode: String!, audio: Upload!): AuthPayload!
     updateProfile(name: String, email: String, currentPassword: String): User!
     changePassword(currentPassword: String!, newPassword: String!): ChangePasswordResponse!
+    signOutOtherSessions: SessionsEndedResponse!
     deleteAccount(password: String!): DeleteAccountResponse!
   }
 `;

@@ -10,6 +10,9 @@ export interface JWTPayload {
   sessionId: string;
   // Fingerprint of the password hash the token was issued against (see passwordFingerprint).
   pwf?: string;
+  // Session version the token was issued under; "sign out other sessions" raises the stored one.
+  // A token without it predates the claim and counts as version 0.
+  sv?: number;
   iat?: number;
   exp?: number;
 }
@@ -94,6 +97,7 @@ export class SecurityConfig {
       email: user.email,
       role: this.roleForToken(user.role),
       pwf: this.passwordFingerprint(user.password),
+      sv: user.sessionVersion ?? 0,
     });
   }
 

@@ -88,7 +88,7 @@ export const disconnectPrisma = async () => {
 export const accountLookupFor =
   (db: Pick<PrismaClient, "user">): AccountLookup =>
   (userId) =>
-    db.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true } });
+    db.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true, sessionVersion: true } });
 
 const lookupStoredAccount = accountLookupFor(prisma);
 

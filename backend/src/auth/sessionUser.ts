@@ -7,6 +7,8 @@ export interface StoredAccount {
   isActive: boolean;
   // The bcrypt hash; used only to compare fingerprints, never returned or logged.
   password: string | null;
+  // Raised by "sign out other sessions". Absent counts as 0.
+  sessionVersion?: number;
 }
 
 export type AccountLookup = (userId: string) => Promise<StoredAccount | null>;
@@ -15,7 +17,8 @@ export type AccountLookup = (userId: string) => Promise<StoredAccount | null>;
 // today. The role is re-read on every request, so a demotion, a disabled account
 // or a deleted user takes effect immediately instead of when the token expires.
 // A token is also bound to the password it was issued under (the pwf claim), so changing
-// the password ends every earlier session. A token without the claim predates this rule
+// the password ends every earlier session. It also carries the session version, so "sign out other
+// sessions" ends every token but the fresh one it returns. A token without the claim predates this rule
 // and is refused; those users sign in once more.
 // A bad token or a missing or disabled account yields no session; a failed lookup
 // refuses the request with a retryable error.
@@ -41,6 +44,10 @@ export async function authenticateToken(
     }
     if (!isIssuedForCurrentPassword(claims, account)) {
       logger.warn("[context] token was issued before the last password change");
+      return null;
+    }
+    if ((claims.sv ?? 0) !== (account.sessionVersion ?? 0)) {
+      logger.warn("[context] token belongs to a session that was signed out");
       return null;
     }
     return { ...claims, role: SecurityConfig.roleForToken(account.role) };

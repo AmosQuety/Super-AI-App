@@ -9,6 +9,8 @@ import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_WINDOW_MS,
   reserveAttempt,
+  MAX_TRACKED_KEYS,
+  trackedKeyCount,
   clearFailedAttempts,
   resetAllFailedAttempts,
 } from "../src/auth/passwordAttempts";
@@ -249,7 +251,19 @@ async function anEmptyPasswordIsNotAGuessInEitherMutation() {
   );
 }
 
+function theTableOfTrackedKeysStaysBounded() {
+  resetAllFailedAttempts();
+  for (let i = 0; i < MAX_TRACKED_KEYS + 500; i++)
+    reserveAttempt(`login:stranger-${i}@example.test`, 1_000_000);
+  assert.ok(trackedKeyCount() <= MAX_TRACKED_KEYS);
+  // A busy table still lets a real, recent key be tracked and locked.
+  for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++)
+    reserveAttempt("login:real@example.test", 1_000_001);
+  assert.ok(!reserveAttempt("login:real@example.test", 1_000_002).allowed);
+}
+
 async function main() {
+  theTableOfTrackedKeysStaysBounded();
   await parallelGuessesAreCappedAtTheLimit();
   await anEmptyPasswordIsNotAGuessInEitherMutation();
   unitCounterBehaviour();
