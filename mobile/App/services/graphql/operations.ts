@@ -84,6 +84,16 @@ export const CHANGE_PASSWORD_MUTATION = gql`
   }
 `;
 
+export const SIGN_OUT_OTHER_SESSIONS_MUTATION = gql`
+  mutation SignOutOtherSessions {
+    signOutOtherSessions {
+      success
+      message
+      token
+    }
+  }
+`;
+
 export const GET_CHATS = gql`
   query GetChats($userId: ID!) {
     chats(userId: $userId) {

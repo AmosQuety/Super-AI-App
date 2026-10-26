@@ -1,0 +1,55 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline). Signing
+      out other devices changes no visible account data
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home. Open Profile; expect the Sign out other devices button
+  - tap:
+      id: tab-profile
+  - await: { visible: { id: profile-sign-out-others } }
+  - await: { idle: true }
+  - echo: On Profile. Tap Sign out other devices; expect the confirmation toast
+  - tap:
+      id: profile-sign-out-others
+  - await: { visible: { text: Other devices signed out }, timeout: 10000 }
+  - await: { hidden: { text: Other devices signed out }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: Other devices were signed out and this one stays signed in. Open
+      Assistant settings, which loads from the server and only works if the
+      fresh token was stored
+  - tap:
+      id: profile-assistant-settings
+  - await: { visible: { id: pref-language }, timeout: 10000 }
+  - await: { idle: true }
+  - echo: The screen loaded with the new token. Go back to Profile, then sign out
+      (restores the signed-out baseline)
+  - tap:
+      text: Go back
+  - await: { visible: { id: profile-sign-out-others } }
+  - await: { idle: true }
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }

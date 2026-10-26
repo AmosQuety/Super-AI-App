@@ -22,6 +22,8 @@ interface AuthContextType {
     currentPassword: string,
     newPassword: string
   ) => Promise<{ success: boolean; message: string }>;
+  // Ends every other session; this device stays signed in.
+  signOutOtherSessions: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -155,6 +157,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signOutOtherSessions = async () => {
+    try {
+      await apiService.signOutOtherSessions();
+    } catch (error) {
+      logUnexpected('Sign out other sessions', error);
+      throw error;
+    }
+  };
+
   const refreshUser = async () => {
     try {
       if (await apiService.isAuthenticated()) {
@@ -176,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     updateProfile,
     changePassword,
+    signOutOtherSessions,
     refreshUser,
   };
 

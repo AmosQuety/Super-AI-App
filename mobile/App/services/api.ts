@@ -16,6 +16,7 @@ import {
   ME_QUERY,
   UPDATE_PROFILE_MUTATION,
   CHANGE_PASSWORD_MUTATION,
+  SIGN_OUT_OTHER_SESSIONS_MUTATION,
   FACE_SERVICE_STATUS,
   LOGIN_WITH_FACE,
 } from './graphql/operations';
@@ -250,6 +251,24 @@ class ApiService {
       }
     }
     return data.changePassword;
+  }
+
+  // Ends every session except this one. The token in use was just revoked by the server, so the
+  // fresh one it returns must be stored before anything else makes a request.
+  async signOutOtherSessions(): Promise<void> {
+    const data = await this.executeMutation<{
+      signOutOtherSessions: { success: boolean; message: string; token: string };
+    }>(SIGN_OUT_OTHER_SESSIONS_MUTATION);
+    if (!data.signOutOtherSessions?.token) {
+      throw new Error('Invalid sign out response');
+    }
+    try {
+      await storageService.setAuthToken(data.signOutOtherSessions.token);
+    } catch (error) {
+      // The other sessions did end, so this is not a failure. The old token is dead, so the next
+      // request sends the user to Sign In.
+      console.warn('Could not store the new session after signing out other devices:', error);
+    }
   }
 
   // Chat Operations

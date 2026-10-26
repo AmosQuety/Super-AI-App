@@ -1,17 +1,23 @@
 import { useQuery } from '@apollo/client/react';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Loading } from '../../components/ui/loading';
+import { useToast } from '../../components/ui/toast';
+import { useSaveFailureToast } from '../../hooks/use-account-save';
 import { useAuth } from '../../hooks/use-auth';
 import { usageStats } from '../../libs/profile';
 import { PROFILE_DETAILS } from '../../services/graphql/operations';
 
 export default function ProfileScreen() {
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, signOutOtherSessions, isLoading } = useAuth();
+  const { showSuccess } = useToast();
+  const showSaveFailure = useSaveFailureToast();
+  const [isEndingSessions, setIsEndingSessions] = useState(false);
+  const isEndingSessionsRef = useRef(false);
   const { data: details, refetch } = useQuery<{ me: Parameters<typeof usageStats>[0] }>(
     PROFILE_DETAILS,
     { fetchPolicy: 'cache-first' }
@@ -23,6 +29,21 @@ export default function ProfileScreen() {
     }, [refetch])
   );
   const stats = usageStats(details?.me ?? null);
+
+  const endOtherSessions = async () => {
+    if (isEndingSessionsRef.current) return;
+    isEndingSessionsRef.current = true;
+    setIsEndingSessions(true);
+    try {
+      await signOutOtherSessions();
+      showSuccess('Other devices signed out', 'You stay signed in on this device.');
+    } catch (error) {
+      showSaveFailure('Could not sign out other devices', error);
+    } finally {
+      isEndingSessionsRef.current = false;
+      setIsEndingSessions(false);
+    }
+  };
 
   if (isLoading) {
     return <Loading fullScreen message="Loading profile..." />;
@@ -102,6 +123,16 @@ export default function ProfileScreen() {
             variant="outline"
             className="mt-3"
             onPress={() => router.push('/features/account/change-password')}
+          />
+          <Button
+            testID="profile-sign-out-others"
+            title="Sign out other devices"
+            accessibilityHint="Signs out every other phone and browser. You stay signed in here."
+            variant="outline"
+            className="mt-3"
+            loading={isEndingSessions}
+            disabled={isEndingSessions}
+            onPress={endOtherSessions}
           />
           <Button title="Sign Out" variant="outline" className="mt-3" onPress={signOut} />
         </Card>
