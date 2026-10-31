@@ -1,9 +1,9 @@
 # Progress
 
-Last updated: 2026-10-31 (late)
+Last updated: 2026-10-31 (end of session)
 
 ## Now
-Merged and live (PR #9, 2026-10-31 about 18:29 UTC): VAPID warning once per process (verified: no repeats since the restart), service worker version `xemora-v5` (verified live on xemora.vercel.app). Two things still show in the live logs. Committed locally, not yet on GitHub: the web `GetTask` fix and a check that validates every client query against the server schema.
+Session stopped on purpose. Everything is committed on `mobile-parity/slice-6-profile-settings`. The developer is pushing and merging the last pull request (carries the web `GetTask` fix and the client query check). Live and verified before stopping: proxy count 3, working GraphQL limiter, JSON warnings in Render's logs, `WEBHOOK_SECRET` set, VAPID warning once per process, service worker `xemora-v5`.
 
 ## Next
 1. Developer: push the branch again and merge a new pull request. It carries `984c7b1` (web `GetTask` id type) and `f5c054d` (client query check). Until then Voice Lab, the Playground and Magic Mirror cannot read task progress on the web.
