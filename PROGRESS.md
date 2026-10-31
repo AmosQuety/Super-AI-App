@@ -3,16 +3,17 @@
 Last updated: 2026-10-31 (late)
 
 ## Now
-Slice 6 (profile and settings) and its security hardening are committed on `mobile-parity/slice-6-profile-settings` after three independent reviews (nothing pushed, so nothing is deployed). Waiting on the developer to push/deploy and read one diagnostic log line from Render so the proxy count can be set.
+The proxy count is known: **`TRUST_PROXY_HOPS=3`** (from Render's diagnostic log: client, Cloudflare edge, Render-internal; the app's own peer is a local proxy). The rate limiter fix is committed together with it on `mobile-parity/slice-6-profile-settings`. Waiting on the developer to set the variable in Render FIRST, verify, and only then push the limiter fix.
 
 ## Next
-1. Developer: push the branch (or merge it into the branch Render deploys) when ready; I do not push unless asked. The Render build runs `prisma migrate deploy`, which will apply `20261026_session_version`.
-2. Render, service Environment tab: add `FORWARDING_DIAGNOSTIC` = `true`, deploy, open the app or the site once, then open Logs. Look for a line containing `"diagnostic":"forwarding-headers"` and send it to me (it holds only addresses a caller already sent; remove anything you do not want to share).
-3. From that line I choose the number for `TRUST_PROXY_HOPS` (too low is harmless, too high lets callers forge an address). Set it in Environment, remove `FORWARDING_DIAGNOSTIC`, redeploy. A bad value stops the server at startup (check Deploys).
-4. In the SAME deploy as step 3, fix the general rate limiter: in `backend/src/auth/rate-limiting.ts` change `ipKeyGenerator(req)` to `ipKeyGenerator(req.ip ?? '')`. Today it never limits anything. Do not apply it before the proxy count is set, or the 100-per-minute cap would apply to the whole app together.
+1. Render, service Environment tab: set `TRUST_PROXY_HOPS` = `3` and keep `FORWARDING_DIAGNOSTIC` = `true` for now. Render redeploys the code that is already live (it already understands the variable), so this is safe on its own.
+2. When it is live, open the site or app once and read Logs: the new diagnostic lines should show `expressIp` equal to the visitor's real address (the same as `cfConnectingIp`, for example `41.210.145.140`), not `::1`. If they still show `::1`, stop and tell me.
+3. Only after step 2 is confirmed: push the branch with the rate limiter fix (commit "fix(backend): make the GraphQL limiter count each client..."). Pushing it BEFORE step 1 and 2 would make the cap of 100 GraphQL requests per minute apply to the whole app together.
+4. Then remove `FORWARDING_DIAGNOSTIC` from Render (it prints at most 20 lines per start, harmless but no longer needed) and redeploy.
 5. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
 
 ## Done recently
+- 2026-10-31: read Render's diagnostic: forwarding chain is `client, Cloudflare edge (172.x), Render internal (10.x)` with peer `::1`, so three hops; recorded as a test (`trustProxy.test.ts`). Rate limiter fixed (`rateLimiter.test.ts`: 100 per client per minute, separate clients separate), startup warning when `TRUST_PROXY_HOPS` is unset in production.
 - 2026-10-31: direct-origin test of the Render backend (`super-ai-app.onrender.com`): every request, including one sent straight to Render's origin address with the service name, was answered through Cloudflare (`server: cloudflare`, `cf-ray`); Render's origin hostname alone returns 404. No direct path found (the real origin address behind Cloudflare is hidden, so this covers only what is publicly reachable). The chain is therefore client, Cloudflare, Render; the exact number still comes from the diagnostic line.
 - 2026-10-31: fixed the Vercel preview build failure of `web` (`SettingsPage.tsx` changePassword result was untyped); reproduced locally with the lockfile's Apollo 4.0.4, then `tsc -b` passes and `vite build` succeeds. Committed locally, not pushed.
 - 2026-10-31: third independent review fixed: forwarding diagnostic that actually reaches Render's logs, WebSocket address by the same rule as HTTP, face engine faults no longer count as guesses, safer address parsing, stricter `TRUST_PROXY_HOPS`, Change Password "sign in again" notice (`e29522d`, `9cf7593`).
@@ -22,7 +23,7 @@ Slice 6 (profile and settings) and its security hardening are committed on `mobi
 - 2026-10-31: Render would not open because the Wi-Fi resolver failed on `onrender.com`; fixed with public DNS on that connection (see Context).
 
 ## Open questions / blockers
-- Proxy count for Render (Next 2 and 3). A direct-origin bypass was not found (see Done recently).
+- If Render ever changes its proxy chain the number 3 would need to change; the diagnostic (`FORWARDING_DIAGNOSTIC=true`) shows the chain again. A direct-origin bypass of Cloudflare was not found; if one existed, a caller on that path would only have a chain of two entries, and three trusted hops would then believe a forged entry.
 - Web dependency heads-up: `web/package.json` allows `@apollo/client ^4.0.4` but the lockfile pins 4.0.4; with Apollo 4.3.x `tsc -b` fails in `web/src/lib/apolloClient.ts` (lines about `errorPolicy` default options). Do not refresh the web lockfile or update Apollo without fixing that; `web/package-lock.json` is also out of sync with `package.json` (`npm ci` fails). Locally `web/node_modules` was installed with `--legacy-peer-deps --ignore-scripts` for checking (gitignored).
 - Retention period for `security_audit_logs` (legal requirement, not decided).
 - Migration `20261026_session_version` was edited (lock timeout); safe only if it was never applied outside the local database.
