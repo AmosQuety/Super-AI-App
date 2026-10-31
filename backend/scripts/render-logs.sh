@@ -21,7 +21,7 @@ usage() {
 Usage:
   render-logs.sh services
       List the services the key can see (name, id, owner id, type).
-  render-logs.sh logs [--minutes N] [--limit N] [--text WORDS] [--level warn|error|info] [--dry-run]
+  render-logs.sh logs [--minutes N] [--limit N] [--text WORDS] [--level warn|error|info|debug] [--dry-run]
       Print the newest log lines of the backend service, oldest first.
       Defaults: the last 60 minutes, at most 100 lines.
       --dry-run prints the request that would be sent and sends nothing.
@@ -101,7 +101,9 @@ cmd_logs() {
   done
   whole_number_between "--minutes" "$minutes" 1 10080
   whole_number_between "--limit" "$limit" 1 1000
-  [[ -z "$level" || "$level" =~ ^(info|warn|error|debug)$ ]] || die "--level must be info, warn, error or debug, got '$level'"
+  [[ -z "$level" || "$level" =~ ^(info|warn|warning|error|debug)$ ]] || die "--level must be info, warn, error or debug, got '$level'"
+  # Render labels warnings "warning", so the short name is translated.
+  [[ "$level" != "warn" ]] || level="warning"
 
   require_key_file
   if (( dry_run )); then

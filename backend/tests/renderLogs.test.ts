@@ -63,6 +63,13 @@ function aDryRunBuildsTheRequestAndNeverShowsTheKey() {
   assert.ok(!result.both.includes(SECRET), "the key is never printed");
 }
 
+function renderCallsAWarningWarningSoTheShortNameIsTranslated() {
+  const asked = (level: string) => run(["logs", "--dry-run", "--level", level], { env: IDS }).out;
+  assert.match(asked("warn"), /level=warning(&|$|\s)/, "warn is sent as Render's own label");
+  assert.match(asked("warning"), /level=warning(&|$|\s)/);
+  assert.match(asked("error"), /level=error(&|$|\s)/);
+}
+
 function numbersAreValidatedBeforeAnythingIsSent() {
   for (const bad of [["--minutes", "abc"], ["--limit", "0"], ["--limit", "5000"], ["--minutes", "-5"], ["--level", "loud"]]) {
     const result = run(["logs", "--dry-run", ...bad], { env: IDS });
@@ -139,6 +146,7 @@ async function theLiveRequestUsesTheKeyAsAHeaderAndFormatsTheLines() {
 withoutAKeyItExplainsHowToCreateOne();
 aKeyOthersCanReadIsRefused();
 aDryRunBuildsTheRequestAndNeverShowsTheKey();
+renderCallsAWarningWarningSoTheShortNameIsTranslated();
 numbersAreValidatedBeforeAnythingIsSent();
 helpAndUnknownCommandsPrintUsage();
 theLiveRequestUsesTheKeyAsAHeaderAndFormatsTheLines().then(

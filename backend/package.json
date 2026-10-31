@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "seed": "ts-node prisma/seed.ts",
     "test:tasks": "ts-node tests/taskLifecycle.test.ts && ts-node tests/taskEventPublisher.test.ts && ts-node tests/taskListMetadata.test.ts && ts-node tests/imageVariantsPrompt.test.ts && ts-node tests/voiceTask.test.ts && ts-node tests/profileSettings.test.ts && ts-node tests/accountChanges.test.ts && ts-node tests/passwordAttempts.test.ts && ts-node tests/loginAttempts.test.ts && ts-node tests/sessionVersion.test.ts",
-    "test:ops": "ts-node tests/productionLogging.test.ts && ts-node tests/renderLogs.test.ts",
+    "test:ops": "ts-node tests/productionLogging.test.ts && ts-node tests/renderLogs.test.ts && ts-node tests/pushWarning.test.ts",
     "test:authz": "ts-node tests/usersQueryAuthorization.test.ts && ts-node tests/chatAuthorization.test.ts && ts-node tests/authorizationFollowups.test.ts && ts-node tests/tokenRole.test.ts && ts-node tests/jwtSecret.test.ts && ts-node tests/webhookAuth.test.ts && ts-node tests/sessionUser.test.ts && ts-node tests/changePassword.test.ts && ts-node tests/socketRegistry.test.ts && ts-node tests/passwordLength.test.ts && ts-node tests/passwordSessions.test.ts && ts-node tests/chatOwnershipErrors.test.ts && ts-node tests/chatCacheInvalidation.test.ts && ts-node tests/faceLoginLimit.test.ts && ts-node tests/networkAddress.test.ts && ts-node tests/connectionContext.test.ts && ts-node tests/trustProxy.test.ts && ts-node tests/clientAddress.test.ts && ts-node tests/forwardingDiagnostic.test.ts && ts-node tests/rateLimiter.test.ts",
     "push:generate-vapid-keys": "ts-node scripts/generateVapidKeys.ts",
     "prisma:generate": "prisma generate",
