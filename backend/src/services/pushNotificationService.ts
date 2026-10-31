@@ -57,6 +57,8 @@ const FEATURE_LABEL_MAP: Record<string, string> = {
   document_ingestion: "Document ingestion",
 };
 
+let vapidWarningLogged = false;
+
 export class PushNotificationService {
   private readonly enabled: boolean;
   private readonly publicKey: string | null;
@@ -77,7 +79,9 @@ export class PushNotificationService {
         this.publicKey as string,
         process.env.VAPID_PRIVATE_KEY as string,
       );
-    } else {
+    } else if (!vapidWarningLogged) {
+      // Request-scoped code builds this service on every request, so report it once per process.
+      vapidWarningLogged = true;
       logger.warn("[push] VAPID not configured; browser push is disabled");
     }
   }
