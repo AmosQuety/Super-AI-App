@@ -39,8 +39,10 @@ export class RateLimitService {
         if (userId) {
           return `user:${userId}`;
         }
-        // Use the built-in IP key generator to properly handle IPv6
-        return ipKeyGenerator(req);
+        // ipKeyGenerator takes the address text (and groups IPv6 by network). Handing it the whole
+        // request returned the request object itself as the key, so every request got a bucket of
+        // its own and nothing was ever limited.
+        return ipKeyGenerator(req.ip ?? '');
       },
     });
   }

@@ -6,6 +6,7 @@ import { forwardingHeaderForLog } from "../src/middleware/logging";
 import {
   MAX_TRUST_PROXY_HOPS,
   parseTrustProxyHops,
+  trustProxyWarning,
 } from "../src/config/trustProxy";
 
 function unsetMeansOffSoNothingIsTrustedByDefault() {
@@ -33,7 +34,12 @@ function anythingElseFailsLoudlyBecauseTrustingTooMuchIsDangerous() {
 
 // What the number actually does, against a real Express server that receives a request whose
 // forwarding header already holds a forged address plus the one a trusted proxy appended.
-async function clientAddressSeenBy(hops: string | undefined): Promise<string> {
+const FORGED_AND_APPENDED = "6.6.6.6, 203.0.113.9";
+
+async function clientAddressSeenBy(
+  hops: string | undefined,
+  forwardedFor: string = FORGED_AND_APPENDED,
+): Promise<string> {
   const app = express();
   app.set("trust proxy", parseTrustProxyHops(hops));
   app.get("/ip", (req, res) => void res.send(req.ip));
@@ -44,7 +50,7 @@ async function clientAddressSeenBy(hops: string | undefined): Promise<string> {
     return await new Promise<string>((resolve, reject) => {
       http
         .get(
-          { port, host: "127.0.0.1", path: "/ip", headers: { "X-Forwarded-For": "6.6.6.6, 203.0.113.9" } },
+          { port, host: "127.0.0.1", path: "/ip", headers: { "X-Forwarded-For": forwardedFor } },
           (res) => {
             let body = "";
             res.on("data", (chunk) => (body += chunk));
@@ -84,7 +90,38 @@ function theForwardingHeaderIsLoggedSafely() {
   assert.equal(forwardingHeaderForLog("9".repeat(5000))!.length, 200, "length is capped");
 }
 
+// The chain Render's logs showed on 2026-10-31 (the app's own peer was a local proxy): the client,
+// then a Cloudflare edge address, then a Render-internal address. Three trusted hops reach the
+// client; two would report Cloudflare's address for every user, and four would believe an entry
+// the caller wrote.
+const RENDER_CHAIN = "41.210.145.140, 172.70.250.154, 10.30.225.224";
+
+async function threeHopsFindTheRealClientBehindRenderAndCloudflare() {
+  assert.equal(await clientAddressSeenBy("3", RENDER_CHAIN), "41.210.145.140");
+  assert.equal(
+    await clientAddressSeenBy("3", `6.6.6.6, ${RENDER_CHAIN}`),
+    "41.210.145.140",
+    "an address the caller put at the front of the header is ignored",
+  );
+  assert.equal(await clientAddressSeenBy("2", RENDER_CHAIN), "172.70.250.154", "two hops sees Cloudflare, not the user");
+  assert.equal(
+    await clientAddressSeenBy("4", `6.6.6.6, ${RENDER_CHAIN}`),
+    "6.6.6.6",
+    "four hops would believe the forged entry",
+  );
+}
+
+function aProductionServerWithoutTheSettingIsToldSo() {
+  assert.match(trustProxyWarning({ NODE_ENV: "production" }) ?? "", /TRUST_PROXY_HOPS/);
+  assert.match(trustProxyWarning({ NODE_ENV: "production", TRUST_PROXY_HOPS: "0" }) ?? "", /TRUST_PROXY_HOPS/);
+  assert.equal(trustProxyWarning({ NODE_ENV: "production", TRUST_PROXY_HOPS: "3" }), undefined);
+  assert.equal(trustProxyWarning({ NODE_ENV: "development" }), undefined);
+  assert.equal(trustProxyWarning({}), undefined);
+}
+
 async function main() {
+  aProductionServerWithoutTheSettingIsToldSo();
+  await threeHopsFindTheRealClientBehindRenderAndCloudflare();
   theForwardingHeaderIsLoggedSafely();
   unsetMeansOffSoNothingIsTrustedByDefault();
   aWholeNumberOfHopsIsAccepted();

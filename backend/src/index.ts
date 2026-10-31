@@ -37,7 +37,7 @@ import {
   performanceMiddleware 
 } from './middleware/logging';
 import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
-import { parseTrustProxyHops } from './config/trustProxy';
+import { parseTrustProxyHops, trustProxyWarning } from './config/trustProxy';
 import { addressFromRequest } from './auth/clientAddress';
 import { createForwardingDiagnostic } from './middleware/forwardingDiagnostic';
 
@@ -61,6 +61,8 @@ const startServer = async (): Promise<any> => {
     const app: Application = express();
     // Must run before any middleware that reads req.ip (rate limiters, logging, audit).
     app.set('trust proxy', parseTrustProxyHops(process.env.TRUST_PROXY_HOPS));
+    const proxyWarning = trustProxyWarning(process.env);
+    if (proxyWarning) process.stderr.write(`${proxyWarning}\n`);
     app.use(createForwardingDiagnostic(process.env.FORWARDING_DIAGNOSTIC));
     const isDev = process.env.NODE_ENV !== 'production';
 

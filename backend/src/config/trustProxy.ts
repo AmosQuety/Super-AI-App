@@ -19,3 +19,13 @@ export function parseTrustProxyHops(raw: string | undefined): number | false {
   }
   return hops;
 }
+
+// A production server that trusts no proxy sees every caller as the proxy in front of it, so the
+// per-address limits (sign-in, face sign-in, the request limiters) would treat all users as one.
+// Returned as text for the caller to print, because the application logger keeps almost nothing in
+// production.
+export function trustProxyWarning(env: Record<string, string | undefined>): string | undefined {
+  if (env.NODE_ENV !== "production") return undefined;
+  if (parseTrustProxyHops(env.TRUST_PROXY_HOPS) !== false) return undefined;
+  return "WARNING: TRUST_PROXY_HOPS is not set. Behind a reverse proxy every caller looks like the proxy, so per-address limits count all users together. Set it to the number of proxies in front of this server.";
+}
