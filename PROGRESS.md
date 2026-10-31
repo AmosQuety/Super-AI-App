@@ -3,16 +3,18 @@
 Last updated: 2026-10-31 (late)
 
 ## Now
-Security hardening for slice 6 is deployed and verified on Render (proxy count 3, working GraphQL limiter). Production logging is improved in code (warnings and errors now print as JSON on standard output) and a log reader script exists, both committed locally and not yet deployed. Waiting on the developer to create a Render API key so logs can be read from here.
+Security hardening, proxy count, working limiter and production logging are live on Render. The Render log reader works with the developer's API key (`backend/scripts/render-logs.sh`). A fix for a repeating warning (`9f7ec23`) is committed locally and not yet deployed. First live read of the logs found three things to act on (below).
 
 ## Next
-1. Developer: push and merge the branch so Render deploys the logger change; check Render's Logs page afterwards: startup should show two `[push] VAPID not configured` warnings (once per push service) and any later warnings or errors as JSON lines.
-2. Developer: create a Render API key (Account Settings, API Keys) and save it without it appearing anywhere else: `mkdir -p ~/.config/render && ( read -rsp 'Render API key: ' KEY && printf '%s' "$KEY" > ~/.config/render/api-key ) && chmod 600 ~/.config/render/api-key`. Then `backend/scripts/render-logs.sh services` should list the services, and `backend/scripts/render-logs.sh logs --minutes 30 --level warn` reads logs. Render limits log requests to 30 per minute.
-3. Developer: check Render's Environment tab: if `{"diagnostic":"forwarding-headers",...}` lines appear for requests after 17:40 UTC, `FORWARDING_DIAGNOSTIC` is still set; remove it (keep `TRUST_PROXY_HOPS=3`).
-4. Developer: decide the shared-address risk of the limiter (see Open questions).
-5. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
+1. Developer: set `WEBHOOK_SECRET` in Render's Environment tab (16 or more random characters, for example from `openssl rand -hex 24` run in your own terminal). Startup logs `WEBHOOK_SECRET is missing or shorter than 16 characters; voice-engine callbacks will be rejected`; voice jobs then fall back to polling. The callback URL given to the engine is built from this value per job, so no engine change is needed.
+2. Developer: find the stale client. In 25 minutes the live logs showed 44 pairs of `[context] invalid or expired token` plus `[UNAUTHENTICATED] You must be logged in to view tasks` for `myTasks`: one or more clients keep polling with a dead session (every password-session or sign-out-others change invalidates old tokens; the Vercel web app may not have the "expired session goes to login" fix deployed, or an old tab or phone is still open). Closing stale tabs, signing in again, or deploying the web fix should stop it.
+3. Developer: decide the logging policy for expected client errors: `formatError` in `backend/src/index.ts` logs every GraphQL error at error level and sends it to Sentry, including expected ones (UNAUTHENTICATED, BAD_USER_INPUT). Proposal: log those at info (hidden in production) and count them as a metric instead, keeping real errors loud. Not changed.
+4. Developer: push and merge so Render deploys `9f7ec23` (the VAPID warning was 104 of 177 production log lines in 25 minutes; after the fix it appears once per start).
+5. Developer: decide the shared-address risk of the limiter (see Open questions).
+6. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
 
 ## Done recently
+- 2026-10-31: first live read of Render's logs through the script (API key works; `render-logs.sh services` and `logs` verified live). Findings: VAPID warning logged every request (my earlier claim that it was startup-only was wrong; fixed to once per process), `WEBHOOK_SECRET` not set in Render, a stale client polling `myTasks` with a dead token. The script's `--level warn` now maps to Render's label `warning`.
 - 2026-10-31: production logging (warnings and errors to standard output as JSON) and the Render log reader script, with tests; the full backend suites pass.
 - 2026-10-31: verified the GraphQL limiter fix live after the 17:39 deploy of `9e3c959`: remaining allowance counts down per client (85, 84, 83); before it stayed at 99 for every request.
 - 2026-10-31: confirmed on Render after setting `TRUST_PROXY_HOPS=3`: visitors now appear with their real addresses (`41.210.145.140`, `35.197.96.157`), Render's internal checks (`10.216.x.x`) are unaffected. Render deploys `master` and builds with `prisma db push`.
@@ -38,6 +40,7 @@ Security hardening for slice 6 is deployed and verified on Render (proxy count 3
 - Until `TRUST_PROXY_HOPS` is set, face sign-in is one shared bucket of 10 per 15 minutes that any stranger can use up (password sign-in is unaffected). Accepted for that period.
 
 ## Context to remember
+- The Render API key is account-wide: it can see every service in the workspace (Random-Room, PyCodeCommenter-Backend, AuthHub, Drug-Site, Super-AI-App, RefugeLink), not only this one, and Render keys cannot be limited to one service. It lives in `~/.config/render/api-key` (mode 600); revoke it in Render (Account Settings, API Keys) when it is no longer needed.
 - Plan and full history: `mobile-web-parity-implementation_plan.md` (START HERE, sections 8.12 and 8.13, including the three review rounds).
 - Render plan: Free, exactly 1 instance. The in-memory attempt counters (`backend/src/auth/passwordAttempts.ts`) need no Redis, but reset on every deploy and whenever the free service spins down after idle time, so a lockout can quietly end.
 - Production logging: the application logger keeps only errors, in files lost on Render, and the console is silenced, so normal request logs do not appear in Render's Logs page. Only `process.stdout` writes (such as the forwarding diagnostic) and uncaught errors do.
