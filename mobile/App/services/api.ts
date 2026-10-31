@@ -6,6 +6,7 @@ import type { OperationVariables } from '@apollo/client';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { Config } from '../libs/config';
 import { AuthCredentials, AuthResponse, Chat, User } from '../libs/types';
+import { replaceTokenIfSessionUnchanged, TokenStore, TokenSwapResult } from '../libs/token-swap';
 import { storageService } from './storage';
 import { apolloClient } from '../libs/apollo-client';
 import {
@@ -20,6 +21,11 @@ import {
   FACE_SERVICE_STATUS,
   LOGIN_WITH_FACE,
 } from './graphql/operations';
+
+const authTokenStore: TokenStore = {
+  get: () => storageService.getAuthToken(),
+  set: (token) => storageService.replaceAuthToken(token),
+};
 
 interface ChangePasswordResult {
   success: boolean;
@@ -232,6 +238,7 @@ class ApiService {
     currentPassword: string,
     newPassword: string
   ): Promise<ChangePasswordResult> {
+    const tokenBefore = await storageService.getAuthToken();
     const data = await this.executeMutation<{ changePassword: ChangePasswordResult }>(
       CHANGE_PASSWORD_MUTATION,
       { currentPassword, newPassword }
@@ -242,33 +249,37 @@ class ApiService {
     // The token in use was just revoked by the server, so swap in the fresh one before
     // anything else makes a request.
     if (data.changePassword.success && data.changePassword.token) {
-      try {
-        await storageService.setAuthToken(data.changePassword.token);
-      } catch (error) {
-        // The password did change, so this is not a failed change. The old token is dead, so the
-        // next request sends the user to Sign In, where the new password works.
-        console.warn('Could not store the new session after a password change:', error);
+      const swap = await replaceTokenIfSessionUnchanged(
+        tokenBefore,
+        data.changePassword.token,
+        authTokenStore
+      );
+      // The password did change, so this is not a failed change. The old token is dead, so the
+      // next request sends the user to Sign In, where the new password works.
+      if (swap === 'storage_failed') {
+        console.warn('Could not store the new session after a password change.');
       }
     }
     return data.changePassword;
   }
 
   // Ends every session except this one. The token in use was just revoked by the server, so the
-  // fresh one it returns must be stored before anything else makes a request.
-  async signOutOtherSessions(): Promise<void> {
+  // fresh one it returns must be stored before anything else makes a request. The result says
+  // whether this device kept its session: 'session_changed' means the user signed out while the
+  // request ran, so nothing is stored and they stay signed out.
+  async signOutOtherSessions(): Promise<TokenSwapResult> {
+    const tokenBefore = await storageService.getAuthToken();
     const data = await this.executeMutation<{
       signOutOtherSessions: { success: boolean; message: string; token: string };
     }>(SIGN_OUT_OTHER_SESSIONS_MUTATION);
     if (!data.signOutOtherSessions?.token) {
       throw new Error('Invalid sign out response');
     }
-    try {
-      await storageService.setAuthToken(data.signOutOtherSessions.token);
-    } catch (error) {
-      // The other sessions did end, so this is not a failure. The old token is dead, so the next
-      // request sends the user to Sign In.
-      console.warn('Could not store the new session after signing out other devices:', error);
-    }
+    return replaceTokenIfSessionUnchanged(
+      tokenBefore,
+      data.signOutOtherSessions.token,
+      authTokenStore
+    );
   }
 
   // Chat Operations

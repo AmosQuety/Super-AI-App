@@ -14,7 +14,7 @@ import { PROFILE_DETAILS } from '../../services/graphql/operations';
 
 export default function ProfileScreen() {
   const { user, signOut, signOutOtherSessions, isLoading } = useAuth();
-  const { showSuccess } = useToast();
+  const { showSuccess, showInfo } = useToast();
   const showSaveFailure = useSaveFailureToast();
   const [isEndingSessions, setIsEndingSessions] = useState(false);
   const isEndingSessionsRef = useRef(false);
@@ -35,8 +35,14 @@ export default function ProfileScreen() {
     isEndingSessionsRef.current = true;
     setIsEndingSessions(true);
     try {
-      await signOutOtherSessions();
-      showSuccess('Other devices signed out', 'You stay signed in on this device.');
+      const outcome = await signOutOtherSessions();
+      if (outcome === 'stored') {
+        showSuccess('Other devices signed out', 'You stay signed in on this device.');
+      } else if (outcome === 'storage_failed') {
+        // The other devices were signed out, but this one could not keep its new session.
+        showInfo('Other devices signed out', 'Please sign in again on this device.');
+      }
+      // 'session_changed': the user signed out while this ran, so there is nothing to confirm.
     } catch (error) {
       showSaveFailure('Could not sign out other devices', error);
     } finally {
@@ -134,7 +140,13 @@ export default function ProfileScreen() {
             disabled={isEndingSessions}
             onPress={endOtherSessions}
           />
-          <Button title="Sign Out" variant="outline" className="mt-3" onPress={signOut} />
+          <Button
+            title="Sign Out"
+            variant="outline"
+            className="mt-3"
+            disabled={isEndingSessions}
+            onPress={signOut}
+          />
         </Card>
       </ScrollView>
     </SafeAreaView>

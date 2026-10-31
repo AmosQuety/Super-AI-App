@@ -59,6 +59,12 @@ class StorageService {
     await this.setItem(Config.STORAGE_KEYS.AUTH_TOKEN, token);
   }
 
+  // Unlike setAuthToken, a failed write is reported to the caller: a fresh token that could not
+  // be saved must not be presented as a success.
+  async replaceAuthToken(token: string): Promise<void> {
+    await SecureStore.setItemAsync(Config.STORAGE_KEYS.AUTH_TOKEN, token);
+  }
+
   async getAuthToken(): Promise<string | null> {
     return await this.getItem(Config.STORAGE_KEYS.AUTH_TOKEN);
   }
