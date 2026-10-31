@@ -11,7 +11,10 @@ import { logger } from "../../utils/logger";
 import { assertPasswordWithinByteLimit } from "../../auth/passwordPolicy";
 import { closeUserSockets } from "../../auth/socketRegistry";
 import { recordAccountEvent } from "../../auth/accountAudit";
-import { recordWrongPassword, signInKey, verifyCurrentPassword } from "../../auth/currentPassword";
+import { verifyCurrentPassword } from "../../auth/currentPassword";
+import { MAX_EMAIL_LENGTH, markSignInSucceeded, reserveSignIn } from "../../auth/signInAttempts";
+import { recordSignInFailure } from "../../auth/signInFailure";
+import { countSecurityEvent } from "../../utils/securityMetrics";
 import { clearFailedAttempts, reserveAttempt } from "../../auth/passwordAttempts";
 
 const voiceCloningService = new VoiceCloningService();
@@ -228,10 +231,17 @@ export const authResolvers = {
         throw new UserInputError("Email and password are required");
       }
 
+      // No real address is this long. Refusing it here keeps oversized text out of the attempt
+      // table; it is not a guess at any account, so it is not counted.
+      if (email.length > MAX_EMAIL_LENGTH) {
+        throw new AuthenticationError("Invalid email or password");
+      }
+
       // Every email, real or not, is limited the same way, so the lockout reveals nothing about
       // which accounts exist. The attempt is reserved before the password is compared.
-      const attempt = reserveAttempt(signInKey(email));
+      const attempt = reserveSignIn(email, context.req?.ip);
       if (!attempt.allowed) {
+        countSecurityEvent("auth.sign_in.locked", { scope: attempt.scope });
         const minutes = Math.ceil(attempt.retryAfterMs / 60_000);
         throw new UserInputError(`Too many sign-in attempts. Try again in ${minutes} minutes.`);
       }
@@ -247,11 +257,15 @@ export const authResolvers = {
       // A disabled account gets the same generic failure, after the password check so timing is unchanged.
       if (!user || !user.password || !isValidPassword || !user.isActive) {
         // Not awaited: an audit write only for real accounts would make them slower to refuse.
-        if (user) void recordWrongPassword(context, user, "login", attempt.isLastAllowed);
+        void recordSignInFailure(context, user, {
+          passwordWasRight: Boolean(user?.password) && isValidPassword,
+          isActive: Boolean(user?.isActive),
+          reachedLimit: attempt.reachedLimit,
+        });
         throw new AuthenticationError("Invalid email or password");
       }
 
-      clearFailedAttempts(signInKey(email));
+      markSignInSucceeded(email, context.req?.ip);
 
       const token = SecurityConfig.generateToken(user);
 

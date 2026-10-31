@@ -2,7 +2,9 @@ import { logger } from "../utils/logger";
 
 // A subscription is authenticated once, when it starts. To honour "changing the password ends
 // every other session" the open WebSocket connections of a user are remembered here and closed
-// when the password changes; clients reconnect with their (new) stored token.
+// when the password changes or other sessions are ended; clients reconnect with the token they hold
+// by then. A device that stays signed in (the one that made the change) gets a new token; the
+// others find theirs refused and sign out.
 //
 // In memory, so it covers only this server process. With several instances behind a load
 // balancer, the close request would have to be shared between them (for example over Redis).
@@ -12,8 +14,10 @@ interface ClosableSocket {
   once(event: "close", listener: () => void): unknown;
 }
 
-// graphql-ws reserves the 4xxx range for applications; 4401 is its "unauthorized" convention.
-export const SESSION_ENDED_CLOSE_CODE = 4401;
+// graphql-ws reserves the 4xxx range for applications. 4401 ("unauthorized") would be treated as
+// fatal by its client, so the device that stays signed in could never resubscribe. 4499 is a code
+// the client retries with its current token.
+export const SESSION_ENDED_CLOSE_CODE = 4499;
 
 const socketsByUser = new Map<string, Set<ClosableSocket>>();
 

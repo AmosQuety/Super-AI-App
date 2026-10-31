@@ -24,8 +24,8 @@ function closesOnlyTheSocketsOfThatUser() {
 
   closeUserSockets("user_1");
 
-  assert.deepEqual(mine.closed, { code: 4401, reason: "Session ended" });
-  assert.equal(mineToo.closed?.code, 4401);
+  assert.deepEqual(mine.closed, { code: 4499, reason: "Session ended" });
+  assert.equal(mineToo.closed?.code, 4499);
   assert.equal(theirs.closed, null);
   closeUserSockets("user_2");
 }
@@ -59,7 +59,7 @@ function aSocketThatFailsToCloseDoesNotStopTheOthers() {
   trackUserSocket("user_5", broken);
   trackUserSocket("user_5", healthy);
   closeUserSockets("user_5");
-  assert.equal(healthy.closed?.code, 4401);
+  assert.equal(healthy.closed?.code, 4499);
 }
 
 function closingForAUserWithNoSocketsIsHarmless() {

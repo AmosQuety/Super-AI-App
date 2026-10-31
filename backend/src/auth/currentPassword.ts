@@ -4,11 +4,9 @@ import { AppContext } from "../resolvers/types/context";
 import { recordAccountEvent } from "./accountAudit";
 import { clearFailedAttempts, reserveAttempt } from "./passwordAttempts";
 
-// Counters for "current password" checks and for sign-in are kept apart, so locking one never
-// blocks the other.
+// Counters for "current password" checks and for sign-in (see signInAttempts.ts) are kept apart,
+// so locking one never blocks the other.
 export const passwordCheckKey = (userId: string) => `password:${userId}`;
-export const signInKey = (email: string) =>
-  `login:${email.toLowerCase().trim()}`;
 
 export type PasswordCheckedAction =
   "change_email" | "change_password" | "login";
@@ -47,13 +45,13 @@ export async function verifyCurrentPassword(
 // Never put the typed password in here: only the action is recorded.
 export async function recordWrongPassword(
   context: AppContext,
-  account: { id: string; email: string },
+  account: { id: string; email: string } | null,
   action: PasswordCheckedAction,
   reachedLimit: boolean,
 ): Promise<void> {
-  await recordAccountEvent(context, account, "PASSWORD_CHECK_FAILED", {
-    action,
-  });
+  // With no account the row says so, and holds neither the typed email nor the typed password.
+  const details = account ? { action } : { action, knownAccount: false };
+  await recordAccountEvent(context, account, "PASSWORD_CHECK_FAILED", details);
   if (reachedLimit) {
     await recordAccountEvent(context, account, "PASSWORD_CHECK_LOCKED", {
       action,

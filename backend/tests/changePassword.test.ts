@@ -122,7 +122,7 @@ async function aChangeEndsTheUsersOpenSubscriptionsButNotAnotherUsers() {
   trackUserSocket("user_1", mine as any);
   trackUserSocket("user_2", theirs as any);
   await run({ c: CURRENT, n: "brand-new-password" }, { user: signedIn, storedUser: true });
-  assert.equal(mine.closedWith, 4401);
+  assert.equal(mine.closedWith, 4499);
   assert.equal(theirs.closedWith, null);
   closeUserSockets("user_2");
 }

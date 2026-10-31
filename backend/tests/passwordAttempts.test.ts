@@ -9,6 +9,7 @@ import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_WINDOW_MS,
   reserveAttempt,
+  refundAttempt,
   MAX_TRACKED_KEYS,
   trackedKeyCount,
   clearFailedAttempts,
@@ -262,7 +263,96 @@ function theTableOfTrackedKeysStaysBounded() {
   assert.ok(!reserveAttempt("login:real@example.test", 1_000_002).allowed);
 }
 
+function aLockSurvivesAFloodOfOtherKeys() {
+  resetAllFailedAttempts();
+  const t0 = 1_000_000;
+  for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++)
+    reserveAttempt("login:victim@example.test", t0);
+  assert.ok(!reserveAttempt("login:victim@example.test", t0 + 1).allowed);
+
+  // The flood arrives AFTER the lock, which is the order an attacker would use.
+  for (let i = 0; i < MAX_TRACKED_KEYS + 500; i++)
+    reserveAttempt(`login:junk-${i}@example.test`, t0 + 2);
+
+  assert.ok(
+    !reserveAttempt("login:victim@example.test", t0 + 3).allowed,
+    "a live lock is never evicted to make room",
+  );
+  assert.ok(trackedKeyCount() <= MAX_TRACKED_KEYS + 1);
+}
+
+function aFloodOfSignInKeysNeverTouchesPasswordKeys() {
+  resetAllFailedAttempts();
+  const t0 = 1_000_000;
+  for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++)
+    reserveAttempt("password:user_1", t0);
+  for (let i = 0; i < MAX_TRACKED_KEYS * 2; i++)
+    reserveAttempt(`login:junk-${i}@example.test`, t0 + 1);
+  assert.ok(
+    !reserveAttempt("password:user_1", t0 + 2).allowed,
+    "current-password locks live in their own table",
+  );
+}
+
+function whenOnlyLocksRemainTheOneClosestToExpiryGoesFirst() {
+  resetAllFailedAttempts();
+  const t0 = 1_000_000;
+  for (let i = 0; i < MAX_TRACKED_KEYS; i++) {
+    for (let n = 0; n < MAX_FAILED_ATTEMPTS; n++)
+      reserveAttempt(`login:locked-${i}`, t0 + i);
+  }
+  // Table is full of locks; one more key must still be tracked.
+  reserveAttempt("login:newcomer", t0 + MAX_TRACKED_KEYS + 1);
+  assert.ok(trackedKeyCount() <= MAX_TRACKED_KEYS);
+  assert.ok(
+    reserveAttempt("login:locked-1", t0 + MAX_TRACKED_KEYS + 2).allowed ===
+      false,
+    "a later lock is kept while the earliest-expiring one is dropped",
+  );
+  assert.ok(
+    reserveAttempt("login:locked-0", t0 + MAX_TRACKED_KEYS + 3).allowed,
+    "the lock closest to expiry was the one dropped",
+  );
+}
+
+function aFloodOfJunkKeysKeepsTheWindowsWithMostProgress() {
+  resetAllFailedAttempts();
+  const t0 = 1_000_000;
+  for (let i = 0; i < 15; i++) reserveAttempt("loginEmail:owner@x.test", t0, 20);
+  for (let i = 0; i < MAX_TRACKED_KEYS + 500; i++)
+    reserveAttempt(`loginEmail:junk-${i}@x.test`, t0 + 1, 20);
+  for (let i = 0; i < 5; i++)
+    assert.ok(reserveAttempt("loginEmail:owner@x.test", t0 + 2, 20).allowed);
+  assert.ok(
+    !reserveAttempt("loginEmail:owner@x.test", t0 + 3, 20).allowed,
+    "15 earlier + 5 more = the limit of 20; the flood did not reset the count",
+  );
+}
+
+function aCustomLimitAndARefundAreHonoured() {
+  resetAllFailedAttempts();
+  for (let i = 0; i < 20; i++)
+    assert.ok(reserveAttempt("loginEmail:a@x.test", 1_000, 20).allowed);
+  assert.ok(!reserveAttempt("loginEmail:a@x.test", 1_001, 20).allowed);
+
+  resetAllFailedAttempts();
+  for (let i = 0; i < 3; i++) reserveAttempt("loginEmail:b@x.test", 1_000, 20);
+  refundAttempt("loginEmail:b@x.test");
+  refundAttempt("loginEmail:never-seen");
+  for (let i = 0; i < 18; i++)
+    assert.ok(reserveAttempt("loginEmail:b@x.test", 1_001, 20).allowed);
+  assert.ok(
+    !reserveAttempt("loginEmail:b@x.test", 1_002, 20).allowed,
+    "3 reserved, 1 refunded, 18 more = 20 used",
+  );
+}
+
 async function main() {
+  aLockSurvivesAFloodOfOtherKeys();
+  aFloodOfSignInKeysNeverTouchesPasswordKeys();
+  whenOnlyLocksRemainTheOneClosestToExpiryGoesFirst();
+  aCustomLimitAndARefundAreHonoured();
+  aFloodOfJunkKeysKeepsTheWindowsWithMostProgress();
   theTableOfTrackedKeysStaysBounded();
   await parallelGuessesAreCappedAtTheLimit();
   await anEmptyPasswordIsNotAGuessInEitherMutation();

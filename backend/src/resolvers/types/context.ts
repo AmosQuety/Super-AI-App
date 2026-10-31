@@ -92,6 +92,17 @@ export const accountLookupFor =
 
 const lookupStoredAccount = accountLookupFor(prisma);
 
+// A WebSocket operation has no Express request, but the limits and the audit trail need to know
+// who is calling. The socket's address is the same address an HTTP request would report when no
+// proxy is trusted. Behind a trusted proxy this would need the forwarded address instead.
+function clientInfoFromConnection(connection: any): any {
+  const request = connection?.extra?.request;
+  return {
+    ip: request?.socket?.remoteAddress,
+    headers: request?.headers ?? {},
+  };
+}
+
 export async function createContext({
   req,
   connection,
@@ -120,7 +131,7 @@ export async function createContext({
   return {
     prisma,
     user,
-    req,
+    req: req ?? clientInfoFromConnection(connection),
     res: req?.res,
     ...singletonServices,
     ...requestServices,
