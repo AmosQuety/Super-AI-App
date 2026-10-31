@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  TouchableOpacityProps
-} from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { cn } from '../../libs/utils';
 
 interface ButtonProps extends TouchableOpacityProps {
@@ -13,10 +8,10 @@ interface ButtonProps extends TouchableOpacityProps {
   loading?: boolean;
 }
 
-export const Button = React.forwardRef<TouchableOpacity, ButtonProps>(
+export const Button = React.forwardRef<React.ElementRef<typeof TouchableOpacity>, ButtonProps>(
   ({ title, variant = 'default', loading, className, disabled, ...props }, ref) => {
     const baseClasses = 'px-4 py-3 rounded-lg flex-row items-center justify-center';
-    
+
     const variantClasses = {
       default: 'bg-blue-500 active:bg-blue-600',
       destructive: 'bg-red-500 active:bg-red-600',
@@ -32,25 +27,17 @@ export const Button = React.forwardRef<TouchableOpacity, ButtonProps>(
     return (
       <TouchableOpacity
         ref={ref}
-        className={cn(
-          baseClasses,
-          variantClasses[variant],
-          disabled && 'opacity-50',
-          className
-        )}
+        className={cn(baseClasses, variantClasses[variant], disabled && 'opacity-50', className)}
         disabled={disabled || loading}
-        {...props}
-      >
+        {...props}>
         {loading && (
-          <ActivityIndicator 
-            size="small" 
-            color={variant === 'outline' ? '#374151' : '#ffffff'} 
-            className="mr-2" 
+          <ActivityIndicator
+            size="small"
+            color={variant === 'outline' ? '#374151' : '#ffffff'}
+            className="mr-2"
           />
         )}
-        <Text className={cn('font-semibold text-base', textClasses[variant])}>
-          {title}
-        </Text>
+        <Text className={cn('text-base font-semibold', textClasses[variant])}>{title}</Text>
       </TouchableOpacity>
     );
   }

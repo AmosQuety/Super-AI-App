@@ -19,6 +19,8 @@ model User {
   preferences String?  // JSON: tone, techDepth, role, domain, goals, language, responseFormat
   lastLoginAt DateTime?
   isActive  Boolean           @default(true)
+  // Raised by "sign out other sessions"; tokens carry the value they were issued under.
+  sessionVersion Int          @default(0)
   chats     Chat[]
   tasks     Task[]
   pushSubscriptions PushSubscription[]

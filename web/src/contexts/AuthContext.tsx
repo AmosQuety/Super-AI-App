@@ -6,6 +6,7 @@ import type { SignInFormData, SignUpFormData } from '../types/auth';
 import { LOGIN_WITH_FACE, LOGIN_WITH_VOICE } from '../graphql/users';
 import client from '../lib/apolloClient';
 import { logger } from '../utils/logger';
+import { isPublicRoute, isSessionExpired, loginRedirectUrl, msUntilExpiry } from '../utils/session';
 
 interface User {
   id: string;
@@ -21,6 +22,7 @@ interface AuthContextType {
   signIn: (data: SignInFormData) => Promise<void>;
   signUp: (data: SignUpFormData) => Promise<void>;
   signOut: () => Promise<void>;
+  updateSessionToken: (token: string) => void;
   loginWithFace: (file: File) => Promise<string>;
   loginWithVoice: (email: string, challengeCode: string, audio: File) => Promise<string>;
 }
@@ -43,6 +45,14 @@ interface LoginWithVoiceResult {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// setTimeout cannot wait longer than this (about 24.8 days).
+const MAX_TIMER_MS = 2_147_483_647;
+
+function clearStoredSession() {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('userData');
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -62,7 +72,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const storedToken = localStorage.getItem('authToken');
     const userData = localStorage.getItem('userData');
 
-    if (storedToken && userData) {
+    if (storedToken && isSessionExpired(storedToken)) {
+      // Do not restore a session the server will refuse; the guards then send the user to login.
+      logger.info('Saved session has expired; clearing it.');
+      clearStoredSession();
+    } else if (storedToken && userData) {
       try {
         setToken(storedToken);
         setUser(JSON.parse(userData) as User);
@@ -77,6 +91,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(false);
   }, []);
+
+  // End the session when the token expires while the app is open, including after
+  // a laptop sleep or a long-idle tab (timers pause, so re-check when the tab returns).
+  useEffect(() => {
+    if (!token) return;
+
+    const endSession = () => {
+      logger.info('Session expired; signing out.');
+      clearStoredSession();
+      void client.clearStore();
+      setToken(null);
+      setUser(null);
+
+      const { pathname, search } = window.location;
+      if (!isPublicRoute(pathname)) {
+        window.location.replace(loginRedirectUrl(pathname, search));
+      }
+    };
+    const endSessionIfExpired = () => {
+      if (isSessionExpired(token)) endSession();
+    };
+    const endSessionWhenTabReturns = () => {
+      if (document.visibilityState === 'visible') endSessionIfExpired();
+    };
+
+    const timer = window.setTimeout(endSessionIfExpired, Math.min(msUntilExpiry(token), MAX_TIMER_MS));
+    document.addEventListener('visibilitychange', endSessionWhenTabReturns);
+    window.addEventListener('focus', endSessionIfExpired);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', endSessionWhenTabReturns);
+      window.removeEventListener('focus', endSessionIfExpired);
+    };
+  }, [token]);
 
   const signIn = async (data: SignInFormData) => {
     try {
@@ -188,6 +237,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // A password change makes the server revoke the old token and return a new one. Keep the
+  // stored copy and the expiry timer (which follows `token`) in step with it.
+  const updateSessionToken = (newToken: string) => {
+    localStorage.setItem('authToken', newToken);
+    setToken(newToken);
+  };
+
   const signOut = async () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
@@ -289,6 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signUp,
     signOut,
+    updateSessionToken,
     loginWithFace,
     loginWithVoice,
   };

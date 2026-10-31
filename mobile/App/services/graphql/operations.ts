@@ -1,4 +1,3 @@
-// Update your operations file
 import { gql } from '@apollo/client';
 
 export const LOGIN_MUTATION = gql`
@@ -75,6 +74,26 @@ export const UPDATE_PROFILE_MUTATION = gql`
   }
 `;
 
+export const CHANGE_PASSWORD_MUTATION = gql`
+  mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+    changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
+      success
+      message
+      token
+    }
+  }
+`;
+
+export const SIGN_OUT_OTHER_SESSIONS_MUTATION = gql`
+  mutation SignOutOtherSessions {
+    signOutOtherSessions {
+      success
+      message
+      token
+    }
+  }
+`;
+
 export const GET_CHATS = gql`
   query GetChats($userId: ID!) {
     chats(userId: $userId) {
@@ -83,17 +102,16 @@ export const GET_CHATS = gql`
       userId
       createdAt
       updatedAt
-      messages {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
+    }
+  }
+`;
+
+export const RECENT_CHATS = gql`
+  query RecentChats($userId: ID!) {
+    chats(userId: $userId) {
+      id
+      title
+      updatedAt
     }
   }
 `;
@@ -117,78 +135,6 @@ export const CREATE_CHAT = gql`
         createdAt
         updatedAt
       }
-    }
-  }
-`;
-
-// NEW: Add message with file support
-export const SEND_MESSAGE_WITH_RESPONSE = gql`
-  mutation SendMessageWithResponse(
-    $chatId: ID!
-    $content: String!
-    $imageUrl: String
-    $fileName: String
-    $fileUri: String
-    $fileMimeType: String
-  ) {
-    sendMessageWithResponse(
-      chatId: $chatId
-      content: $content
-      imageUrl: $imageUrl
-      fileName: $fileName
-      fileUri: $fileUri
-      fileMimeType: $fileMimeType
-    ) {
-      userMessage {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
-      aiMessage {
-        id
-        role
-        content
-        createdAt
-        updatedAt
-      }
-      usedCustomResponse
-    }
-  }
-`;
-
-// NEW: Chat history with pagination
-export const CHAT_HISTORY = gql`
-  query ChatHistory($chatId: ID!, $limit: Int, $offset: Int) {
-    chatHistory(chatId: $chatId, limit: $limit, offset: $offset) {
-      messages {
-        id
-        role
-        content
-        imageUrl
-        fileName
-        fileUri
-        fileMimeType
-        createdAt
-        updatedAt
-      }
-      hasMore
-    }
-  }
-`;
-
-
-
-export const REMOVE_FACE = gql`
-  mutation RemoveFace {
-    removeFace {
-      success
-      message
     }
   }
 `;
@@ -221,6 +167,102 @@ export const LOGIN_WITH_FACE = gql`
         updatedAt
       }
       message
+    }
+  }
+`;
+
+export const GET_MY_TASKS = gql`
+  query GetMyTasks($limit: Int, $includeArchived: Boolean) {
+    myTasks(limit: $limit, includeArchived: $includeArchived) {
+      id
+      feature
+      status
+      progress
+      metadata
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_AI_IMAGE_STATUS = gql`
+  query GetAIImageStatus {
+    aiImageGenerationStatus {
+      available
+      message
+    }
+  }
+`;
+
+export const GENERATE_AI_IMAGE_VARIANTS = gql`
+  mutation GenerateAIImageVariants($prompt: String!) {
+    generateAIImageVariants(prompt: $prompt) {
+      success
+      images
+      error
+      generationTime
+    }
+  }
+`;
+
+export const GET_TASK = gql`
+  query GetTask($id: ID!) {
+    task(id: $id) {
+      id
+      feature
+      status
+      progress
+      metadata
+    }
+  }
+`;
+
+export const PROCESS_VOICE_TASK = gql`
+  mutation ProcessVoiceTask($input: ProcessVoiceTaskInput!) {
+    processVoiceTask(input: $input) {
+      success
+      result
+      error
+    }
+  }
+`;
+
+export const PROFILE_DETAILS = gql`
+  query ProfileDetails {
+    me {
+      id
+      totalChats
+      totalMessages
+      totalVoiceJobs
+      totalDocuments
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
+    }
+  }
+`;
+
+export const UPDATE_PREFERENCES = gql`
+  mutation UpdatePreferences($preferences: PreferencesInput!) {
+    updatePreferences(preferences: $preferences) {
+      id
+      preferences {
+        tone
+        detail
+        techDepth
+        responseFormat
+        role
+        domain
+        goals
+        language
+      }
     }
   }
 `;

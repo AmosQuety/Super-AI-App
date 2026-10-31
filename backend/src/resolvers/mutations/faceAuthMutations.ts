@@ -6,6 +6,13 @@ import { SecurityConfig } from "../../auth/security";
 import { logger } from "../../utils/logger";
 import { FaceRecognitionService } from "../../services/faceRecognitionService";
 import { createClient } from "@supabase/supabase-js";
+import { recordAccountEvent } from "../../auth/accountAudit";
+import {
+  markFaceLoginSucceeded,
+  releaseFaceLogin,
+  reserveFaceLogin,
+} from "../../auth/faceLoginAttempts";
+import { countSecurityEvent } from "../../utils/securityMetrics";
 
 const faceService = new FaceRecognitionService();
 
@@ -123,21 +130,65 @@ export const faceAuthMutations = {
     context: AppContext
   ) => {
     logger.info("🔐 Face login attempt...");
+
+    // Reserved before any photo is compared, so a burst of parallel tries cannot all start while
+    // the count is still low.
+    const address = context.req?.ip;
+    const turn = reserveFaceLogin(address);
+    if (!turn.allowed) {
+      countSecurityEvent("auth.face_login.locked", {});
+      const minutes = Math.ceil(turn.retryAfterMs / 60_000);
+      return {
+        success: false,
+        token: null,
+        user: null,
+        message: `Too many face sign-in attempts. Try again in ${minutes} minutes, or use your password.`,
+      };
+    }
+
+    // The lock is real only if the attempt that used up the limit also fails; an offline service
+    // or a genuine login hands the attempt back.
+    const failed = (reason: string, message: string) => {
+      countSecurityEvent("auth.face_login.failed", { reason });
+      if (turn.reachedLimit) {
+        void recordAccountEvent(context, null, "FACE_LOGIN_LOCKED", {});
+      }
+      return { success: false, token: null, user: null, message };
+    };
+
     const health = await faceService.checkHealth();
-    if (!health.isOnline) return { success: false, message: "Service offline. Use password." };
+    if (!health.isOnline) {
+      releaseFaceLogin(address);
+      return { success: false, message: "Service offline. Use password." };
+    }
+
+    // An engine that is up but cannot answer (cold, timed out, failing) is not a guess at anyone's
+    // face, so the attempt is handed back and the user is not told their face was wrong.
+    const unavailable = () => {
+      releaseFaceLogin(address);
+      countSecurityEvent("auth.face_login.unavailable", {});
+      return {
+        success: false,
+        token: null,
+        user: null,
+        message: "Face sign-in is temporarily unavailable. Please try again, or use your password.",
+      };
+    };
 
     try {
       // Always verify against "global" for login
       const verification = await faceService.verifyFace("global", "global", image);
+      if ("unavailable" in verification && verification.unavailable) return unavailable();
 
       if (verification.success && verification.matchedUser) {
         const foundUser = await context.prisma.user.findUnique({
           where: { email: verification.matchedUser },       
         });
 
-        if (!foundUser) return { success: false, message: "Account not found." };
-        if (!foundUser.isActive) return { success: false, message: "Account disabled." };
+        if (!foundUser) return failed("account_not_found", "Account not found.");
+        if (!foundUser.isActive) return failed("disabled", "Account disabled.");
 
+        markFaceLoginSucceeded(address);
         const token = SecurityConfig.generateToken(foundUser);
         await context.prisma.user.update({ where: { id: foundUser.id }, data: { lastLoginAt: new Date() } });
 
@@ -149,16 +200,14 @@ export const faceAuthMutations = {
         };
       } 
       
-      return {
-        success: false,
-        token: null,
-        user: null,
-        message: verification.emotion ? `Liveness: ${verification.emotion}` : "Face not recognized.",
-      };
+      return failed(
+        "not_recognized",
+        verification.emotion ? `Liveness: ${verification.emotion}` : "Face not recognized."
+      );
 
     } catch (error: any) {
       logger.error("Login Error:", error.message);
-      return { success: false, message: "Login failed." };
+      return unavailable();
     }
   },
 

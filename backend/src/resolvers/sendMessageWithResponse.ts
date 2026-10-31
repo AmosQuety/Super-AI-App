@@ -1,5 +1,5 @@
 // src/resolvers/sendMessageWithResponse.ts
-import { AuthenticationError, ApolloError } from "apollo-server-express";
+import { AuthenticationError, ApolloError, UserInputError } from "apollo-server-express";
 import { AppContext } from "./types/context";
 import { IntelligentMatcher, createIntelligentMatcher } from "../IntelligentMatcher/IntelligentMatcher";
 import customResponses from "../IntelligentMatcher/customResponses";
@@ -9,6 +9,7 @@ import { CircuitBreaker } from "../IntelligentMatcher/safety/CircuitBreaker";
 import { AIManager } from "../utils/aiManager"; // Import our new Manager
 import { DocumentRetrievalService } from "../services/ai/DocumentRetrievalService";
 import { logger } from "../utils/logger";
+import { invalidateChatHistory } from "../services/chatCache";
 
 const MAX_HISTORY_TURNS = 20; // cap to avoid blowing context window
 
@@ -168,7 +169,8 @@ export const sendMessageWithResponse = {
         select: { name: true, email: true, preferences: true },
       }),
     ]);
-    if (!chat || chat.userId !== userId) throw new AuthenticationError("Unauthorized");
+    // Not UNAUTHENTICATED: clients sign the user out on that code, and the session is fine.
+    if (!chat || chat.userId !== userId) throw new UserInputError("Chat not found");
 
     let task: any = null;
 
@@ -274,6 +276,8 @@ export const sendMessageWithResponse = {
         },
       });
 
+      await invalidateChatHistory(userId, chatId);
+
       await context.taskService.updateProgress(task.id, userId, 35, {
         phase: "user-message-saved",
         chatId,
@@ -341,6 +345,8 @@ export const sendMessageWithResponse = {
       const aiMessage = await context.prisma.message.create({
         data: { chatId, role: "assistant", content: aiResponse },
       });
+
+      await invalidateChatHistory(userId, chatId);
 
       await context.taskService.updateProgress(task.id, userId, 95, {
         phase: "assistant-message-saved",

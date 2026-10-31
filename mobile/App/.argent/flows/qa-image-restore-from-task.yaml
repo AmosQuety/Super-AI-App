@@ -1,0 +1,69 @@
+steps:
+  - echo: "Restart the app signed out. Expect the Sign In screen (baseline). Needs the
+      seeded finished image task, newest in AI tasks: run
+      backend/scripts/seed-local-image-task.ts first"
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered. Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home. Open AI tasks; expect the list with the seeded finished image task
+  - tap:
+      id: home-tasks
+  - await: { visible: { id: task-row, text: "Image task, Done" }, timeout: 15000 }
+  - await: { idle: true }
+  - echo: The finished image task is listed. Open it; expect the AI images screen
+      with its prompt and four images restored
+  - tap:
+      id: task-row
+      text: "Image task, Done"
+  - await: { visible: { id: image-prompt }, timeout: 15000 }
+  - await: { visible: { id: image-result }, timeout: 15000 }
+  - await: { visible: { text: Image 4 of 4 } }
+  - await: { visible: { text: "Seeded sample: four colour squares" } }
+  - await: { idle: true }
+  - echo: Four images restored. Tap the first to enlarge it; expect the enlarged view
+  - tap:
+      text: Image 1 of 4
+  - await: { visible: { text: "Image 1, enlarged" } }
+  - tap:
+      text: Close
+  - await: { hidden: { text: "Image 1, enlarged" } }
+  - await: { idle: true }
+  - echo: Enlarged view closed. Go back twice to Home, then sign out (restores the
+      signed-out baseline)
+  - tap:
+      text: Go back
+  - await: { visible: { id: tasks-list } }
+  - await: { idle: true }
+  - tap:
+      text: Go back
+  - await: { visible: { text: Recent chats } }
+  - await: { idle: true }
+  - tap:
+      id: tab-profile
+  - await: { visible: { text: Sign Out } }
+  - await: { idle: true }
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }

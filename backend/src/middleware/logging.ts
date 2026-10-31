@@ -6,15 +6,38 @@ import crypto from 'crypto';
  * Comprehensive logging middleware for Express
  * Logs all incoming requests and outgoing responses
  */
+// Credentials in a URL (the webhook secret in its path, or a secret/token/key/password
+// query parameter) must never reach the logs.
+export const loggableUrl = (url: string): string =>
+  url
+    .replace(/(\/python\/cb\/)[^/?#]+/gi, '$1[redacted]')
+    .replace(/([?&](?:secret|token|key|password)=)[^&]*/gi, '$1[redacted]');
+
+const SENSITIVE_QUERY_KEY = /secret|token|key|password/i;
+
+export const loggableQuery = (query: Record<string, unknown> | undefined) =>
+  query &&
+  Object.fromEntries(
+    Object.entries(query).map(([name, value]) => [name, SENSITIVE_QUERY_KEY.test(name) ? '[redacted]' : value])
+  );
+
+// Callers write these headers, so what is logged is shortened and cannot contain a line break.
+// Used by the temporary forwarding diagnostic (see forwardingDiagnostic.ts).
+export const forwardingHeaderForLog = (raw: string | string[] | undefined): string | undefined => {
+  if (raw === undefined) return undefined;
+  const text = Array.isArray(raw) ? raw.join(', ') : raw;
+  return text.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 200);
+};
+
 export const loggingMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   
   // Log request details
   const requestLog = {
     method: req.method,
-    url: req.url,
-    path: req.path,
-    query: req.query,
+    url: loggableUrl(req.url),
+    path: loggableUrl(req.path),
+    query: loggableQuery(req.query),
     headers: {
       'user-agent': req.get('User-Agent'),
       'content-type': req.get('Content-Type'),
@@ -49,7 +72,7 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
     const duration = Date.now() - start;
     const responseLog = {
       method: req.method,
-      url: req.url,
+      url: loggableUrl(req.url),
       statusCode: res.statusCode,
       statusMessage: res.statusMessage,
       duration: `${duration}ms`,
@@ -82,7 +105,7 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
   res.on('error', (error) => {
     logger.error('Response Error', {
       method: req.method,
-      url: req.url,
+      url: loggableUrl(req.url),
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
@@ -149,10 +172,10 @@ export const errorLoggingMiddleware = (
     message: error.message,
     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     method: req.method,
-    url: req.url,
+    url: loggableUrl(req.url),
     ip: req.ip,
     body: process.env.NODE_ENV === 'development' ? req.body : undefined,
-    query: process.env.NODE_ENV === 'development' ? req.query : undefined,
+    query: process.env.NODE_ENV === 'development' ? loggableQuery(req.query) : undefined,
     timestamp: new Date().toISOString(),
   };
 
@@ -184,7 +207,7 @@ export const securityLoggingMiddleware = (req: Request, _: Response, next: NextF
   if (Object.values(securityIndicators).some(Boolean)) {
     logger.warn('Security Event Detected', {
       method: req.method,
-      url: req.url,
+      url: loggableUrl(req.url),
       ip: req.ip,
       indicators: securityIndicators,
       userAgent: req.get('User-Agent'),
@@ -219,7 +242,7 @@ function hasXSSIndicators(req: Request): boolean {
 
 function hasPathTraversalIndicators(req: Request): boolean {
   const traversalPatterns = ['../', '..\\', '/etc/passwd', 'C:\\'];
-  const searchString = JSON.stringify({ ...req.query, ...req.body, url: req.url });
+  const searchString = JSON.stringify({ ...req.query, ...req.body, url: loggableUrl(req.url) });
   return traversalPatterns.some(pattern => searchString.includes(pattern));
 }
 
@@ -238,7 +261,7 @@ export const performanceMiddleware = (req: Request, res: Response, next: NextFun
 
     const performanceLog = {
       method: req.method,
-      url: req.url,
+      url: loggableUrl(req.url),
       duration: `${duration.toFixed(2)}ms`,
       memory: {
         rss: `${((endMemory.rss - startMemory.rss) / 1024 / 1024).toFixed(2)}MB`,

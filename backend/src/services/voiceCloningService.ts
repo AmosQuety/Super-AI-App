@@ -1,3 +1,4 @@
+import { webhookCallbackUrl } from '../auth/webhookAuth';
 import axios from 'axios';
 import FormData from 'form-data';
 import http from 'http';
@@ -72,9 +73,7 @@ export class VoiceCloningService {
       formData.append('reference_audio', audioBuffer, { filename, contentType: mimetype });
 
       // Build the webhook URL and pass it to Python
-      const WEBHOOK_BASE_URL = process.env.APP_URL || 'http://localhost:4001';
-      
-      formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
+      formData.append('webhook_url', webhookCallbackUrl());
 
       // Enqueue — returns instantly with a jobId
       const { data: queued } = await aiEngineClient.post(
@@ -127,10 +126,9 @@ export class VoiceCloningService {
       const formData = new FormData();
       formData.append('text', text);
 
-      const WEBHOOK_BASE_URL = process.env.APP_URL || 'http://localhost:4001';
           
       // Python will append the Job ID when it hits this URL
-      formData.append('webhook_url', `${WEBHOOK_BASE_URL}/api/webhooks/python`);
+      formData.append('webhook_url', webhookCallbackUrl());
 
       if (referenceAudio) {
         const { createReadStream, filename, mimetype } = await referenceAudio;

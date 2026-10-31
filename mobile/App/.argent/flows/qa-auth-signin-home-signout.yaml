@@ -1,0 +1,43 @@
+steps:
+  - echo: Restart the app signed out. Expect the Sign In screen (baseline)
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 60000 }
+  - await: { idle: true }
+  - echo: On Sign In. Focus the email field and type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Focus the password field and type the stored secret, then
+      dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Credentials entered, Sign In enabled. Tap Sign In; expect Home with recent
+      chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - await: { visible: { text: "Hello," } }
+  - await: { hidden: { text: Welcome Back } }
+  - echo: On Home, signed in. Open the Profile tab through its test id; expect Sign
+      Out and the test account email
+  - tap:
+      id: tab-profile
+  - await: { visible: { text: Sign Out } }
+  - await: { idle: true }
+  - await: { visible: { text: agent-test@xemora.local } }
+  - echo: On Profile as the test account. Tap Sign Out; expect Sign In again
+      (restores the signed-out baseline)
+  - tap:
+      text: Sign Out
+  - await: { visible: { text: Welcome Back } }
+  - await: { idle: true }
+  - await: { hidden: { text: Sign Out } }

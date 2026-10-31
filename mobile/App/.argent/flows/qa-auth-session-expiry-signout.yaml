@@ -1,0 +1,39 @@
+steps:
+  - echo: Needs the local backend started with JWT_EXPIRES_IN=60s. Restart the app
+      signed out; expect Sign In (baseline)
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - echo: On Sign In. Type the test account email
+  - tap:
+      text: Enter your email
+  - tool: keyboard
+    args:
+      text: agent-test@xemora.local
+  - echo: Email entered. Type the stored password secret and dismiss the keyboard
+  - tap:
+      text: "[password]"
+  - tool: keyboard
+    args:
+      text: "{{secret:XEMORA_TEST_PASSWORD}}"
+  - tool: keyboard
+    args:
+      key: enter
+  - echo: Tap Sign In; expect Home with recent chats
+  - tap:
+      text: Sign In
+  - await: { visible: { text: Recent chats }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: On Home with a 60 second session. Prove Sign In is gone while signed in,
+      so its return below can only come from the expiry
+  - await: { hidden: { text: Welcome Back } }
+  - echo: Do nothing; expect the app to sign out by itself and show Sign In
+  - await: { visible: { text: Welcome Back }, timeout: 90000 }
+  - await: { idle: true }
+  - await: { hidden: { text: Recent chats } }
+  - echo: Session ended by expiry. Restart the app; the expired session must not
+      come back, so expect Sign In and no Home
+  - launch: com.xemora.app
+  - await: { visible: { text: Welcome Back }, timeout: 60000 }
+  - await: { idle: true }
+  - await: { hidden: { text: Recent chats } }

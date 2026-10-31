@@ -1,14 +1,16 @@
 // src/resolvers/queries/chatQueries.ts
-import { AuthenticationError } from "apollo-server-express";
 import { AppContext } from "../types/context";
+import { chatHistoryCacheKey, chatListCacheKey } from "../../services/chatCache";
 import { redisClient } from "../../lib/redis";
+import { AuthorizationService } from "../../auth/authorization";
+import { requireChatAccess } from "../../auth/chatAccess";
 
 export const chatQueries = {
   chats: async (_: any, { userId }: { userId: string }, context: AppContext) => {
-    if (!context.user) throw new AuthenticationError("You must be logged in");
+    AuthorizationService.requireSelfOrAdmin(context, userId);
 
     if (redisClient) {
-      const cacheKey = `user:${userId}:chats`;
+      const cacheKey = chatListCacheKey(userId);
       const cached = await redisClient.get(cacheKey);
       if (cached) return JSON.parse(cached);
 
@@ -25,12 +27,11 @@ export const chatQueries = {
     { chatId, limit = 20, offset = 0 }: { chatId: string; limit?: number; offset?: number },
     context: AppContext
   ) => {
-    if (!context.user) {
-      throw new AuthenticationError("You must be logged in to view chat history");
-    }
+    await requireChatAccess(context, chatId);
+    const user = context.user!;
 
     if (redisClient) {
-      const cacheKey = `user:${context.user.userId}:chatHistory:${chatId}:limit:${limit}:offset:${offset}`;
+      const cacheKey = chatHistoryCacheKey(user.userId, chatId, limit, offset);
       const cached = await redisClient.get(cacheKey);
       if (cached) return JSON.parse(cached);
 

@@ -17,7 +17,8 @@ import { PushNotificationService } from "../../services/pushNotificationService"
 import { PollinationsService } from '../../services/pollinations.service'; 
 
 import prisma from "../../lib/db";
-import { JWTPayload, SecurityConfig } from "../../auth/security"; 
+import { JWTPayload } from "../../auth/security";
+import { authenticateToken, AccountLookup } from "../../auth/sessionUser"; 
 
 // ============================================
 // SINGLETON SERVICES (Created once, reused)
@@ -83,25 +84,45 @@ export const disconnectPrisma = async () => {
 // ============================================
 // CONTEXT CREATION
 // ============================================
-export async function createContext({ req, connection }: any): Promise<AppContext> {
+// `password` (the hash) is read only to compare the token's password fingerprint.
+export const accountLookupFor =
+  (db: Pick<PrismaClient, "user">): AccountLookup =>
+  (userId) =>
+    db.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, password: true, sessionVersion: true } });
+
+const lookupStoredAccount = accountLookupFor(prisma);
+
+// A WebSocket operation has no Express request, but the limits and the audit trail need to know
+// who is calling. The socket's address is the same address an HTTP request would report when no
+// proxy is trusted. With a trusted proxy the caller passes `resolveAddress`, so the address is
+// worked out by the same rule as for HTTP.
+function clientInfoFromConnection(
+  connection: any,
+  resolveAddress?: (request: any) => string | undefined,
+): any {
+  const request = connection?.extra?.request;
+  return {
+    ip: resolveAddress ? resolveAddress(request) : request?.socket?.remoteAddress,
+    headers: request?.headers ?? {},
+  };
+}
+
+export async function createContext({
+  req,
+  connection,
+  resolveAddress,
+  lookupAccount = lookupStoredAccount,
+}: any): Promise<AppContext> {
   let token: string | undefined;
-  
+
   if (req) {
     token = req.headers.authorization?.replace("Bearer ", "");
-    
-  } else if (connection?.context?.authToken) {
-    token = connection.context.authToken;
+  } else if (connection?.connectionParams?.authToken) {
+    // graphql-ws delivers the client's connection params here
+    token = connection.connectionParams.authToken;
   }
-  
-  let user: JWTPayload | null = null;
-  if (token) {
-    try {
-      user = SecurityConfig.verifyToken(token);
-      logger.debug('[context] user authenticated');
-    } catch (error) {
-      logger.warn('[context] invalid or expired token');
-    }
-  }
+
+  const user: JWTPayload | null = await authenticateToken(token, lookupAccount);
 
   const requestServices = {
     chatService: new ChatService(prisma),
@@ -115,7 +136,7 @@ export async function createContext({ req, connection }: any): Promise<AppContex
   return {
     prisma,
     user,
-    req,
+    req: req ?? clientInfoFromConnection(connection, resolveAddress),
     res: req?.res,
     ...singletonServices,
     ...requestServices,

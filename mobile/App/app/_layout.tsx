@@ -1,15 +1,16 @@
 // app/_layout.tsx
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from 'hooks/use-auth';
 import { useEffect } from 'react';
+import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { AppToast } from '../components/ui/toast';
 import { ApolloProvider } from '@apollo/client/react';
 import { apolloClient } from '../libs/apollo-client';
 import '../global.css';
-import ErrorBoundary from 'components/ui/error-boundary';
+import { ErrorBoundary } from 'components/ui/error-boundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,25 +26,35 @@ export default function RootLayout() {
     console.log('App initialized with Apollo Client');
   }, []);
 
+  if (!apolloClient) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <Text className="text-center text-base text-gray-700">
+          The app is not available because GraphQL is disabled in this build.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ApolloProvider client={apolloClient}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <ErrorBoundary 
+            <ErrorBoundary
               onError={(error) => {
                 console.log('Root error:', error);
               }}
               resetOnNavigate={true}
-              showDetails={__DEV__}
-            >
-              <StatusBar style="auto" />
+              showDetails={__DEV__}>
+              {/* The app is light-only, so the status bar icons are dark on every screen. */}
+              <StatusBar style="dark" />
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/sign-in" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/sign-up" options={{ headerShown: false }} />
                 <Stack.Screen name="features" options={{ headerShown: false }} />
                 <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
-                
               </Stack>
               <AppToast />
             </ErrorBoundary>

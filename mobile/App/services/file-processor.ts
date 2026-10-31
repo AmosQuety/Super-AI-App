@@ -7,7 +7,8 @@ export class FileProcessor {
     const { uri, name, type, size } = fileInfo;
 
     // Strategy 1: Small text files - process locally
-    if (type === 'text/plain' && size < 100000) { // 100KB
+    if (type === 'text/plain' && size < 100000) {
+      // 100KB
       return await this.processTextFile(uri, name);
     }
 
@@ -26,37 +27,45 @@ export class FileProcessor {
       type: 'text',
       content: content,
       metadata: { fileName: name, size: content.length },
-      needsBackendProcessing: false
+      needsBackendProcessing: false,
     };
   }
 
-  private static async processImageFile(uri: string, name: string, type: string): Promise<ProcessedFile> {
+  private static async processImageFile(
+    uri: string,
+    name: string,
+    type: string
+  ): Promise<ProcessedFile> {
     const cloudinaryResult = await uploadToCloudinary(uri, type);
     return {
       type: 'image',
       content: '', // Backend will extract text via OCR
       fileUrl: cloudinaryResult.url,
-      metadata: { 
-        fileName: name, 
+      metadata: {
+        fileName: name,
         publicId: cloudinaryResult.publicId,
-        mimeType: type 
+        mimeType: type,
       },
-      needsBackendProcessing: true
+      needsBackendProcessing: true,
     };
   }
 
-  private static async processDocumentFile(uri: string, name: string, type: string): Promise<ProcessedFile> {
+  private static async processDocumentFile(
+    uri: string,
+    name: string,
+    type: string
+  ): Promise<ProcessedFile> {
     const cloudinaryResult = await uploadToCloudinary(uri, type);
     return {
       type: 'document',
       content: '', // Backend will extract text
       fileUrl: cloudinaryResult.url,
-      metadata: { 
-        fileName: name, 
+      metadata: {
+        fileName: name,
         publicId: cloudinaryResult.publicId,
-        mimeType: type 
+        mimeType: type,
       },
-      needsBackendProcessing: true
+      needsBackendProcessing: true,
     };
   }
 }

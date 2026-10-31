@@ -29,7 +29,6 @@ class StorageService {
     }
   }
 
-  
   async setItem(key: string, value: string): Promise<void> {
     try {
       await SecureStore.setItemAsync(key, value);
@@ -58,6 +57,12 @@ class StorageService {
   // Auth-specific methods
   async setAuthToken(token: string): Promise<void> {
     await this.setItem(Config.STORAGE_KEYS.AUTH_TOKEN, token);
+  }
+
+  // Unlike setAuthToken, a failed write is reported to the caller: a fresh token that could not
+  // be saved must not be presented as a success.
+  async replaceAuthToken(token: string): Promise<void> {
+    await SecureStore.setItemAsync(Config.STORAGE_KEYS.AUTH_TOKEN, token);
   }
 
   async getAuthToken(): Promise<string | null> {

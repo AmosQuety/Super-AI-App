@@ -6,7 +6,7 @@ import { useToast } from '../ui/toastContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';
+import { PASSWORD_HINT, signUpSchema, type SignUpFormData } from '../../lib/validation-schemas';
 import { FaceCapture } from "./FaceCapture";
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
@@ -218,8 +218,10 @@ export default function RegisterScreen() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && (
+              {errors.password ? (
                 <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">{PASSWORD_HINT}</p>
               )}
             </div>
 

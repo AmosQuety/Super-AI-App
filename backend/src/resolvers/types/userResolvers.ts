@@ -1,12 +1,15 @@
 // src/resolvers/types/userResolvers.ts
 import { AppContext } from "./context";
+import { withoutGeneratedImages } from "../../services/taskMetadata";
 
 export const userResolvers = {
   tasks: async (parent: any, _: any, context: AppContext) => {
-    return await context.prisma.task.findMany({
+    const tasks = await context.prisma.task.findMany({
       where: { userId: parent.id },
       orderBy: { updatedAt: "desc" },
     });
+    // A list never carries generated images; only the single-task query does.
+    return tasks.map((task) => ({ ...task, metadata: withoutGeneratedImages(task.metadata) }));
   },
 
   chats: async (parent: any, _: any, context: AppContext) => {

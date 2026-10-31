@@ -6,7 +6,7 @@ export const Colors = {
   error: '#EF4444',
   background: '#FFFFFF',
   text: '#1F2937',
-  
+
   dark: {
     primary: '#60A5FA',
     background: '#111827',

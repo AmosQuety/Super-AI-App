@@ -1,12 +1,23 @@
-// libs/apollo-client.ts - FIXED VERSION
-import { ApolloClient, InMemoryCache, createHttpLink, from, split } from '@apollo/client';
+// libs/apollo-client.ts
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  from,
+  split,
+  type ErrorLike,
+} from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
-import { onError } from '@apollo/client/link/error';
+import { ErrorLink } from '@apollo/client/link/error';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { storageService } from '../services/storage';
 import { config } from './environment';
+import { isExpectedFailureCode } from './error-codes';
+import { isRejectionForCurrentSession } from './session';
+import { notifySessionEnded } from './session-events';
 
 // Create HTTP link
 const httpLink = createHttpLink({
@@ -17,12 +28,14 @@ const httpLink = createHttpLink({
 // Auth link to add token to requests
 const authLink = setContext(async (_, { headers }) => {
   const token = await storageService.getAuthToken();
-  
+
   return {
+    // Remembered so a late rejection can be matched to the session that sent the request.
+    sentToken: token,
     headers: {
       ...headers,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-    }
+    },
   };
 });
 
@@ -33,7 +46,7 @@ let usePollingFallback = false;
 if (config.FEATURE_FLAGS.enableSubscriptions) {
   try {
     const wsUrl = config.GRAPHQL_URL.replace('http', 'ws').replace('https', 'wss');
-    
+
     wsLink = new GraphQLWsLink(
       createClient({
         url: wsUrl,
@@ -71,23 +84,76 @@ if (config.FEATURE_FLAGS.enableSubscriptions) {
   usePollingFallback = true;
 }
 
-// Error handling link
-const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
-  if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, locations, path, extensions }) => {
-      console.error(
-        `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
+// These legitimately answer UNAUTHENTICATED for wrong credentials (a failed sign-in), so they
+// must not end the session. A wrong current password is BAD_USER_INPUT on the server, so
+// ChangePassword is not listed: UNAUTHENTICATED there really means the session is invalid.
+const OPERATIONS_WITH_EXPECTED_AUTH_ERRORS = new Set([
+  'Login',
+  'Register',
+  'LoginWithFace',
+  'LoginWithVoice',
+]);
+
+let isEndingSession = false;
+
+// Drops the stored login and cached data. Failures are logged, not thrown: a stale cache
+// must not keep the user on protected screens.
+async function clearSessionData() {
+  try {
+    await storageService.clearAuth();
+    await apolloClient?.clearStore();
+  } catch (error) {
+    console.error('Failed to fully clear the rejected session:', error);
+  }
+}
+
+// The server no longer accepts this session (expired, revoked, account disabled):
+// clear it, then tell the app to show sign-in.
+async function endRejectedSession(tokenSentWithRequest: string | null | undefined) {
+  if (isEndingSession) return;
+  isEndingSession = true;
+  try {
+    const currentToken = await storageService.getAuthToken();
+    // A slow request from before a new sign-in must not sign the new session out.
+    if (!isRejectionForCurrentSession(tokenSentWithRequest, currentToken)) return;
+
+    await clearSessionData();
+    notifySessionEnded();
+  } finally {
+    isEndingSession = false;
+  }
+}
+
+function isSessionRejection(error: ErrorLike, operationName: string): boolean {
+  if (OPERATIONS_WITH_EXPECTED_AUTH_ERRORS.has(operationName)) return false;
+  return (
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(({ extensions }) => extensions?.code === 'UNAUTHENTICATED')
+  );
+}
+
+// Only an explicit UNAUTHENTICATED ends the session; network and server errors
+// (including 'Account verification is temporarily unavailable') keep the user signed in.
+const errorLink = new ErrorLink(({ error, operation }) => {
+  const operationName = operation.operationName || 'AnonymousOperation';
+
+  if (CombinedGraphQLErrors.is(error)) {
+    error.errors.forEach(({ message, path, extensions }) => {
+      // Errors the server meant for the user are routine; console.error would raise a
+      // development banner over the screen that is already showing them.
+      const log = isExpectedFailureCode(extensions?.code) ? console.log : console.error;
+      log(
+        `[GraphQL error] ${operationName}: ${message}, Path: ${path?.join('.')}, Code: ${extensions?.code}`
       );
-      
-      if (extensions?.code === 'UNAUTHENTICATED') {
-        console.warn('User authentication failed');
-        storageService.clearAuth().catch(console.error);
-      }
     });
+  } else {
+    console.error(`[Network error] ${operationName}: ${error.message}`);
   }
 
-  if (networkError) {
-    console.error(`[Network error]: ${networkError.message}`);
+  if (isSessionRejection(error, operationName)) {
+    // An expected event, so not console.warn (that raises a development banner).
+    console.log(`Session rejected by the server during ${operationName}; signing out`);
+    void endRejectedSession(operation.getContext().sentToken);
   }
 });
 
@@ -99,10 +165,7 @@ if (wsLink && !usePollingFallback) {
   link = split(
     ({ query }) => {
       const definition = getMainDefinition(query);
-      return (
-        definition.kind === 'OperationDefinition' &&
-        definition.operation === 'subscription'
-      );
+      return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
     },
     wsLink,
     from([errorLink, authLink, httpLink]) // HTTP operations

@@ -1,5 +1,4 @@
 // src/resolvers/queries/index.ts - UPDATED
-import { userQueries } from "./userQueries";
 import { chatQueries } from "./chatQueries";
 import { faceServiceQueries } from "./faceServiceQueries";
 import { imageQueries } from "./imageQueries"; // ADD THIS
@@ -8,7 +7,6 @@ import { taskQueries } from "./taskQueries";
 import { pushQueries } from "./pushQueries";
 
 export const queryResolvers = {
-  ...userQueries,
   ...chatQueries,
   ...faceServiceQueries,
   ...imageQueries, // ADD THIS

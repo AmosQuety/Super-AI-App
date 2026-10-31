@@ -1,5 +1,6 @@
 // src/index.ts
 
+import { webhookSecretProblem } from "./auth/webhookAuth";
 import './utils/quietConsole';
 import "./utils/sentry"; 
 import * as Sentry from "@sentry/node";
@@ -21,6 +22,7 @@ import { createContext, disconnectPrisma } from "./resolvers/types/context";
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws'; 
+import { trackUserSocket } from './auth/socketRegistry';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { RateLimitService } from './auth/rate-limiting';
 import { SecurityConfig } from './auth/security';
@@ -35,6 +37,9 @@ import {
   performanceMiddleware 
 } from './middleware/logging';
 import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
+import { parseTrustProxyHops } from './config/trustProxy';
+import { addressFromRequest } from './auth/clientAddress';
+import { createForwardingDiagnostic } from './middleware/forwardingDiagnostic';
 
 // Init complete - server start phase begins
 
@@ -54,6 +59,9 @@ let subscriptionServerInstance: any;
 const startServer = async (): Promise<any> => {
   try {
     const app: Application = express();
+    // Must run before any middleware that reads req.ip (rate limiters, logging, audit).
+    app.set('trust proxy', parseTrustProxyHops(process.env.TRUST_PROXY_HOPS));
+    app.use(createForwardingDiagnostic(process.env.FORWARDING_DIAGNOSTIC));
     const isDev = process.env.NODE_ENV !== 'production';
 
     // 1. DYNAMIC CORS CONFIGURATION
@@ -130,9 +138,12 @@ const corsOptions: cors.CorsOptions = {
       logger.info("✅ Security configuration validated");
     } catch (error: any) {
       logger.error("❌ Security configuration error:", { error: error.message });
-      if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-      }
+      process.exit(1);
+    }
+
+    const webhookProblem = webhookSecretProblem();
+    if (webhookProblem) {
+      logger.warn(`⚠️ ${webhookProblem}`);
     }
 
     // Helper to decide if error is safe to show
@@ -252,7 +263,13 @@ const corsOptions: cors.CorsOptions = {
       {
         schema,
         context: async (ctx) => {
-          return createContext({ connection: ctx });
+          const context = await createContext({
+            connection: ctx,
+            resolveAddress: (request: any) => addressFromRequest(app, request),
+          });
+          // Remember the socket so a password change can end this subscription (see socketRegistry).
+          if (context.user) trackUserSocket(context.user.userId, ctx.extra.socket);
+          return context;
         },
         onConnect: () => {
           logger.info('🔌 WebSocket client connected');

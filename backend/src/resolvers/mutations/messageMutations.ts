@@ -1,8 +1,9 @@
 // src/resolvers/mutations/messageMutations.ts
-import { AuthenticationError, UserInputError } from "apollo-server-express";
+import { ApolloError, AuthenticationError, UserInputError } from "apollo-server-express";
 import { Message } from "@prisma/client";
 import { AppContext } from "../types/context";
 import { pubsub } from '../subscriptionResolvers'; // ADD THIS IMPORT
+import { invalidateChatHistory } from "../../services/chatCache";
 
 export const messageMutations = {
   addMessage: async (
@@ -27,8 +28,9 @@ export const messageMutations = {
       throw new UserInputError("Chat not found");
     }
 
+    // Not UNAUTHENTICATED: clients sign the user out on that code, and the session is fine.
     if (chat.userId !== context.user.userId) {
-      throw new AuthenticationError("You can only add messages to your own chats");
+      throw new UserInputError("Chat not found");
     }
 
     // Create the message
@@ -39,6 +41,8 @@ export const messageMutations = {
         content,
       },
     });
+
+    await invalidateChatHistory(context.user.userId, chatId);
 
     // ADD THIS: PUBLISH TO SUBSCRIPTION
     await pubsub.publish('MESSAGE_ADDED', {
@@ -74,16 +78,19 @@ export const messageMutations = {
       }
 
       if (message.chat.userId !== context.user.userId) {
-        throw new AuthenticationError("You can only delete your own messages");
+        throw new UserInputError("Message not found");
       }
 
       // Delete the message
       await context.prisma.message.delete({
         where: { id: messageId },
       });
+      await invalidateChatHistory(context.user.userId, message.chatId);
 
       return true;
     } catch (error: any) {
+      // Errors that already carry a code (not found, not allowed) must reach the client as they are.
+      if (error instanceof ApolloError) throw error;
       console.error("Error deleting message:", error);
       throw new Error(error.message || "Failed to delete message");
     }

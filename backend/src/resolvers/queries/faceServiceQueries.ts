@@ -1,6 +1,7 @@
 // src/resolvers/queries/faceServiceQueries.ts
 import { AppContext } from "../types/context";
 import axios from "axios";
+import { AuthorizationService } from "../../auth/authorization";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL || "http://127.0.0.1:8000";
 
@@ -10,10 +11,11 @@ export const faceServiceQueries = {
       // Check root endpoint
       const response = await axios.get(`${PYTHON_SERVICE_URL}/`, { timeout: 2000 });
       
-      // Calculate how many users have Face ID enabled in our database
-      const facesInDb = await context.prisma.user.count({
-        where: { hasFaceRegistered: true }
-      });
+      // The head count of enrolled users is only shown to admins; everyone else sees 0.
+      const facesInDb =
+        context.user && AuthorizationService.isAdmin(context.user)
+          ? await context.prisma.user.count({ where: { hasFaceRegistered: true } })
+          : 0;
 
       if (response.status === 200) {
         return {

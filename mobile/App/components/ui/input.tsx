@@ -1,38 +1,27 @@
 import React from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, TextInputProps, View } from 'react-native';
 import { cn } from '../../utils/formatters';
 
-interface InputProps {
-  placeholder?: string;
-  value?: string;
-  onChangeText?: (text: string) => void;
-  secureTextEntry?: boolean;
+interface InputProps extends Omit<TextInputProps, 'className' | 'style'> {
   error?: string;
+  // Applied to the wrapper around the text field and its error message.
   className?: string;
 }
 
-export function Input({
-  placeholder,
-  value,
-  onChangeText,
-  secureTextEntry = false,
-  error,
-  className = '',
-}: InputProps) {
+// Every TextInput prop (keyboardType, autoCapitalize, autoCorrect, onBlur, ...) reaches the
+// field; the screens rely on them, for example the email keyboard on sign-in.
+export function Input({ error, className = '', ...textInputProps }: InputProps) {
   return (
     <View className={className}>
       <TextInput
         className={cn(
-          'border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white bg-white dark:bg-gray-800',
+          'rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white',
           error && 'border-red-500'
         )}
-        placeholder={placeholder}
         placeholderTextColor="#9CA3AF"
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secureTextEntry}
+        {...textInputProps}
       />
-      {error && <Text className="text-red-500 text-sm mt-1">{error}</Text>}
+      {error && <Text className="mt-1 text-sm text-red-500">{error}</Text>}
     </View>
   );
 }

@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "size": "size-limit",
+    "test:session": "esbuild tests/session.test.ts --bundle --platform=node --format=cjs --outfile=.test-build/session.test.cjs --log-level=warning && node --test .test-build/session.test.cjs",
+    "test:validation": "esbuild tests/validation.test.ts --bundle --platform=node --format=cjs --outfile=.test-build/validation.test.cjs --log-level=warning && node --test .test-build/validation.test.cjs",
     "test:lighthouse": "lhci autorun"
   },
   "dependencies": {
