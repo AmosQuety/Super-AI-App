@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-31
+Last updated: 2026-10-31 (evening)
 
 ## Now
 Slice 6 (profile and settings) plus its security hardening are committed on `mobile-parity/slice-6-profile-settings` (4 commits, nothing pushed). Waiting on the developer for two deployment facts (below) and a decision on the next slice.
@@ -27,4 +27,5 @@ Slice 6 (profile and settings) plus its security hardening are committed on `mob
 - Start the environment: `systemctl --user start docker-desktop`; `docker start xemora-dev-postgres xemora-dev-redis`; backend `cd backend && ./scripts/local-env.sh npm run dev` (run in background); Metro `cd mobile/App && npx expo start --dev-client --port 8082`; emulator `~/Android/Sdk/emulator/emulator -avd Xemora_Pixel_API_35 -gpu swiftshader_indirect -no-audio -no-boot-anim` (host GPU crashed twice), then `adb reverse tcp:8082 tcp:8082`.
 - Checks: backend `npx tsc --noEmit`, `./scripts/local-env.sh npm run test:authz` and `test:tasks`; mobile `npm test`, `npx tsc --noEmit`, eslint, prettier; flows in `mobile/App/.argent/flows/`.
 - A flow that dies mid-run leaves the app signed in; sign out by hand before rerunning.
-- Uncommitted on purpose: `.claude/` and this file.
+- DNS (2026-10-31): the Wi-Fi `Hey there` resolver (10.213.117.197) returned NXDOMAIN for `dashboard.render.com` and `onrender.com`, so Render would not open. Fixed by setting `ipv4.dns "1.1.1.1 8.8.8.8"` and `ipv4.ignore-auto-dns yes` on that one connection only. Undo: `nmcli connection modify "Hey there" ipv4.dns "" ipv4.ignore-auto-dns no && nmcli device reapply wlp0s20f3`. Other networks are unaffected.
+- Uncommitted on purpose: `.claude/`.
