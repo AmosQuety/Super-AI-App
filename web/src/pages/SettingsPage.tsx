@@ -24,6 +24,11 @@ import { Link } from "react-router-dom";
 
 type Tab = "account" | "security" | "interface";
 
+// What the changePassword mutation returns; the token is the fresh session for this tab.
+interface ChangePasswordData {
+  changePassword: { success: boolean; message: string; token?: string | null };
+}
+
 interface UserData {
   me: {
     id: string;
@@ -44,7 +49,7 @@ export default function SettingsPage() {
   });
 
   const [updateProfile, { loading: updating }] = useMutation(UPDATE_PROFILE);
-  const [changePassword, { loading: changingPass }] = useMutation(CHANGE_PASSWORD);
+  const [changePassword, { loading: changingPass }] = useMutation<ChangePasswordData>(CHANGE_PASSWORD);
 
   // Form States
   const [name, setName] = useState("");

@@ -13,6 +13,8 @@ Slice 6 (profile and settings) and its security hardening are committed on `mobi
 5. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
 
 ## Done recently
+- 2026-10-31: direct-origin test of the Render backend (`super-ai-app.onrender.com`): every request, including one sent straight to Render's origin address with the service name, was answered through Cloudflare (`server: cloudflare`, `cf-ray`); Render's origin hostname alone returns 404. No direct path found (the real origin address behind Cloudflare is hidden, so this covers only what is publicly reachable). The chain is therefore client, Cloudflare, Render; the exact number still comes from the diagnostic line.
+- 2026-10-31: fixed the Vercel preview build failure of `web` (`SettingsPage.tsx` changePassword result was untyped); reproduced locally with the lockfile's Apollo 4.0.4, then `tsc -b` passes and `vite build` succeeds. Committed locally, not pushed.
 - 2026-10-31: third independent review fixed: forwarding diagnostic that actually reaches Render's logs, WebSocket address by the same rule as HTTP, face engine faults no longer count as guesses, safer address parsing, stricter `TRUST_PROXY_HOPS`, Change Password "sign in again" notice (`e29522d`, `9cf7593`).
 - 2026-10-31: `TRUST_PROXY_HOPS` setting (`88b3cec`).
 - 2026-10-31: sign-in limit per email and network (IPv6 /64), ceiling of 20 per email, unknown-email audit (capped) and metrics, face login limit, WebSocket address, mobile late-token guard (`15ece71`, `0946adc`).
@@ -20,7 +22,8 @@ Slice 6 (profile and settings) and its security hardening are committed on `mobi
 - 2026-10-31: Render would not open because the Wi-Fi resolver failed on `onrender.com`; fixed with public DNS on that connection (see Context).
 
 ## Open questions / blockers
-- Proxy count for Render (Next 2 and 3). Also whether callers can reach the `*.onrender.com` origin directly, bypassing Cloudflare (affects which number is safe).
+- Proxy count for Render (Next 2 and 3). A direct-origin bypass was not found (see Done recently).
+- Web dependency heads-up: `web/package.json` allows `@apollo/client ^4.0.4` but the lockfile pins 4.0.4; with Apollo 4.3.x `tsc -b` fails in `web/src/lib/apolloClient.ts` (lines about `errorPolicy` default options). Do not refresh the web lockfile or update Apollo without fixing that; `web/package-lock.json` is also out of sync with `package.json` (`npm ci` fails). Locally `web/node_modules` was installed with `--legacy-peer-deps --ignore-scripts` for checking (gitignored).
 - Retention period for `security_audit_logs` (legal requirement, not decided).
 - Migration `20261026_session_version` was edited (lock timeout); safe only if it was never applied outside the local database.
 - Other face endpoints (`compareFaces`, `findFaceInCrowd`, `verifyFaceInWorkspace`) are unlimited by decision, to be done separately.
