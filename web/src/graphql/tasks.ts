@@ -20,7 +20,7 @@ export const GET_MY_TASKS = gql`
 `;
 
 export const GET_TASK = gql`
-  query GetTask($id: String!) {
+  query GetTask($id: ID!) {
     task(id: $id) {
       id
       feature
