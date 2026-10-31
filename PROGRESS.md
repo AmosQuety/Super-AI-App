@@ -3,12 +3,13 @@
 Last updated: 2026-10-31 (late)
 
 ## Now
-`TRUST_PROXY_HOPS=3` is live on Render and verified: the diagnostic now shows `expressIp` equal to the visitor's real address (checked 2026-10-31 17:27 UTC). GitHub `master` is the merge of PR #6 (up to `8f7d9bb`); the rate limiter fix (`e87caab`) and the later notes are only on the local branch, so the limiter fix is NOT live yet.
+`TRUST_PROXY_HOPS=3` is live and verified. The rate limiter fix is merged on GitHub `master` (PR #7, `9e3c959`) but a live check (2026-10-31, three requests to `/graphql`) showed `ratelimit-remaining: 99` every time, so Render is still running the old limiter: the deploy of `9e3c959` has not happened yet.
 
 ## Next
-1. Developer: push `mobile-parity/slice-6-profile-settings` (commits `e87caab` and `8f8422f`), open a pull request into `master` and merge it so Render deploys the limiter fix. It is now safe: the proxy count is set. Afterwards the startup warning should not appear in Render's Logs.
-2. After that deploy, remove `FORWARDING_DIAGNOSTIC` from Render's Environment and redeploy (not needed any more; keep `TRUST_PROXY_HOPS=3`).
-3. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
+1. Render, service Events or Deploys tab: look for a deploy of commit `9e3c959` (or later). If there is none, use Manual Deploy, "Deploy latest commit". The 17:31 deploy was an environment-variable restart, not a new build.
+2. After that deploy, check the limiter is live: run `for i in 1 2 3; do curl -s -D - -o /dev/null https://super-ai-app.onrender.com/graphql | grep -i ratelimit-remaining; done`. Live and correct: the number counts down (99, 98, 97). Still 99 every time: old code.
+3. Check Render's Environment tab: `FORWARDING_DIAGNOSTIC` should be removed (the diagnostic only prints when requests arrive, so its absence from a log that ends at "live" proves nothing). Keep `TRUST_PROXY_HOPS=3`.
+4. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
 
 ## Done recently
 - 2026-10-31: confirmed on Render after setting `TRUST_PROXY_HOPS=3`: visitors now appear with their real addresses (`41.210.145.140`, `35.197.96.157`), Render's internal checks (`10.216.x.x`) are unaffected. Render deploys `master` and builds with `prisma db push`.
