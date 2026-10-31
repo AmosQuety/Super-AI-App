@@ -3,16 +3,15 @@
 Last updated: 2026-10-31 (late)
 
 ## Now
-The proxy count is known: **`TRUST_PROXY_HOPS=3`** (from Render's diagnostic log: client, Cloudflare edge, Render-internal; the app's own peer is a local proxy). The rate limiter fix is committed together with it on `mobile-parity/slice-6-profile-settings`. Waiting on the developer to set the variable in Render FIRST, verify, and only then push the limiter fix.
+`TRUST_PROXY_HOPS=3` is live on Render and verified: the diagnostic now shows `expressIp` equal to the visitor's real address (checked 2026-10-31 17:27 UTC). GitHub `master` is the merge of PR #6 (up to `8f7d9bb`); the rate limiter fix (`e87caab`) and the later notes are only on the local branch, so the limiter fix is NOT live yet.
 
 ## Next
-1. Render, service Environment tab: set `TRUST_PROXY_HOPS` = `3` and keep `FORWARDING_DIAGNOSTIC` = `true` for now. Render redeploys the code that is already live (it already understands the variable), so this is safe on its own.
-2. When it is live, open the site or app once and read Logs: the new diagnostic lines should show `expressIp` equal to the visitor's real address (the same as `cfConnectingIp`, for example `41.210.145.140`), not `::1`. If they still show `::1`, stop and tell me.
-3. Only after step 2 is confirmed: push the branch with the rate limiter fix (commit "fix(backend): make the GraphQL limiter count each client..."). Pushing it BEFORE step 1 and 2 would make the cap of 100 GraphQL requests per minute apply to the whole app together.
-4. Then remove `FORWARDING_DIAGNOSTIC` from Render (it prints at most 20 lines per start, harmless but no longer needed) and redeploy.
-5. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
+1. Developer: push `mobile-parity/slice-6-profile-settings` (commits `e87caab` and `8f8422f`), open a pull request into `master` and merge it so Render deploys the limiter fix. It is now safe: the proxy count is set. Afterwards the startup warning should not appear in Render's Logs.
+2. After that deploy, remove `FORWARDING_DIAGNOSTIC` from Render's Environment and redeploy (not needed any more; keep `TRUST_PROXY_HOPS=3`).
+3. Pick the next slice: 5b voice cloning (needs a short plan first), 3b push (deferred to the end), or Phase 4 hardening.
 
 ## Done recently
+- 2026-10-31: confirmed on Render after setting `TRUST_PROXY_HOPS=3`: visitors now appear with their real addresses (`41.210.145.140`, `35.197.96.157`), Render's internal checks (`10.216.x.x`) are unaffected. Render deploys `master` and builds with `prisma db push`.
 - 2026-10-31: read Render's diagnostic: forwarding chain is `client, Cloudflare edge (172.x), Render internal (10.x)` with peer `::1`, so three hops; recorded as a test (`trustProxy.test.ts`). Rate limiter fixed (`rateLimiter.test.ts`: 100 per client per minute, separate clients separate), startup warning when `TRUST_PROXY_HOPS` is unset in production.
 - 2026-10-31: direct-origin test of the Render backend (`super-ai-app.onrender.com`): every request, including one sent straight to Render's origin address with the service name, was answered through Cloudflare (`server: cloudflare`, `cf-ray`); Render's origin hostname alone returns 404. No direct path found (the real origin address behind Cloudflare is hidden, so this covers only what is publicly reachable). The chain is therefore client, Cloudflare, Render; the exact number still comes from the diagnostic line.
 - 2026-10-31: fixed the Vercel preview build failure of `web` (`SettingsPage.tsx` changePassword result was untyped); reproduced locally with the lockfile's Apollo 4.0.4, then `tsc -b` passes and `vite build` succeeds. Committed locally, not pushed.
@@ -26,7 +25,7 @@ The proxy count is known: **`TRUST_PROXY_HOPS=3`** (from Render's diagnostic log
 - If Render ever changes its proxy chain the number 3 would need to change; the diagnostic (`FORWARDING_DIAGNOSTIC=true`) shows the chain again. A direct-origin bypass of Cloudflare was not found; if one existed, a caller on that path would only have a chain of two entries, and three trusted hops would then believe a forged entry.
 - Web dependency heads-up: `web/package.json` allows `@apollo/client ^4.0.4` but the lockfile pins 4.0.4; with Apollo 4.3.x `tsc -b` fails in `web/src/lib/apolloClient.ts` (lines about `errorPolicy` default options). Do not refresh the web lockfile or update Apollo without fixing that; `web/package-lock.json` is also out of sync with `package.json` (`npm ci` fails). Locally `web/node_modules` was installed with `--legacy-peer-deps --ignore-scripts` for checking (gitignored).
 - Retention period for `security_audit_logs` (legal requirement, not decided).
-- Migration `20261026_session_version` was edited (lock timeout); safe only if it was never applied outside the local database.
+- Render's build command runs `npx prisma db push` against the live Supabase database on every deploy (not migrations). So the migration files, including the edited `20261026_session_version`, are not used by Render; `db push` already added the `sessionVersion` column to production (the 17:26 build said "already in sync"). Earlier notes saying the build runs `prisma migrate deploy` were wrong. Proposal for the developer (not done): `db push` on production skips version-controlled migrations, which is against the database rules in the global instructions; a baselined migration history plus `prisma migrate deploy` would be the proper setup, a larger change to decide separately.
 - Other face endpoints (`compareFaces`, `findFaceInCrowd`, `verifyFaceInWorkspace`) are unlimited by decision, to be done separately.
 - One-time sign-out of every user when the password-session hardening ships: not announced yet.
 - Render env vars still to confirm: `JWT_SECRET` (32+ characters), `WEBHOOK_SECRET` (16+ characters).
