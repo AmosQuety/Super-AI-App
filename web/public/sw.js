@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xemora-v4';
+const CACHE_NAME = 'xemora-v5';
 const ASSETS = [
   '/',
   '/index.html',
