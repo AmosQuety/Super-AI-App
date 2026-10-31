@@ -30,7 +30,8 @@ const logFormat = winston.format.combine(
 );
 
 export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'error' : 'debug',
+  // Production keeps warnings and errors: enough to see what went wrong without logging every request.
+  level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
   format: logFormat,
   defaultMeta: { 
     service: 'backend-api',
@@ -45,6 +46,10 @@ export const logger = winston.createLogger({
         )
       }),
     ] : [
+      // Standard output is what a host such as Render shows in its Logs page and serves through its
+      // logs API; the files below live on a disk that is wiped on every deploy and restart.
+      // process.stdout is written directly because quietConsole silences console.* in production.
+      new winston.transports.Stream({ stream: process.stdout }),
       new winston.transports.File({ 
         filename: 'logs/error.log', 
         level: 'error',
