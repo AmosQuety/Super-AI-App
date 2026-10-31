@@ -21,6 +21,15 @@ export const loggableQuery = (query: Record<string, unknown> | undefined) =>
     Object.entries(query).map(([name, value]) => [name, SENSITIVE_QUERY_KEY.test(name) ? '[redacted]' : value])
   );
 
+// Callers write these headers, so what is logged is shortened and cannot contain a line break.
+// Seeing them next to the address Express chose is how the proxy count (TRUST_PROXY_HOPS) is
+// checked against the real chain.
+export const forwardingHeaderForLog = (raw: string | string[] | undefined): string | undefined => {
+  if (raw === undefined) return undefined;
+  const text = Array.isArray(raw) ? raw.join(', ') : raw;
+  return text.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 200);
+};
+
 export const loggingMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   
@@ -47,6 +56,8 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
       method: requestLog.method,
       url: requestLog.url,
       ip: requestLog.ip,
+      forwardedFor: forwardingHeaderForLog(req.headers['x-forwarded-for']),
+      cfConnectingIp: forwardingHeaderForLog(req.headers['cf-connecting-ip']),
     });
   }
 

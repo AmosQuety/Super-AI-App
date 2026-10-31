@@ -37,6 +37,7 @@ import {
   performanceMiddleware 
 } from './middleware/logging';
 import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
+import { parseTrustProxyHops } from './config/trustProxy';
 
 // Init complete - server start phase begins
 
@@ -56,6 +57,8 @@ let subscriptionServerInstance: any;
 const startServer = async (): Promise<any> => {
   try {
     const app: Application = express();
+    // Must run before any middleware that reads req.ip (rate limiters, logging, audit).
+    app.set('trust proxy', parseTrustProxyHops(process.env.TRUST_PROXY_HOPS));
     const isDev = process.env.NODE_ENV !== 'production';
 
     // 1. DYNAMIC CORS CONFIGURATION
