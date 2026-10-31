@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { replaceTokenIfSessionUnchanged, TokenStore } from '../libs/token-swap';
+import { mustSignInAgain, replaceTokenIfSessionUnchanged, TokenStore } from '../libs/token-swap';
 
 function makeStore(initial: string | null, options: { failSet?: boolean } = {}) {
   let token = initial;
@@ -48,4 +48,12 @@ test('treats a device that held no token before the request as changed', async (
 test('reports a storage failure instead of pretending the device stays signed in', async () => {
   const { store } = makeStore('old', { failSet: true });
   assert.equal(await replaceTokenIfSessionUnchanged('old', 'new', store), 'storage_failed');
+});
+
+test('only a failed write means the user has to sign in again on this device', () => {
+  assert.equal(mustSignInAgain('storage_failed'), true);
+  assert.equal(mustSignInAgain('stored'), false);
+  // The user signed out while the request ran: they already know, there is nothing to add.
+  assert.equal(mustSignInAgain('session_changed'), false);
+  assert.equal(mustSignInAgain(undefined), false);
 });

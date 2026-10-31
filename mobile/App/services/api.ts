@@ -32,6 +32,8 @@ interface ChangePasswordResult {
   message: string;
   // A password change ends every earlier session; this one keeps this device signed in.
   token?: string | null;
+  // What happened to this device's own session after the change (set by changePassword below).
+  sessionSwap?: TokenSwapResult;
 }
 
 interface FaceServiceStatus {
@@ -249,16 +251,15 @@ class ApiService {
     // The token in use was just revoked by the server, so swap in the fresh one before
     // anything else makes a request.
     if (data.changePassword.success && data.changePassword.token) {
-      const swap = await replaceTokenIfSessionUnchanged(
+      // The password did change, so a failed write is not a failed change. The old token is dead,
+      // so the next request sends the user to Sign In, where the new password works; the screen
+      // says so (see mustSignInAgain).
+      const sessionSwap = await replaceTokenIfSessionUnchanged(
         tokenBefore,
         data.changePassword.token,
         authTokenStore
       );
-      // The password did change, so this is not a failed change. The old token is dead, so the
-      // next request sends the user to Sign In, where the new password works.
-      if (swap === 'storage_failed') {
-        console.warn('Could not store the new session after a password change.');
-      }
+      return { ...data.changePassword, sessionSwap };
     }
     return data.changePassword;
   }

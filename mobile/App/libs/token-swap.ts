@@ -25,3 +25,10 @@ export async function replaceTokenIfSessionUnchanged(
     return 'storage_failed';
   }
 }
+
+// After the server has revoked this device's token, only a failed write leaves the user without a
+// session they have been told about; the screens use this to say so instead of reporting plain
+// success.
+export function mustSignInAgain(result: TokenSwapResult | undefined): boolean {
+  return result === 'storage_failed';
+}

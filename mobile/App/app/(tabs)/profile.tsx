@@ -10,6 +10,7 @@ import { useToast } from '../../components/ui/toast';
 import { useSaveFailureToast } from '../../hooks/use-account-save';
 import { useAuth } from '../../hooks/use-auth';
 import { usageStats } from '../../libs/profile';
+import { mustSignInAgain } from '../../libs/token-swap';
 import { PROFILE_DETAILS } from '../../services/graphql/operations';
 
 export default function ProfileScreen() {
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
       const outcome = await signOutOtherSessions();
       if (outcome === 'stored') {
         showSuccess('Other devices signed out', 'You stay signed in on this device.');
-      } else if (outcome === 'storage_failed') {
+      } else if (mustSignInAgain(outcome)) {
         // The other devices were signed out, but this one could not keep its new session.
         showInfo('Other devices signed out', 'Please sign in again on this device.');
       }

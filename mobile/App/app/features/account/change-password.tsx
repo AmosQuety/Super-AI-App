@@ -16,6 +16,7 @@ import { useToast } from '../../../components/ui/toast';
 import { useAuth } from '../../../hooks/use-auth';
 import { useZodForm } from '../../../hooks/use-form';
 import { useScreenCaptureBlock } from '../../../hooks/use-screen-capture-block';
+import { mustSignInAgain } from '../../../libs/token-swap';
 import { ApiError } from '../../../services/api';
 import {
   changePasswordSchema,
@@ -28,7 +29,7 @@ const EMPTY_FORM = { currentPassword: '', newPassword: '', confirmPassword: '' }
 export default function ChangePasswordScreen() {
   const { changePassword } = useAuth();
   useScreenCaptureBlock('change-password');
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showInfo, showError } = useToast();
   const [showPasswords, setShowPasswords] = useState(false);
   const form = useZodForm(changePasswordSchema, EMPTY_FORM);
 
@@ -44,7 +45,12 @@ export default function ChangePasswordScreen() {
         throw new Error(result.message || 'The password was not changed.');
       }
       form.reset(EMPTY_FORM);
-      showSuccess('Password changed', 'Use your new password the next time you sign in.');
+      if (mustSignInAgain(result.sessionSwap)) {
+        // The password changed but this device could not keep its new session.
+        showInfo('Password changed', 'Please sign in again on this device with your new password.');
+      } else {
+        showSuccess('Password changed', 'Use your new password the next time you sign in.');
+      }
       if (router.canGoBack()) router.back();
     } catch (error) {
       // The server no longer accepts the session: the app is already taking the user to Sign In,

@@ -22,7 +22,7 @@ interface AuthContextType {
   changePassword: (
     currentPassword: string,
     newPassword: string
-  ) => Promise<{ success: boolean; message: string }>;
+  ) => Promise<{ success: boolean; message: string; sessionSwap?: TokenSwapResult }>;
   // Ends every other session; this device stays signed in.
   // Resolves to what happened to this device's own session; see replaceTokenIfSessionUnchanged.
   signOutOtherSessions: () => Promise<TokenSwapResult>;
