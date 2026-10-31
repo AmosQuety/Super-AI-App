@@ -36,10 +36,35 @@ function aZoneSuffixIsIgnored() {
 function missingOrUnreadableAddressesShareOneUnknownBucket() {
   assert.equal(networkOf(undefined), "unknown");
   assert.equal(networkOf(""), "unknown");
-  assert.equal(networkOf("not-an-address"), "not-an-address");
+  assert.equal(networkOf("not-an-address"), "unknown");
+}
+
+function portsAndBracketsAreRemovedBeforeGrouping() {
+  assert.equal(networkOf("203.0.113.5:51234"), "203.0.113.5");
+  assert.equal(networkOf("203.0.113.5:80"), networkOf("203.0.113.5:443"));
+  assert.equal(networkOf("[2001:db8:1:2::1]:443"), networkOf("2001:db8:1:2::9"));
+  assert.equal(networkOf("[2001:db8:1:2::1]"), networkOf("2001:db8:1:2::9"));
+  assert.equal(networkOf(" 203.0.113.5 "), "203.0.113.5");
+}
+
+function everyFormOfAMappedIpv4IsThePlainIpv4() {
+  assert.equal(networkOf("::ffff:7f00:1"), "127.0.0.1");
+  assert.equal(networkOf("::ffff:0102:0304"), "1.2.3.4");
+  assert.equal(networkOf("0:0:0:0:0:ffff:1.2.3.4"), "1.2.3.4");
+  assert.equal(networkOf("::ffff:1.2.3.4%eth0"), "1.2.3.4");
+  assert.notEqual(networkOf("::ffff:1.2.3.4"), networkOf("::ffff:1.2.3.5"));
+}
+
+function unreadableInputSharesOneFixedKeyAndNeverEchoesTheInput() {
+  for (const bad of ["garbage", "999.1.1.1", "1.2.3", "::g", "a".repeat(500)]) {
+    assert.equal(networkOf(bad), "unknown", bad.slice(0, 20));
+  }
 }
 
 ipv4IsKeptAsIs();
+portsAndBracketsAreRemovedBeforeGrouping();
+everyFormOfAMappedIpv4IsThePlainIpv4();
+unreadableInputSharesOneFixedKeyAndNeverEchoesTheInput();
 aMappedIpv4IsTheSameClientAsThePlainOne();
 everyAddressInOneIpv6Slash64IsOneNetwork();
 differentSlash64NetworksStayApart();

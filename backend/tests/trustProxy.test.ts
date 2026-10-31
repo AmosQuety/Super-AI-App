@@ -22,7 +22,7 @@ function aWholeNumberOfHopsIsAccepted() {
 }
 
 function anythingElseFailsLoudlyBecauseTrustingTooMuchIsDangerous() {
-  for (const bad of ["true", "yes", "-1", "1.5", "abc", "1,2", String(MAX_TRUST_PROXY_HOPS + 1), "9999"]) {
+  for (const bad of ["true", "yes", "-1", "1.5", "abc", "1,2", "01", "00", "007", "+2", "1e1", "0x2", "２", String(MAX_TRUST_PROXY_HOPS + 1), "9999"]) {
     assert.throws(
       () => parseTrustProxyHops(bad),
       /TRUST_PROXY_HOPS/,

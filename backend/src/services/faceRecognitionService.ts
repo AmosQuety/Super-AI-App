@@ -144,7 +144,7 @@ export class FaceRecognitionService {
       // Check for timeout
       if (error.code === 'ECONNABORTED') {
          logger.error("❌ Python Service Timed Out");
-         return { success: false, error: "Service warming up, please try again." };
+         return { success: false, unavailable: true, error: "Service warming up, please try again." };
       }
       
       logger.error("❌ Face Verification Error", { 

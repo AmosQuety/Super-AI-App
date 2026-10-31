@@ -18,10 +18,14 @@ const account = {
 let healthy = true;
 let recognised: string | null = null;
 let verifyCalls = 0;
+let verifyOutcome: "normal" | "unavailable" | "throws" = "normal";
 FaceRecognitionService.prototype.checkHealth = async () =>
   ({ isOnline: healthy }) as any;
 FaceRecognitionService.prototype.verifyFace = async () => {
   verifyCalls++;
+  if (verifyOutcome === "unavailable")
+    return { success: false, unavailable: true, error: "Service warming up, please try again." } as any;
+  if (verifyOutcome === "throws") throw new Error("Could not connect to biometric engine.");
   return recognised
     ? ({ success: true, matchedUser: recognised, emotion: "neutral" } as any)
     : ({ success: false } as any);
@@ -53,6 +57,7 @@ function reset() {
   healthy = true;
   recognised = null;
   verifyCalls = 0;
+  verifyOutcome = "normal";
 }
 
 async function repeatedFailuresFromOneAddressAreStopped() {
@@ -180,7 +185,26 @@ async function aLockIsAuditedOnlyWhenTheLimitReachingAttemptFails() {
   assert.deepEqual(winner.audits, [], "a successful login is not a lockout");
 }
 
+async function aServiceThatIsUpButCannotAnswerIsNotAGuess() {
+  for (const outcome of ["unavailable", "throws"] as const) {
+    reset();
+    verifyOutcome = outcome;
+    const { context, audits } = makeContext();
+    for (let i = 0; i < MAX_FACE_LOGIN_ATTEMPTS + 3; i++) {
+      const result = await attempt(context);
+      assert.equal(result.success, false);
+      assert.match(result.message, /temporarily unavailable|password/i);
+      assert.doesNotMatch(result.message, /not recognized/i, "the user is not told their face was wrong");
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(audits, [], `${outcome}: no lockout from a service failure`);
+    verifyOutcome = "normal";
+    assert.match((await attempt(context)).message, /not recognized/i, `${outcome}: the count was never used`);
+  }
+}
+
 async function main() {
+  await aServiceThatIsUpButCannotAnswerIsNotAGuess();
   await addressesInOneIpv6NetworkShareOneFaceCount();
   await aSuccessDoesNotForgiveTheGuessesBeforeIt();
   await aLockIsAuditedOnlyWhenTheLimitReachingAttemptFails();

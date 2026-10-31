@@ -22,8 +22,7 @@ export const loggableQuery = (query: Record<string, unknown> | undefined) =>
   );
 
 // Callers write these headers, so what is logged is shortened and cannot contain a line break.
-// Seeing them next to the address Express chose is how the proxy count (TRUST_PROXY_HOPS) is
-// checked against the real chain.
+// Used by the temporary forwarding diagnostic (see forwardingDiagnostic.ts).
 export const forwardingHeaderForLog = (raw: string | string[] | undefined): string | undefined => {
   if (raw === undefined) return undefined;
   const text = Array.isArray(raw) ? raw.join(', ') : raw;
@@ -56,8 +55,6 @@ export const loggingMiddleware = (req: Request, res: Response, next: NextFunctio
       method: requestLog.method,
       url: requestLog.url,
       ip: requestLog.ip,
-      forwardedFor: forwardingHeaderForLog(req.headers['x-forwarded-for']),
-      cfConnectingIp: forwardingHeaderForLog(req.headers['cf-connecting-ip']),
     });
   }
 

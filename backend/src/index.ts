@@ -38,6 +38,8 @@ import {
 } from './middleware/logging';
 import { initAIOrchestrator, shutdownAIOrchestrator } from './bootstrap/aiOrchestrator';
 import { parseTrustProxyHops } from './config/trustProxy';
+import { addressFromRequest } from './auth/clientAddress';
+import { createForwardingDiagnostic } from './middleware/forwardingDiagnostic';
 
 // Init complete - server start phase begins
 
@@ -59,6 +61,7 @@ const startServer = async (): Promise<any> => {
     const app: Application = express();
     // Must run before any middleware that reads req.ip (rate limiters, logging, audit).
     app.set('trust proxy', parseTrustProxyHops(process.env.TRUST_PROXY_HOPS));
+    app.use(createForwardingDiagnostic(process.env.FORWARDING_DIAGNOSTIC));
     const isDev = process.env.NODE_ENV !== 'production';
 
     // 1. DYNAMIC CORS CONFIGURATION
@@ -260,7 +263,10 @@ const corsOptions: cors.CorsOptions = {
       {
         schema,
         context: async (ctx) => {
-          const context = await createContext({ connection: ctx });
+          const context = await createContext({
+            connection: ctx,
+            resolveAddress: (request: any) => addressFromRequest(app, request),
+          });
           // Remember the socket so a password change can end this subscription (see socketRegistry).
           if (context.user) trackUserSocket(context.user.userId, ctx.extra.socket);
           return context;

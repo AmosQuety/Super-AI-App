@@ -94,11 +94,15 @@ const lookupStoredAccount = accountLookupFor(prisma);
 
 // A WebSocket operation has no Express request, but the limits and the audit trail need to know
 // who is calling. The socket's address is the same address an HTTP request would report when no
-// proxy is trusted. Behind a trusted proxy this would need the forwarded address instead.
-function clientInfoFromConnection(connection: any): any {
+// proxy is trusted. With a trusted proxy the caller passes `resolveAddress`, so the address is
+// worked out by the same rule as for HTTP.
+function clientInfoFromConnection(
+  connection: any,
+  resolveAddress?: (request: any) => string | undefined,
+): any {
   const request = connection?.extra?.request;
   return {
-    ip: request?.socket?.remoteAddress,
+    ip: resolveAddress ? resolveAddress(request) : request?.socket?.remoteAddress,
     headers: request?.headers ?? {},
   };
 }
@@ -106,6 +110,7 @@ function clientInfoFromConnection(connection: any): any {
 export async function createContext({
   req,
   connection,
+  resolveAddress,
   lookupAccount = lookupStoredAccount,
 }: any): Promise<AppContext> {
   let token: string | undefined;
@@ -131,7 +136,7 @@ export async function createContext({
   return {
     prisma,
     user,
-    req: req ?? clientInfoFromConnection(connection),
+    req: req ?? clientInfoFromConnection(connection, resolveAddress),
     res: req?.res,
     ...singletonServices,
     ...requestServices,

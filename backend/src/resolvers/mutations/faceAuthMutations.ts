@@ -162,9 +162,23 @@ export const faceAuthMutations = {
       return { success: false, message: "Service offline. Use password." };
     }
 
+    // An engine that is up but cannot answer (cold, timed out, failing) is not a guess at anyone's
+    // face, so the attempt is handed back and the user is not told their face was wrong.
+    const unavailable = () => {
+      releaseFaceLogin(address);
+      countSecurityEvent("auth.face_login.unavailable", {});
+      return {
+        success: false,
+        token: null,
+        user: null,
+        message: "Face sign-in is temporarily unavailable. Please try again, or use your password.",
+      };
+    };
+
     try {
       // Always verify against "global" for login
       const verification = await faceService.verifyFace("global", "global", image);
+      if ("unavailable" in verification && verification.unavailable) return unavailable();
 
       if (verification.success && verification.matchedUser) {
         const foundUser = await context.prisma.user.findUnique({
@@ -193,7 +207,7 @@ export const faceAuthMutations = {
 
     } catch (error: any) {
       logger.error("Login Error:", error.message);
-      return failed("error", "Login failed.");
+      return unavailable();
     }
   },
 

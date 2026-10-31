@@ -21,6 +21,16 @@ async function aWebSocketCallerIsIdentifiedByItsSocketAddress() {
   assert.equal(context.req.headers["user-agent"], "mobile-app/1.0");
 }
 
+async function aSuppliedResolverDecidesTheAddress() {
+  const request = { socket: { remoteAddress: "10.0.0.7" }, headers: { "x-forwarded-for": "203.0.113.9" } };
+  const context = await createContext({
+    connection: { connectionParams: {}, extra: { request } },
+    resolveAddress: (seen: unknown) => (seen === request ? "203.0.113.9" : "wrong"),
+    lookupAccount: noAccount,
+  });
+  assert.equal(context.req.ip, "203.0.113.9");
+}
+
 async function aConnectionWithoutARequestStillHasAnEmptyClientInfo() {
   const context = await createContext({
     connection: { connectionParams: {} },
@@ -38,6 +48,7 @@ async function anHttpRequestIsLeftAsItIs() {
 
 async function main() {
   await aWebSocketCallerIsIdentifiedByItsSocketAddress();
+  await aSuppliedResolverDecidesTheAddress();
   await aConnectionWithoutARequestStillHasAnEmptyClientInfo();
   await anHttpRequestIsLeftAsItIs();
   console.log("connectionContext tests passed");

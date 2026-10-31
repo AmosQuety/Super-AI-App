@@ -10,8 +10,9 @@ export function parseTrustProxyHops(raw: string | undefined): number | false {
   const text = (raw ?? "").trim();
   if (text === "" || text === "0") return false;
 
+  // No leading zeros or signs: only the plain digits 1 to 5.
   const hops = Number(text);
-  if (!/^\d+$/.test(text) || hops > MAX_TRUST_PROXY_HOPS) {
+  if (!/^[1-9]\d*$/.test(text) || hops > MAX_TRUST_PROXY_HOPS) {
     throw new Error(
       `TRUST_PROXY_HOPS must be a whole number from 0 to ${MAX_TRUST_PROXY_HOPS} (the number of reverse proxies in front of this server), got "${text}"`,
     );
